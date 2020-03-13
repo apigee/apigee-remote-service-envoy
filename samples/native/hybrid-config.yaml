@@ -1,0 +1,9 @@
+# Example hybrid configuration
+# Must be used in the hybrid cluster and apigee namespace
+tenant:
+  customer_base: https://RUNTIME-ROOT/istio-auth
+  hybrid_config: /opt/apigee/customer/default.properties
+  org_name: ORG
+  env_name: ENV
+  key: KEY
+  secret: SECRET

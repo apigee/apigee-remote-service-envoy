@@ -1,0 +1,46 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: httpbin-apigee
+  namespace: default
+spec:
+  workloadSelector:
+    labels:
+      app: httpbin
+  configPatches:
+
+  - applyTo: HTTP_FILTER # apigee authentication call
+    match:
+      context: SIDECAR_INBOUND
+      listener:
+        portNumber: 8080
+        filterChain:
+          filter:
+            name: "envoy.http_connection_manager"
+            subFilter:
+              name: "envoy.router"
+    patch:
+      operation: INSERT_BEFORE
+      value: # filter specification
+        name: envoy.ext_authz
+        config:
+          grpc_service:
+            envoy_grpc:
+              cluster_name: apigee-proxy-envoy.apigee
+            timeout: 0.5s
+
+  # - applyTo: CLUSTER # apigee-proxy-envoy service callout
+  #   match:
+  #     context: SIDECAR_OUTBOUND
+  #   patch:
+  #     operation: ADD
+  #     value: # cluster specification
+  #       name: apigee-proxy-envoy
+  #       type: STRICT_DNS
+  #       connect_timeout: 0.5s
+  #       lb_policy: ROUND_ROBIN
+  #       hosts:
+  #       - socket_address:
+  #           protocol: TCP
+  #           address: "apigee-proxy-envoy.apigee"
+  #           port_value: 5000

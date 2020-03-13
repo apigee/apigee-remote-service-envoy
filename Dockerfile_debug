@@ -1,0 +1,26 @@
+# Keep in sync with Dockerfile!
+
+# Build binary in golang container #
+
+FROM golang:1.14 as builder
+
+RUN mkdir /app
+ADD . /app/
+WORKDIR /app
+
+RUN CGO_ENABLED=0 go build -a -o apigee-proxy-envoy .
+
+# Build runtime container #
+
+FROM ubuntu:xenial
+
+# Add certs
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+
+# Add service
+COPY --from=builder /app/apigee-proxy-envoy .
+
+# Run
+ENTRYPOINT ["/apigee-proxy-envoy"]
+EXPOSE 50051
+CMD ["--address=:50051", "--log_level=info"]
