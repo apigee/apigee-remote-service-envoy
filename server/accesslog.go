@@ -17,8 +17,8 @@ package server
 import (
 	"strings"
 
-	"github.com/apigee/apigee-proxy-go/analytics"
-	"github.com/apigee/apigee-proxy-go/log"
+	"github.com/apigee/apigee-remote-service-golib/analytics"
+	"github.com/apigee/apigee-remote-service-golib/log"
 	als "github.com/envoyproxy/go-control-plane/envoy/service/accesslog/v2"
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/duration"

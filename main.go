@@ -20,11 +20,12 @@ import (
 	"os"
 
 	"github.com/apigee/apigee-proxy-envoy/server"
-	"github.com/apigee/apigee-proxy-go/log"
+	"github.com/apigee/apigee-remote-service-golib/log"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
 	hproto "google.golang.org/grpc/health/grpc_health_v1"
+	"google.golang.org/grpc/keepalive"
 )
 
 var address string
@@ -44,8 +45,6 @@ func main() {
 				panic(err)
 			}
 
-			s := grpc.NewServer()
-
 			config := server.DefaultConfig()
 			if err = config.Load(configFile); err != nil {
 				log.Errorf("Load config: %v", err)
@@ -53,6 +52,10 @@ func main() {
 			}
 
 			log.Debugf("Config: %#v", config)
+
+			s := grpc.NewServer(grpc.KeepaliveParams(keepalive.ServerParameters{
+				MaxConnectionAge: config.Global.KeepAliveMaxConnectionAge,
+			}))
 
 			handler, err := server.NewHandler(config)
 			if err != nil {

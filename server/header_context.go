@@ -18,8 +18,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 
-	"github.com/apigee/apigee-proxy-go/auth"
-	"github.com/apigee/apigee-proxy-go/log"
+	"github.com/apigee/apigee-remote-service-golib/auth"
+	"github.com/apigee/apigee-remote-service-golib/log"
 )
 
 const headerContextKey = "x-apigee-hc"

@@ -20,9 +20,9 @@ import (
 	"net/url"
 	"strings"
 
-	aauth "github.com/apigee/apigee-proxy-go/auth"
-	"github.com/apigee/apigee-proxy-go/log"
-	"github.com/apigee/apigee-proxy-go/product"
+	aauth "github.com/apigee/apigee-remote-service-golib/auth"
+	"github.com/apigee/apigee-remote-service-golib/log"
+	"github.com/apigee/apigee-remote-service-golib/product"
 	core "github.com/envoyproxy/go-control-plane/envoy/api/v2/core"
 	auth "github.com/envoyproxy/go-control-plane/envoy/service/auth/v2"
 	envoy_type "github.com/envoyproxy/go-control-plane/envoy/type"

@@ -2,14 +2,14 @@ module github.com/apigee/apigee-proxy-envoy
 
 go 1.13
 
-replace github.com/apigee/apigee-proxy-go => github.com/theganyo/apigee-proxy-go v0.0.0-20200310211753-749ef7c33c7c
+replace github.com/apigee/apigee-remote-service-golib => github.com/theganyo/apigee-remote-service-golib v0.0.0-20200317205714-bc036d661c4a
 
-// replace github.com/apigee/apigee-proxy-go => ../apigee-proxy-go
+// replace github.com/apigee/apigee-remote-service-golib => ../apigee-remote-service-golib
 
 replace github.com/apigee/apigee-proxy-envoy => ./
 
 require (
-	github.com/apigee/apigee-proxy-go v0.0.0-00010101000000-000000000000
+	github.com/apigee/apigee-remote-service-golib v0.0.0-00010101000000-000000000000
 	github.com/envoyproxy/go-control-plane v0.9.4
 	github.com/gogo/googleapis v1.3.2
 	github.com/golang/protobuf v1.3.3

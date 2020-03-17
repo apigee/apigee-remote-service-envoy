@@ -21,10 +21,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/apigee/apigee-proxy-go/analytics"
-	"github.com/apigee/apigee-proxy-go/auth"
-	"github.com/apigee/apigee-proxy-go/product"
-	"github.com/apigee/apigee-proxy-go/quota"
+	"github.com/apigee/apigee-remote-service-golib/analytics"
+	"github.com/apigee/apigee-remote-service-golib/auth"
+	"github.com/apigee/apigee-remote-service-golib/product"
+	"github.com/apigee/apigee-remote-service-golib/quota"
 )
 
 type handler struct {
@@ -117,7 +117,7 @@ func NewHandler(config *Config) (*handler, error) {
 	}
 
 	tempDirMode := os.FileMode(0700)
-	tempDir := "/tmp/apigee-proxy"
+	tempDir := config.Global.TempDir
 	analyticsDir := filepath.Join(tempDir, "analytics")
 	if err := os.MkdirAll(analyticsDir, tempDirMode); err != nil {
 		return nil, err

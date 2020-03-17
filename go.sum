@@ -123,10 +123,12 @@ github.com/stretchr/objx v0.1.1/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+
 github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
 github.com/stretchr/testify v1.4.0 h1:2E4SXV/wtOkTonXsotYi4li6zVWxYlZuYNCXe9XRJyk=
 github.com/stretchr/testify v1.4.0/go.mod h1:j7eGeouHqKxXV5pUuKE4zz7dFj8WfuZ+81PSLYec5m4=
-github.com/theganyo/apigee-proxy-go v0.0.0-20200310210304-e2b072c2f37d h1:0UpyRbzYvW41m2xJBC/1rFUT/ePFQCL0EAl5wdowCjo=
-github.com/theganyo/apigee-proxy-go v0.0.0-20200310210304-e2b072c2f37d/go.mod h1:Ac+bmJkVCa4ycU6qE1c0FSv+hgGd4oiL2KXlezKQdus=
-github.com/theganyo/apigee-proxy-go v0.0.0-20200310211753-749ef7c33c7c h1:H8Rb7RjrgyF5rby1PnvZGleWKz27vCOaTl74sLdaJk0=
-github.com/theganyo/apigee-proxy-go v0.0.0-20200310211753-749ef7c33c7c/go.mod h1:Ac+bmJkVCa4ycU6qE1c0FSv+hgGd4oiL2KXlezKQdus=
+github.com/theganyo/apigee-remote-service-golib v0.0.0-20200310210304-e2b072c2f37d h1:0UpyRbzYvW41m2xJBC/1rFUT/ePFQCL0EAl5wdowCjo=
+github.com/theganyo/apigee-remote-service-golib v0.0.0-20200310210304-e2b072c2f37d/go.mod h1:Ac+bmJkVCa4ycU6qE1c0FSv+hgGd4oiL2KXlezKQdus=
+github.com/theganyo/apigee-remote-service-golib v0.0.0-20200310211753-749ef7c33c7c h1:H8Rb7RjrgyF5rby1PnvZGleWKz27vCOaTl74sLdaJk0=
+github.com/theganyo/apigee-remote-service-golib v0.0.0-20200310211753-749ef7c33c7c/go.mod h1:Ac+bmJkVCa4ycU6qE1c0FSv+hgGd4oiL2KXlezKQdus=
+github.com/theganyo/apigee-remote-service-golib v0.0.0-20200317205714-bc036d661c4a h1:jWGwMMajjbC9x0aoRGRVI5kdsoBw7ftRavZgTnpCzCE=
+github.com/theganyo/apigee-remote-service-golib v0.0.0-20200317205714-bc036d661c4a/go.mod h1:GMHr4zczdM/ZQAjtcFu70pnwF2xIsQ+4K2TNqjhJAlc=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5/go.mod h1:ncp9v5uamzpCO7NfCPTXjqaC+bZgJeR0sMTm6dMHP7U=
 github.com/ugorji/go v1.1.4/go.mod h1:uQMGLiO92mf5W77hV/PUCpI3pbzQx3CRekS0kk+RGrc=
 github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=
