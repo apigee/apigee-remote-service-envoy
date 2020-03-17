@@ -24,7 +24,10 @@ import (
 // DefaultConfig returns a config with defaults set
 func DefaultConfig() *Config {
 	return &Config{
-		TempDir: "/tmp/apigee-istio",
+		Global: GlobalConfig{
+			TempDir:                   "/tmp/apigee-istio",
+			KeepAliveMaxConnectionAge: 10 * time.Minute,
+		},
 		Tenant: TenantConfig{
 			ClientTimeout: 30 * time.Second,
 		},
@@ -44,11 +47,17 @@ func DefaultConfig() *Config {
 
 // Config is all config
 type Config struct {
-	TempDir   string          `yaml:"temp_dir"`
+	Global    GlobalConfig    `yaml:"global"`
 	Tenant    TenantConfig    `yaml:"tenant"`
 	Products  ProductsConfig  `yaml:"products"`
 	Analytics AnalyticsConfig `yaml:"analytics"`
 	Auth      AuthConfig      `yaml:"auth"`
+}
+
+// GlobalConfig is global configuration for the server
+type GlobalConfig struct {
+	TempDir                   string        `yaml:"temp_dir"`
+	KeepAliveMaxConnectionAge time.Duration `yaml:"keep_alive_max_connection_age"`
 }
 
 // TenantConfig is config relating to an Apigee tentant
@@ -94,7 +103,9 @@ func (c *Config) Load(file string) error {
 }
 
 // # Example Config file
-// temp_dir: /tmp/apigee-istio
+// global:
+// 	 temp_dir: /tmp/apigee-istio
+//   keep_alive_max_connection_age: 10m
 // tenant:
 //   apigee_base: https://istioservices.apigee.net/edgemicro
 //   customer_base: https://myorg-test.apigee.net/istio-auth
@@ -104,7 +115,7 @@ func (c *Config) Load(file string) error {
 //   key: mykey
 //   secret: mysecret
 //   client_timeout: 30s
-//   allowUnverifiedSSLCert: false
+//   allow_Unverified_ssl_cert: false
 // products:
 //   refresh_rate: 2m
 // analytics:
