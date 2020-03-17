@@ -9,7 +9,7 @@ ADD . /app/
 WORKDIR /app
 
 # note: -ldflags '-s -w' strips debugger info
-RUN CGO_ENABLED=0 go build -a -ldflags '-s -w' -o apigee-proxy-envoy .
+RUN CGO_ENABLED=0 go build -a -ldflags '-s -w' -o apigee-remote-service-envoy .
 
 # Build runtime container #
 
@@ -19,9 +19,9 @@ FROM scratch
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 
 # Add service
-COPY --from=builder /app/apigee-proxy-envoy .
+COPY --from=builder /app/apigee-remote-service-envoy .
 
 # Run
-ENTRYPOINT ["/apigee-proxy-envoy"]
+ENTRYPOINT ["/apigee-remote-service-envoy"]
 EXPOSE 50051
 CMD ["--address=:50051", "--log_level=info"]

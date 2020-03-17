@@ -1,4 +1,4 @@
-module github.com/apigee/apigee-proxy-envoy
+module github.com/apigee/apigee-remote-service-envoy
 
 go 1.13
 
@@ -6,7 +6,7 @@ replace github.com/apigee/apigee-remote-service-golib => github.com/theganyo/api
 
 // replace github.com/apigee/apigee-remote-service-golib => ../apigee-remote-service-golib
 
-replace github.com/apigee/apigee-proxy-envoy => ./
+replace github.com/apigee/apigee-remote-service-envoy => ./
 
 require (
 	github.com/apigee/apigee-remote-service-golib v0.0.0-00010101000000-000000000000

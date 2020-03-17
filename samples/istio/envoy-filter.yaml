@@ -26,21 +26,21 @@ spec:
         config:
           grpc_service:
             envoy_grpc:
-              cluster_name: apigee-proxy-envoy.apigee
+              cluster_name: apigee-remote-service-envoy.apigee
             timeout: 0.5s
 
-  # - applyTo: CLUSTER # apigee-proxy-envoy service callout
+  # - applyTo: CLUSTER # apigee-remote-service-envoy service callout
   #   match:
   #     context: SIDECAR_OUTBOUND
   #   patch:
   #     operation: ADD
   #     value: # cluster specification
-  #       name: apigee-proxy-envoy
+  #       name: apigee-remote-service-envoy
   #       type: STRICT_DNS
   #       connect_timeout: 0.5s
   #       lb_policy: ROUND_ROBIN
   #       hosts:
   #       - socket_address:
   #           protocol: TCP
-  #           address: "apigee-proxy-envoy.apigee"
+  #           address: "apigee-remote-service-envoy.apigee"
   #           port_value: 5000

@@ -28,12 +28,12 @@ if [[ $GCP_PROJECT == "" ]]; then
 fi
 
 if [[ "${TARGET_DOCKER_IMAGE}" == "" ]]; then
-  TARGET_DOCKER_IMAGE="gcr.io/${GCP_PROJECT}/apigee-proxy-envoy"
+  TARGET_DOCKER_IMAGE="gcr.io/${GCP_PROJECT}/apigee-remote-service-envoy"
   echo "TARGET_DOCKER_IMAGE not set, defaulting to ${TARGET_DOCKER_IMAGE}."
 fi
 
 if [[ "${DEBUG}" == "1" && "${TARGET_DOCKER_DEBUG_IMAGE}" == "" ]]; then
-  TARGET_DOCKER_DEBUG_IMAGE="gcr.io/${GCP_PROJECT}/apigee-proxy-envoy-debug"
+  TARGET_DOCKER_DEBUG_IMAGE="gcr.io/${GCP_PROJECT}/apigee-remote-service-envoy-debug"
   echo "TARGET_DOCKER_DEBUG_IMAGE not set, defaulting to ${TARGET_DOCKER_DEBUG_IMAGE}."
 fi
 
@@ -78,12 +78,12 @@ fi
 echo "Building docker image..."
 
 cd "${ROOTDIR}"
-docker build -t apigee-proxy-envoy -f Dockerfile .
+docker build -t apigee-remote-service-envoy -f Dockerfile .
 
-IMAGE_ID=$(docker images apigee-proxy-envoy --format "{{.ID}}" | head -n1)
+IMAGE_ID=$(docker images apigee-remote-service-envoy --format "{{.ID}}" | head -n1)
 
 if [[ "${IMAGE_ID}" == "" ]]; then
-  echo "No image found for apigee-proxy-envoy. Does it exist?"
+  echo "No image found for apigee-remote-service-envoy. Does it exist?"
   exit 1
 fi
 
@@ -93,12 +93,12 @@ gcloud auth configure-docker --quiet
 docker push "${TARGET_DOCKER_IMAGE}" || exit 1
 
 if [[ "${DEBUG}" == "1" ]]; then
-  docker build -t apigee-proxy-envoy-debug -f Dockerfile_debug .
+  docker build -t apigee-remote-service-envoy-debug -f Dockerfile_debug .
 
-  IMAGE_ID=$(docker images apigee-proxy-envoy-debug --format "{{.ID}}" | head -n1)
+  IMAGE_ID=$(docker images apigee-remote-service-envoy-debug --format "{{.ID}}" | head -n1)
 
   if [[ "${IMAGE_ID}" == "" ]]; then
-    echo "No image found for apigee-proxy-envoy-debug. Does it exist?"
+    echo "No image found for apigee-remote-service-envoy-debug. Does it exist?"
     exit 1
   fi
 

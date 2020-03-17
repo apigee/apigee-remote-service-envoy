@@ -40,7 +40,7 @@ static_resources:
             config:
               grpc_service:
                 envoy_grpc:
-                  cluster_name: apigee-proxy-envoy
+                  cluster_name: apigee-remote-service-envoy
                 timeout: 0.5s
                 
           - name: envoy.router
@@ -68,11 +68,11 @@ static_resources:
         address: 127.0.0.1
         port_value: 11000
 
-  - name: apigee-proxy-envoy
+  - name: apigee-remote-service-envoy
     type: static
     http2_protocol_options: {}
     load_assignment:
-      cluster_name: apigee-proxy-envoy
+      cluster_name: apigee-remote-service-envoy
       endpoints:
       - lb_endpoints:
         - endpoint:
@@ -99,7 +99,7 @@ static_resources:
     type: static
     http2_protocol_options: {}
     load_assignment:
-      cluster_name: apigee-proxy-envoy
+      cluster_name: apigee-remote-service-envoy
       endpoints:
       - lb_endpoints:
         - endpoint:

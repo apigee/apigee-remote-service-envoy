@@ -8,7 +8,7 @@ RUN mkdir /app
 ADD . /app/
 WORKDIR /app
 
-RUN CGO_ENABLED=0 go build -a -o apigee-proxy-envoy .
+RUN CGO_ENABLED=0 go build -a -o apigee-remote-service-envoy .
 
 # Build runtime container #
 
@@ -18,9 +18,9 @@ FROM ubuntu:xenial
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 
 # Add service
-COPY --from=builder /app/apigee-proxy-envoy .
+COPY --from=builder /app/apigee-remote-service-envoy .
 
 # Run
-ENTRYPOINT ["/apigee-proxy-envoy"]
+ENTRYPOINT ["/apigee-remote-service-envoy"]
 EXPOSE 50051
 CMD ["--address=:50051", "--log_level=info"]

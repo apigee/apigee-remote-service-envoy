@@ -19,7 +19,7 @@ import (
 	"net"
 	"os"
 
-	"github.com/apigee/apigee-proxy-envoy/server"
+	"github.com/apigee/apigee-remote-service-envoy/server"
 	"github.com/apigee/apigee-remote-service-golib/log"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
