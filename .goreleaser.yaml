@@ -1,0 +1,24 @@
+# .goreleaser.yml
+# Build customization
+builds:
+  - main: main.go
+    binary: apigee-remote-service-envoy
+    goos:
+      - windows
+      - darwin
+      - linux
+    goarch:
+      - amd64
+# Archive customization
+archives:
+  - format: tar.gz
+    replacements:
+      darwin: macOS
+      amd64: 64-bit
+    files:
+      - LICENSE
+      - README.md
+      - samples/**/*
+release:
+  draft: true
+  prerelease: true
