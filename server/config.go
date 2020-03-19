@@ -64,7 +64,7 @@ type GlobalConfig struct {
 type TenantConfig struct {
 	ApigeeBase             string        `yaml:"apigee_base"`
 	CustomerBase           string        `yaml:"customer_base"`
-	HybridConfigFile       string        `yaml:"hybrid_config"`
+	FluentdConfigFile      string        `yaml:"fluentd_config_file"`
 	OrgName                string        `yaml:"org_name"`
 	EnvName                string        `yaml:"env_name"`
 	Key                    string        `yaml:"key"`
@@ -109,7 +109,7 @@ func (c *Config) Load(file string) error {
 // tenant:
 //   apigee_base: https://istioservices.apigee.net/edgemicro
 //   customer_base: https://myorg-test.apigee.net/istio-auth
-//   hybrid_config: /opt/apigee/customer/default.properties
+//   fluentd_config_file: /opt/apigee/customer/default.properties
 //   org_name: myorg
 //   env_name: test
 //   key: mykey

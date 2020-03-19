@@ -28,14 +28,14 @@ import (
 )
 
 type handler struct {
-	apigeeBase     *url.URL
-	customerBase   *url.URL
-	hybridConfig   string
-	orgName        string
-	envName        string
-	key            string
-	secret         string
-	apiKeyClaimKey string
+	apigeeBase        *url.URL
+	customerBase      *url.URL
+	fluentdConfigFile string
+	orgName           string
+	envName           string
+	key               string
+	secret            string
+	apiKeyClaimKey    string
 
 	productMan   *product.Manager
 	authMan      *auth.Manager
@@ -132,23 +132,23 @@ func NewHandler(config *Config) (*handler, error) {
 		Secret:             config.Tenant.Secret,
 		Client:             httpClient,
 		SendChannelSize:    10,
-		HybridConfigFile:   config.Tenant.HybridConfigFile,
+		FluentdConfigFile:  config.Tenant.FluentdConfigFile,
 		CollectionInterval: time.Minute,
 	})
 
 	h := &handler{
-		customerBase:   customerBase,
-		apigeeBase:     apigeeBase,
-		hybridConfig:   config.Tenant.HybridConfigFile,
-		orgName:        config.Tenant.OrgName,
-		envName:        config.Tenant.EnvName,
-		key:            config.Tenant.Key,
-		secret:         config.Tenant.Secret,
-		productMan:     productMan,
-		authMan:        authMan,
-		analyticsMan:   analyticsMan,
-		quotaMan:       quotaMan,
-		apiKeyClaimKey: config.Auth.APIKeyClaim,
+		customerBase:      customerBase,
+		apigeeBase:        apigeeBase,
+		fluentdConfigFile: config.Tenant.FluentdConfigFile,
+		orgName:           config.Tenant.OrgName,
+		envName:           config.Tenant.EnvName,
+		key:               config.Tenant.Key,
+		secret:            config.Tenant.Secret,
+		productMan:        productMan,
+		authMan:           authMan,
+		analyticsMan:      analyticsMan,
+		quotaMan:          quotaMan,
+		apiKeyClaimKey:    config.Auth.APIKeyClaim,
 	}
 
 	return h, nil
