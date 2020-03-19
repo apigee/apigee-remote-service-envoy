@@ -62,8 +62,8 @@ type GlobalConfig struct {
 
 // TenantConfig is config relating to an Apigee tentant
 type TenantConfig struct {
-	ApigeeBase             string        `yaml:"apigee_base"`
-	CustomerBase           string        `yaml:"customer_base"`
+	ManagementAPI          string        `yaml:"management_api"`
+	RemoteServiceAPI       string        `yaml:"remote_service_api"`
 	FluentdConfigFile      string        `yaml:"fluentd_config_file"`
 	OrgName                string        `yaml:"org_name"`
 	EnvName                string        `yaml:"env_name"`
@@ -107,8 +107,8 @@ func (c *Config) Load(file string) error {
 // 	 temp_dir: /tmp/apigee-istio
 //   keep_alive_max_connection_age: 10m
 // tenant:
-//   apigee_base: https://istioservices.apigee.net/edgemicro
-//   customer_base: https://myorg-test.apigee.net/istio-auth
+//   management_api: https://istioservices.apigee.net/edgemicro
+//   remote_service_api: https://myorg-test.apigee.net/istio-auth
 //   fluentd_config_file: /opt/apigee/customer/default.properties
 //   org_name: myorg
 //   env_name: test

@@ -1,7 +1,7 @@
 # Example SaaS Config
 tenant:
-  apigee_base: https://ORG-ENV.apigee.net/istio-auth
-  customer_base: https://ORG-ENV.apigee.net/istio-auth
+  management_api: https://ORG-ENV.apigee.net/istio-auth
+  remote_service_api: https://ORG-ENV.apigee.net/istio-auth
   org_name: ORG
   env_name: ENV
   key: KEY

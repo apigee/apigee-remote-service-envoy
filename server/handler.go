@@ -28,8 +28,8 @@ import (
 )
 
 type handler struct {
-	apigeeBase        *url.URL
-	customerBase      *url.URL
+	managementAPI     *url.URL
+	remoteServiceAPI  *url.URL
 	fluentdConfigFile string
 	orgName           string
 	envName           string
@@ -43,11 +43,11 @@ type handler struct {
 	quotaMan     *quota.Manager
 }
 
-func (h *handler) ApigeeBase() *url.URL {
-	return h.apigeeBase
+func (h *handler) ManagementAPI() *url.URL {
+	return h.managementAPI
 }
-func (h *handler) CustomerBase() *url.URL {
-	return h.customerBase
+func (h *handler) RemoteServiceAPI() *url.URL {
+	return h.remoteServiceAPI
 }
 func (h *handler) Organization() string {
 	return h.orgName
@@ -65,16 +65,16 @@ func (h *handler) Secret() string {
 // NewHandler creates a handler
 func NewHandler(config *Config) (*handler, error) {
 
-	var apigeeBase, customerBase *url.URL
+	var managementAPI, remoteServiceAPI *url.URL
 	var err error
-	if config.Tenant.ApigeeBase != "" {
-		apigeeBase, err = url.Parse(config.Tenant.ApigeeBase)
+	if config.Tenant.ManagementAPI != "" {
+		managementAPI, err = url.Parse(config.Tenant.ManagementAPI)
 		if err != nil {
 			return nil, err
 		}
 	}
-	if config.Tenant.CustomerBase != "" {
-		customerBase, err = url.Parse(config.Tenant.CustomerBase)
+	if config.Tenant.RemoteServiceAPI != "" {
+		remoteServiceAPI, err = url.Parse(config.Tenant.RemoteServiceAPI)
 		if err != nil {
 			return nil, err
 		}
@@ -88,7 +88,7 @@ func NewHandler(config *Config) (*handler, error) {
 
 	productMan, err := product.NewManager(product.Options{
 		Client:      httpClient,
-		BaseURL:     customerBase,
+		BaseURL:     remoteServiceAPI,
 		RefreshRate: config.Products.RefreshRate,
 		Key:         config.Tenant.Key,
 		Secret:      config.Tenant.Secret,
@@ -107,7 +107,7 @@ func NewHandler(config *Config) (*handler, error) {
 	}
 
 	quotaMan, err := quota.NewManager(quota.Options{
-		BaseURL: customerBase,
+		BaseURL: remoteServiceAPI,
 		Client:  httpClient,
 		Key:     config.Tenant.Key,
 		Secret:  config.Tenant.Secret,
@@ -127,7 +127,7 @@ func NewHandler(config *Config) (*handler, error) {
 		LegacyEndpoint:     false,
 		BufferPath:         analyticsDir,
 		StagingFileLimit:   2024,
-		BaseURL:            apigeeBase,
+		BaseURL:            managementAPI,
 		Key:                config.Tenant.Key,
 		Secret:             config.Tenant.Secret,
 		Client:             httpClient,
@@ -137,8 +137,8 @@ func NewHandler(config *Config) (*handler, error) {
 	})
 
 	h := &handler{
-		customerBase:      customerBase,
-		apigeeBase:        apigeeBase,
+		remoteServiceAPI:  remoteServiceAPI,
+		managementAPI:     managementAPI,
 		fluentdConfigFile: config.Tenant.FluentdConfigFile,
 		orgName:           config.Tenant.OrgName,
 		envName:           config.Tenant.EnvName,
