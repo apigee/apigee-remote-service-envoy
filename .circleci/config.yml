@@ -56,6 +56,26 @@ jobs:
 
       - run: 
           name: "Run GoReleaser"
+          command: curl -sL https://git.io/goreleaser | bash
+
+  build-dist:
+
+    docker:
+      - image: circleci/golang:1.14
+
+    steps:
+      - checkout
+      - restore_cache: # restores saved cache if no changes are detected since last run
+          keys:
+            - go-mod-v4-{{ checksum "go.sum" }}
+      
+      - run:
+          name: Set GoReleaser Version
+          command: |
+            echo "export VERSION=v0.128.0" >> $BASH_ENV
+
+      - run: 
+          name: "Run GoReleaser"
           command: curl -sL https://git.io/goreleaser | bash -s -- --snapshot --skip-publish --rm-dist
 
 workflows:
