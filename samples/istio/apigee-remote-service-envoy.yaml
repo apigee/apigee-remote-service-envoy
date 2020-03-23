@@ -24,14 +24,14 @@ spec:
           value: http2client=0
         ports:
         - containerPort: 5000
-        # readinessProbe:
-        #   exec:
-        #     command: ["/grpc_health_probe", "-addr=:5000"]
-        #   initialDelaySeconds: 5
-        # livenessProbe:
-        #   exec:
-        #     command: ["/grpc_health_probe", "-addr=:5000"]
-        #   initialDelaySeconds: 10
+        readinessProbe:
+          exec:
+            command: ["/grpc_health_probe", "-addr=:5000"]
+          initialDelaySeconds: 5
+        livenessProbe:
+          exec:
+            command: ["/grpc_health_probe", "-addr=:5000"]
+          initialDelaySeconds: 10
         args:
           - --address=:5000
           - --log_level=debug
