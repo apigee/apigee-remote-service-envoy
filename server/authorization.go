@@ -22,7 +22,6 @@ import (
 
 	aauth "github.com/apigee/apigee-remote-service-golib/auth"
 	"github.com/apigee/apigee-remote-service-golib/log"
-	"github.com/apigee/apigee-remote-service-golib/product"
 	core "github.com/envoyproxy/go-control-plane/envoy/api/v2/core"
 	auth "github.com/envoyproxy/go-control-plane/envoy/service/auth/v2"
 	envoy_type "github.com/envoyproxy/go-control-plane/envoy/type"
@@ -43,22 +42,32 @@ func (a *AuthorizationServer) Register(s *grpc.Server, handler *handler) {
 	a.handler = handler
 }
 
-const apiKeyKey = "x-api-key"
+const (
+	apiKeyKey            = "x-api-key"
+	jwtFilterMetadataKey = "envoy.filters.http.jwt_authn"
+)
 
 // Check does check
 func (a *AuthorizationServer) Check(ctx context.Context, req *auth.CheckRequest) (*auth.CheckResponse, error) {
 
-	// TODO: remove logging
-	b, err := json.MarshalIndent(req.Attributes.Request.Http.Headers, "", "  ")
-	if err == nil {
-		log.Debugf("Inbound Headers: ")
-		log.Debugf((string(b)))
+	if log.DebugEnabled() {
+		if b, err := json.MarshalIndent(req.Attributes.Request.Http.Headers, "", "  "); err == nil {
+			log.Debugf("Inbound Headers: %s", string(b))
+		}
+
+		if ct, err := json.MarshalIndent(req.Attributes.ContextExtensions, "", "  "); err == nil {
+			log.Debugf("Context Extensions: %s", string(ct))
+		}
 	}
 
-	ct, err := json.MarshalIndent(req.Attributes.ContextExtensions, "", "  ")
-	if err == nil {
-		log.Debugf("Context Extensions: ")
-		log.Debugf((string(ct)))
+	// check for JWT from Envoy filter
+	protoBufStruct := req.Attributes.GetMetadataContext().GetFilterMetadata()[jwtFilterMetadataKey]
+	fieldsMap := protoBufStruct.GetFields()
+	var claims map[string]interface{}
+	// TODO: just using the first for now, should configure and/or support multiple
+	for k, v := range fieldsMap {
+		log.Debugf("Using JWT at key: %s", k)
+		claims = DecodeToMap(v.GetStructValue())
 	}
 
 	splits := strings.SplitN(req.Attributes.Request.Http.Path, "?", 2)
@@ -74,16 +83,7 @@ func (a *AuthorizationServer) Check(ctx context.Context, req *auth.CheckRequest)
 		}
 	}
 
-	// TODO: JWT processing?
-	// if authHeader, ok := req.Attributes.Request.Http.Headers["authorization"]; ok {
-	// 	if splitToken := strings.SplitN(authHeader, "Bearer ", 2); len(splitToken) == 2 {
-	// 		token = splitToken[1]
-	// 	}
-	// }
-
-	claims := map[string]interface{}{}
-	claimKey := ""
-	authContext, err := a.handler.authMan.Authenticate(a.handler, apiKey, claims, claimKey)
+	authContext, err := a.handler.authMan.Authenticate(a.handler, apiKey, claims, a.handler.apiKeyClaimKey)
 	if err != nil {
 		log.Errorf("authenticating: %v", err)
 		return unauthenticated(), nil
@@ -93,15 +93,13 @@ func (a *AuthorizationServer) Check(ctx context.Context, req *auth.CheckRequest)
 		return unauthorized(), nil
 	}
 
-	// TODO: get real target host name!
-	api := "httpbin.default.svc.cluster.local"
-	products := a.handler.productMan.Resolve(authContext, api, path)
-
-	return authOK(authContext, products), nil
+	api := req.Attributes.Request.Http.GetHost()
+	return authOK(authContext, api, path), nil
 }
 
-func authOK(authContext *aauth.Context, products []*product.APIProduct) *auth.CheckResponse {
-	hc := makeHeaderContext(authContext)
+func authOK(authContext *aauth.Context, api, path string) *auth.CheckResponse {
+
+	hc := makeHeaderContext(api, authContext)
 	data := hc.encode()
 
 	return &auth.CheckResponse{

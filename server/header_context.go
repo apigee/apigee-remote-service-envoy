@@ -26,27 +26,29 @@ const headerContextKey = "x-apigee-hc"
 
 // note: authContext Scopes, Expires, and APIKey are not needed for ax
 type headerContext struct {
-	DeveloperEmail string   `json:"DE"`
-	Application    string   `json:"DA"`
-	AccessToken    string   `json:"AT"`
-	ClientID       string   `json:"CI"`
-	Organization   string   `json:"Or"`
-	Environment    string   `json:"En"`
-	APIProducts    []string `json:"AP"`
+	DeveloperEmail string   `json:"Dev"`
+	Application    string   `json:"App"`
+	AccessToken    string   `json:"Tok"`
+	ClientID       string   `json:"CID"`
+	Organization   string   `json:"Org"`
+	Environment    string   `json:"Env"`
+	API            string   `json:"API"`
+	APIProducts    []string `json:"Pro"`
 }
 
-func makeHeaderContext(ac *auth.Context) *headerContext {
+func makeHeaderContext(api string, ac *auth.Context) *headerContext {
 	if ac == nil {
 		return nil
 	}
 	return &headerContext{
-		DeveloperEmail: ac.DeveloperEmail,
-		Application:    ac.Application,
 		AccessToken:    ac.AccessToken,
-		ClientID:       ac.ClientID,
-		Organization:   ac.Organization(),
-		Environment:    ac.Environment(),
+		Application:    ac.Application,
+		API:            api,
 		APIProducts:    ac.APIProducts,
+		ClientID:       ac.ClientID,
+		DeveloperEmail: ac.DeveloperEmail,
+		Environment:    ac.Environment(),
+		Organization:   ac.Organization(),
 	}
 }
 
@@ -59,7 +61,7 @@ func (hc *headerContext) encode() string {
 	return base64.StdEncoding.EncodeToString([]byte(msg))
 }
 
-func decodeAuthContext(h *handler, data string) *auth.Context {
+func decodeHeaderContext(h *handler, data string) (string, *auth.Context) {
 	hc := &headerContext{}
 	msg, err := base64.StdEncoding.DecodeString(data)
 	if err != nil {
@@ -68,12 +70,12 @@ func decodeAuthContext(h *handler, data string) *auth.Context {
 		json.Unmarshal(msg, hc)
 	}
 
-	return &auth.Context{
+	return hc.API, &auth.Context{
 		Context:        h,
-		ClientID:       hc.ClientID,
 		AccessToken:    hc.AccessToken,
 		Application:    hc.Application,
 		APIProducts:    hc.APIProducts,
+		ClientID:       hc.ClientID,
 		DeveloperEmail: hc.DeveloperEmail,
 	}
 }

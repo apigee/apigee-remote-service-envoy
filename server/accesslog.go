@@ -50,23 +50,20 @@ func (a *AccessLogServer) StreamAccessLogs(srv als.AccessLogService_StreamAccess
 
 	case *als.StreamAccessLogsMessage_HttpLogs:
 
-		// var records = make([]analytics.Record, 0, len(msg.HttpLogs.LogEntry))
-
 		for _, v := range msg.HttpLogs.LogEntry {
-			// log.Infof("HttpLogs: %#v", v)
-			// log.Infof("CommonProperties: %#v", v.CommonProperties)
-			// log.Infof("Request: %#v", v.Request)
-			// log.Infof("Request Headers: %#v", v.Request.RequestHeaders)
-			// log.Infof("Response: %#v", v.Response)
-			log.Infof("DownstreamLocalAddress: %#v", v.CommonProperties.DownstreamLocalAddress)
-			log.Infof("DownstreamRemoteAddress: %#v", v.CommonProperties.DownstreamRemoteAddress.GetAddress())
-			log.Infof("DownstreamDirectRemoteAddress: %#v", v.CommonProperties.DownstreamDirectRemoteAddress.GetAddress())
-			log.Infof("UpstreamLocalAddress: %#v", v.CommonProperties.UpstreamLocalAddress.GetAddress())
-			log.Infof("UpstreamRemoteAddress: %#v", v.CommonProperties.UpstreamRemoteAddress.GetAddress())
-			log.Infof("UpstreamCluster: %#v", v.CommonProperties.UpstreamCluster)
-
-			cp := v.CommonProperties
 			req := v.Request
+			cp := v.CommonProperties
+
+			// if no context header, ignore
+			header, ok := v.Request.RequestHeaders[headerContextKey]
+			if !ok {
+				log.Debugf("no context, skipping: %#v", v.Request)
+				continue
+			}
+
+			api, authContext := decodeHeaderContext(a.handler, header)
+			requestPath := strings.SplitN(req.Path, "?", 2)[0] // Apigee doesn't want query params in requestPath
+
 			record := analytics.Record{
 				ClientReceivedStartTimestamp: timeToUnix(cp.StartTime),
 				ClientReceivedEndTimestamp:   add(cp.StartTime, cp.TimeToLastRxByte),
@@ -76,46 +73,41 @@ func (a *AccessLogServer) StreamAccessLogs(srv als.AccessLogService_StreamAccess
 				TargetReceivedEndTimestamp:   add(cp.StartTime, cp.TimeToLastUpstreamRxByte),
 				TargetSentStartTimestamp:     add(cp.StartTime, cp.TimeToFirstDownstreamTxByte),
 				TargetSentEndTimestamp:       add(cp.StartTime, cp.TimeToLastDownstreamTxByte),
-				APIProxy:                     cp.UpstreamCluster,
+				APIProxy:                     api,
 				RequestURI:                   req.Path,
+				RequestPath:                  requestPath,
 				RequestVerb:                  req.RequestMethod.String(),
 				UserAgent:                    req.UserAgent,
 				ResponseStatusCode:           int(v.Response.ResponseCode.Value),
 				GatewaySource:                gatewaySource,
-				// ClientIP:                     cp.DownstreamRemoteAddress.Address, // TODO
+				ClientIP:                     req.GetForwardedFor(),
 			}
 
-			// Apigee expects RequestURI to include query parameters. Envoy's request.path matches this.
-			// However, Apigee expects RequestPath exclude query parameters. Thus, we need to drop the
-			// query params from request.path for RequestPath.
-			record.RequestPath = strings.SplitN(record.RequestURI, "?", 2)[0]
-
-			if header, ok := v.Request.RequestHeaders[headerContextKey]; ok {
-
-				// TODO: not terribly efficient, but changing requires a rewrite of underlying library
-				// since it assumes the same authContext for all records and we shouldn't here
-				authContext := decodeAuthContext(a.handler, header)
-				records := []analytics.Record{record}
-				a.handler.analyticsMan.SendRecords(authContext, records)
-
-				// // note: the following would replace: record.EnsureFields() when we address the above
-				// record.GatewayFlowID = uuid.New().String()
-				// record.DeveloperEmail = authContext.DeveloperEmail
-				// record.DeveloperApp = authContext.Application
-				// record.AccessToken = authContext.AccessToken
-				// record.ClientID = authContext.ClientID
-				// record.Organization = authContext.Organization
-				// record.Environment = authContext.Environment
-				// if len(authContext.APIProducts) > 0 {
-				// 	record.APIProduct = authContext.APIProducts[0]
-				// }
+			// TODO: not terribly efficient, but changing the impl requires a rewrite as
+			// it assumes the same authContext for all records and we shouldn't
+			records := []analytics.Record{record}
+			err := a.handler.analyticsMan.SendRecords(authContext, records)
+			if err != nil {
+				log.Warnf("Unable to send ax: %v", err)
 			}
+
+			// the following could replace: record.EnsureFields() in SendRecords() if we address the above
+			// record.GatewayFlowID = uuid.New().String()
+			// record.DeveloperEmail = authContext.DeveloperEmail
+			// record.DeveloperApp = authContext.Application
+			// record.AccessToken = authContext.AccessToken
+			// record.ClientID = authContext.ClientID
+			// record.Organization = authContext.Organization
+			// record.Environment = authContext.Environment
+			// if len(authContext.APIProducts) > 0 {
+			// 	record.APIProduct = authContext.APIProducts[0]
+			// }
 		}
 
-	// TODO: support StreamAccessLogsMessage_TcpLogs?
+	// TODO: support TcpLogs?
 	case *als.StreamAccessLogsMessage_TcpLogs:
 		for _, v := range msg.TcpLogs.LogEntry {
-			log.Infof("TcpLogs not supported: %#v", v)
+			log.Warnf("TcpLogs not supported: %#v", v)
 		}
 	}
 
