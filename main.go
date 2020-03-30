@@ -51,6 +51,11 @@ func main() {
 				panic(err)
 			}
 
+			// ManagementAPI and RemoteServiceAPI are the same for GCP Experience
+			if config.Tenant.ManagementAPI == "" && config.Tenant.FluentdConfigFile != "" {
+				config.Tenant.ManagementAPI = config.Tenant.RemoteServiceAPI
+			}
+
 			log.Debugf("Config: %#v", config)
 
 			s := grpc.NewServer(grpc.KeepaliveParams(keepalive.ServerParameters{
