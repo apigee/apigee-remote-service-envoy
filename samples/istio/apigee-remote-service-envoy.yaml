@@ -1,13 +1,16 @@
-# Example deployment for Apigee Proxy Service.
-# This will work without modification for SaaS.
-# For Hybrid, you must uncomment and properly configure the secret volumes.
-apiVersion: extensions/v1beta1
+# Example Deployment and Service for `apigee-remote-service-envoy` in Hybrid.
+# Deployed into the apigee namespace where appropriate secrets reside.
+# You must update the both `secretName:` values for your hybrid environment!
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: apigee-remote-service-envoy
   namespace: apigee
 spec:
   replicas: 1
+  selector:
+    matchLabels:
+      app: apigee-remote-service-envoy
   template:
     metadata:
       labels:
@@ -16,9 +19,8 @@ spec:
     spec:
       containers:
       - name: apigee-remote-service-envoy
-        image: "apigee-remote-service-envoy:latest"
-        # image: "gcr.io/apigee-api-management-istio/apigee-remote-service-envoy:latest"
-        imagePullPolicy: IfNotPresent #Always
+        image: "gcr.io/apigee-api-management-istio/apigee-remote-service-envoy:latest"
+        imagePullPolicy: IfNotPresent
         env:
         - name: GODEBUG # value must be 0, as apigee does not support http 2
           value: http2client=0
@@ -47,24 +49,24 @@ spec:
         - mountPath: /config
           name: apigee-remote-service-envoy
           readOnly: true
-      #   - mountPath: /opt/apigee/customer
-      #     name: cwc-volume
-      #     readOnly: true
-      #   - mountPath: /opt/apigee/tls
-      #     name: tls-volume
-      #     readOnly: true
+        - mountPath: /opt/apigee/customer
+          name: cwc-volume
+          readOnly: true
+        - mountPath: /opt/apigee/tls
+          name: tls-volume
+          readOnly: true
       volumes:
       - name: apigee-remote-service-envoy
         configMap:
           name: apigee-remote-service-envoy
-      # - name: cwc-volume
-      #   secret:
-      #     defaultMode: 420
-      #     secretName: REPLACE ME
-      # - name: tls-volume
-      #   secret:
-      #     defaultMode: 420
-      #     secretName: REPLACE ME
+      - name: cwc-volume
+        secret:
+          defaultMode: 420
+          secretName: config-apigee-runtime-theganyo-apigee-test
+      - name: tls-volume
+        secret:
+          defaultMode: 420
+          secretName: apigee-runtime-theganyo-apigee-test-tls
 ---
 apiVersion: v1
 kind: Service
@@ -76,6 +78,6 @@ metadata:
 spec:
   ports:
   - port: 5000
-    name: http
+    name: grpc
   selector:
     app: apigee-remote-service-envoy

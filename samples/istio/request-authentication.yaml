@@ -1,0 +1,32 @@
+# Creates a RequestAuthentication for httpbin.
+# This causes Istio to evaluate JWT tokens passed to httpbin services.
+# The `originIsOptional: true` flag will allow requests with missing or invalid JWTs
+# to continue in case a valid x-api-key value can be evaluated by Apigee.
+# You must update the issuer and jwks_uri for your environment.
+# Replaces authentication Policy in Istio 1.5+.
+apiVersion: security.istio.io/v1beta1
+kind: RequestAuthentication
+metadata:
+ name: httpbin-jwt
+ namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: httpbin
+  jwtRules:
+  - issuer: https://theganyo-apigee.hybrid.e2e.apigeeks.net/remote-service/token
+    jwksUri: https://theganyo-apigee.hybrid.e2e.apigeeks.net/remote-service/certs
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+ name: httpbin-jwt
+ namespace: default
+spec:
+ selector:
+   matchLabels:
+     app: httpbin
+ rules:
+ - from:
+   - source:
+       requestPrincipals: ["*"]

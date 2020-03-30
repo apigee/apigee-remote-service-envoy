@@ -1,3 +1,4 @@
+# set up to forward to cluster: httpbin.default.svc.cluster.local
 admin:
   access_log_path: /tmp/admin_access.log
   address:
@@ -27,22 +28,16 @@ static_resources:
               - match:
                   prefix: "/"
                 route:
-                  host_rewrite: server.domain.com
-                  cluster: service_backend
-                # per_filter_config:
-                #   envoy.ext_authz:
-                #     check_settings:
-                #       context_extensions:
-                #         x-forwarded-host: original-host-as-context
-                                          
+                  cluster: backend
+                  host_rewrite: httpbin.default.svc.cluster.local
+                  
           http_filters:
           - name: envoy.ext_authz
             config:
               grpc_service:
                 envoy_grpc:
                   cluster_name: apigee-remote-service-envoy
-                timeout: 0.5s
-                
+                timeout: 1s                
           - name: envoy.router
           
           access_log: 
@@ -51,14 +46,14 @@ static_resources:
               common_config:
                 grpc_service:
                   envoy_grpc:
-                    cluster_name: accesslog
-                log_name: accesslog
+                    cluster_name: apigee-remote-service-envoy
+                log_name: apigee-remote-service-envoy
               additional_request_headers_to_log:
               - x-apigee-hc
 
   clusters:
     
-  - name: service_backend
+  - name: backend
     connect_timeout: 2s
     type: STRICT_DNS
     dns_lookup_family: V4_ONLY
@@ -82,7 +77,7 @@ static_resources:
                 port_value: 5000
     common_lb_config:
       healthy_panic_threshold:
-        value: 50.0   
+        value: 50.0
     health_checks:
       - timeout: 1s
         interval: 5s
@@ -92,32 +87,5 @@ static_resources:
         healthy_threshold: 3
         grpc_health_check:
           service_name: "envoy.service.auth.v2alpha.Authorization"
-          authority: "server.domain.com"
-    connect_timeout: 0.25s
-
-  - name: accesslog
-    type: static
-    http2_protocol_options: {}
-    load_assignment:
-      cluster_name: apigee-remote-service-envoy
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: 127.0.0.1
-                port_value: 5000
-    common_lb_config:
-      healthy_panic_threshold:
-        value: 50.0   
-    health_checks:
-      - timeout: 1s
-        interval: 5s
-        interval_jitter: 1s
-        no_traffic_interval: 5s
-        unhealthy_threshold: 1
-        healthy_threshold: 3
-        grpc_health_check:
-          service_name: "envoy.service.auth.v2.AccessLog"
           authority: "server.domain.com"
     connect_timeout: 0.25s

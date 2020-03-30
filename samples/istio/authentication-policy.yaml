@@ -1,0 +1,22 @@
+# Creates a JWT authentication Policy for httpbin.
+# This causes Istio to evaluate JWT tokens passed to httpbin services.
+# The `originIsOptional: true` flag will allow requests with missing or invalid JWTs
+# to continue in case a valid x-api-key value can be evaluated by Apigee.
+# You must update the issuer and jwks_uri for your environment.
+# Deprecated as of Istio 1.5 (see request-authentication.yaml)
+apiVersion: "authentication.istio.io/v1alpha1"
+kind: Policy
+metadata:
+  name: httpbin-jwt
+  namespace: default
+spec:
+  targets:
+  - name: httpbin
+  peers:
+  # - mtls: {}  # uncomment if you're using mTLS between services in your mesh
+  originIsOptional: true
+  origins:
+  - jwt:
+      issuer: https://theganyo-apigee.hybrid.e2e.apigeeks.net/remote-service/token
+      jwks_uri: https://theganyo-apigee.hybrid.e2e.apigeeks.net/remote-service/certs
+  principalBinding: USE_ORIGIN

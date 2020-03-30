@@ -1,0 +1,38 @@
+# Deploys an httpbin gateway and virtual service
+# Note the VirtualService rewrites `authority` to `httpbin.default.svc.cluster.local`
+# The `authority` value is used by apigee-remote-service-envoy to identify the API Product.
+# The product match values come the API Product attribute 'apigee-remote-service-targets' (comma delim).
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: httpbin-gateway
+  namespace: default
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "*"
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: httpbin
+  namespace: default
+spec:
+  hosts:
+  - "*"
+  gateways:
+  - httpbin-gateway
+  http:
+  - route:
+    - destination:
+        host: httpbin
+        port:
+          number: 8000
+    rewrite:
+      authority: httpbin.default.svc.cluster.local

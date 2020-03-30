@@ -1,0 +1,60 @@
+# Installs an Istio EnvoyFilter in the apigee namespace 
+# targeting httpbin for apigee authz and logging.
+# Uses `apigee-remote-service-envoy.apigee:5000` as target.
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: apigee-remote-httpbin
+  namespace: default
+spec:
+  workloadSelector:
+    labels:
+      app: httpbin
+  configPatches:
+
+  - applyTo: HTTP_FILTER
+    match:
+      context: SIDECAR_INBOUND
+      listener:
+        filterChain:
+          filter:
+            name: envoy.http_connection_manager
+            subFilter:
+              name: envoy.router
+    
+    patch:
+      operation: INSERT_BEFORE
+      value:
+        name: envoy.ext_authz
+        config:
+          grpc_service:
+            google_grpc:
+              target_uri: apigee-remote-service-envoy.apigee:5000
+              stat_prefix: apigee-remote-service
+            timeout: 1s
+          metadata_context_namespaces:
+            - envoy.filters.http.jwt_authn
+
+  - applyTo: NETWORK_FILTER
+    match:
+      context: SIDECAR_INBOUND
+      listener:
+        filterChain:
+          filter:
+            name: "envoy.http_connection_manager"
+    patch:
+      operation: MERGE
+      value:
+        typed_config:
+          "@type": "type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager"
+          access_log:
+          - name: envoy.http_grpc_access_log
+            config:
+              common_config:
+                log_name: apigee-remote-service
+                grpc_service:
+                  google_grpc:
+                    target_uri: apigee-remote-service-envoy.apigee:5000
+                    stat_prefix: apigee-remote-service
+              additional_request_headers_to_log:
+              - x-apigee-hc

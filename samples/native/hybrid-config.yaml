@@ -1,9 +1,18 @@
-# Example hybrid configuration
-# Must be used in the hybrid cluster and apigee namespace
+# Example configuration for hybrid.
+# You must update the tenant values appropriately or use the CLI to create this file.
 tenant:
-  remote_service_api: https://RUNTIME-ROOT/remote-service
+  remote_service_api: https://apigee-runtime-theganyo-apigee-test:8443/remote-service
   fluentd_config_file: /opt/apigee/customer/default.properties
-  org_name: ORG
-  env_name: ENV
-  key: KEY
-  secret: SECRET
+  org_name: theganyo-apigee
+  env_name: test
+  key: NotReal
+  secret: NotReal
+  allow_unverified_ssl_cert: true # required for local cluster access to hybrid runtime
+products:
+  refresh_rate: 2m
+analytics:
+  file_limit: 1024
+  collection_interval: 10s
+auth:
+  api_key_cache_duration: 30m
+  api_key_claim:
