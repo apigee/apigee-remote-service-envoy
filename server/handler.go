@@ -15,6 +15,8 @@
 package server
 
 import (
+	"crypto/tls"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -81,6 +83,21 @@ func NewHandler(config *Config) (*handler, error) {
 	}
 
 	tr := http.DefaultTransport
+	if config.Tenant.AllowUnverifiedSSLCert {
+		tr = &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			DialContext: (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+				DualStack: true,
+			}).DialContext,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+			TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
+		}
+	}
 	httpClient := &http.Client{
 		Timeout:   config.Tenant.ClientTimeout,
 		Transport: tr,
@@ -135,6 +152,9 @@ func NewHandler(config *Config) (*handler, error) {
 		FluentdConfigFile:  config.Tenant.FluentdConfigFile,
 		CollectionInterval: time.Minute,
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	h := &handler{
 		remoteServiceAPI:  remoteServiceAPI,
