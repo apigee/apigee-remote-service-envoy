@@ -18,3 +18,4 @@ test.yaml
 
 # Distribution
 dist/
+temp/
