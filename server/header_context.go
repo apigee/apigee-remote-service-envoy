@@ -61,7 +61,7 @@ func (hc *headerContext) encode() string {
 	return base64.StdEncoding.EncodeToString([]byte(msg))
 }
 
-func decodeHeaderContext(h *handler, data string) (string, *auth.Context) {
+func decodeHeaderContext(h *Handler, data string) (string, *auth.Context) {
 	hc := &headerContext{}
 	msg, err := base64.StdEncoding.DecodeString(data)
 	if err != nil {

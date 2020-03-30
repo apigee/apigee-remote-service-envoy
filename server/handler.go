@@ -29,7 +29,8 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/quota"
 )
 
-type handler struct {
+// A Handler is the main entry
+type Handler struct {
 	managementAPI     *url.URL
 	remoteServiceAPI  *url.URL
 	fluentdConfigFile string
@@ -45,27 +46,38 @@ type handler struct {
 	quotaMan     *quota.Manager
 }
 
-func (h *handler) ManagementAPI() *url.URL {
+// ManagementAPI is the management base
+func (h *Handler) ManagementAPI() *url.URL {
 	return h.managementAPI
 }
-func (h *handler) RemoteServiceAPI() *url.URL {
+
+// RemoteServiceAPI is the remote service base
+func (h *Handler) RemoteServiceAPI() *url.URL {
 	return h.remoteServiceAPI
 }
-func (h *handler) Organization() string {
+
+// Organization is the tenant organization
+func (h *Handler) Organization() string {
 	return h.orgName
 }
-func (h *handler) Environment() string {
+
+// Environment is the tenant environment
+func (h *Handler) Environment() string {
 	return h.envName
 }
-func (h *handler) Key() string {
+
+// Key is the access key for the remote service
+func (h *Handler) Key() string {
 	return h.key
 }
-func (h *handler) Secret() string {
+
+// Secret is the access secret for the remote service
+func (h *Handler) Secret() string {
 	return h.secret
 }
 
 // NewHandler creates a handler
-func NewHandler(config *Config) (*handler, error) {
+func NewHandler(config *Config) (*Handler, error) {
 
 	var managementAPI, remoteServiceAPI *url.URL
 	var err error
@@ -156,7 +168,7 @@ func NewHandler(config *Config) (*handler, error) {
 		return nil, err
 	}
 
-	h := &handler{
+	h := &Handler{
 		remoteServiceAPI:  remoteServiceAPI,
 		managementAPI:     managementAPI,
 		fluentdConfigFile: config.Tenant.FluentdConfigFile,

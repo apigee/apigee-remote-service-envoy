@@ -30,11 +30,11 @@ const gatewaySource = "envoy"
 
 // AccessLogServer server
 type AccessLogServer struct {
-	handler *handler
+	handler *Handler
 }
 
 // Register registers
-func (a *AccessLogServer) Register(s *grpc.Server, handler *handler) {
+func (a *AccessLogServer) Register(s *grpc.Server, handler *Handler) {
 	als.RegisterAccessLogServiceServer(s, a)
 	a.handler = handler
 }

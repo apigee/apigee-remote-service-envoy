@@ -33,11 +33,11 @@ import (
 
 // AuthorizationServer server
 type AuthorizationServer struct {
-	handler *handler
+	handler *Handler
 }
 
 // Register registers
-func (a *AuthorizationServer) Register(s *grpc.Server, handler *handler) {
+func (a *AuthorizationServer) Register(s *grpc.Server, handler *Handler) {
 	auth.RegisterAuthorizationServer(s, a)
 	a.handler = handler
 }
