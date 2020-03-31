@@ -1,0 +1,68 @@
+# Example Deployment and Service for `apigee-remote-service-envoy` for SaaS.
+# Deployed into the apigee namespace.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apigee-remote-service-envoy
+  namespace: apigee
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: apigee-remote-service-envoy
+  template:
+    metadata:
+      labels:
+        app: apigee-remote-service-envoy
+        version: v1
+    spec:
+      containers:
+      - name: apigee-remote-service-envoy
+        image: "gcr.io/apigee-api-management-istio/apigee-remote-service-envoy:latest"
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: GODEBUG # value must be 0, as apigee does not support http 2
+          value: http2client=0
+        ports:
+        - containerPort: 5000
+        readinessProbe:
+          exec:
+            command: ["/grpc_health_probe", "-addr=:5000"]
+          initialDelaySeconds: 5
+        livenessProbe:
+          exec:
+            command: ["/grpc_health_probe", "-addr=:5000"]
+          initialDelaySeconds: 10
+        args:
+          - --address=:5000
+          - --log_level=debug
+          - --config=/config/config.yaml
+        resources:
+          limits:
+            cpu: 100m
+            memory: 100Mi
+          requests:
+            cpu: 10m
+            memory: 100Mi
+        volumeMounts:
+        - mountPath: /config
+          name: apigee-remote-service-envoy
+          readOnly: true
+      volumes:
+      - name: apigee-remote-service-envoy
+        configMap:
+          name: apigee-remote-service-envoy
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: apigee-remote-service-envoy
+  namespace: apigee
+  labels:
+    app: apigee-remote-service-envoy
+spec:
+  ports:
+  - port: 5000
+    name: grpc
+  selector:
+    app: apigee-remote-service-envoy
