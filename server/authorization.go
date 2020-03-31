@@ -16,7 +16,7 @@ package server
 
 import (
 	// "encoding/json"
-	"encoding/json"
+
 	"net/url"
 	"strings"
 
@@ -49,16 +49,6 @@ const (
 
 // Check does check
 func (a *AuthorizationServer) Check(ctx context.Context, req *auth.CheckRequest) (*auth.CheckResponse, error) {
-
-	if log.DebugEnabled() {
-		if b, err := json.MarshalIndent(req.Attributes.Request.Http.Headers, "", "  "); err == nil {
-			log.Debugf("Inbound Headers: %s", string(b))
-		}
-
-		if ct, err := json.MarshalIndent(req.Attributes.ContextExtensions, "", "  "); err == nil {
-			log.Debugf("Context Extensions: %s", string(ct))
-		}
-	}
 
 	// check for JWT from Envoy filter
 	protoBufStruct := req.Attributes.GetMetadataContext().GetFilterMetadata()[jwtFilterMetadataKey]
