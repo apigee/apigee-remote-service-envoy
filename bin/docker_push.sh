@@ -12,9 +12,11 @@
 # - TARGET_DOCKER_IMAGE - the name of the docker image to build.
 # - DEBUG - set DEBUG=1 to also build and push a debug image.
 # - TARGET_DOCKER_DEBUG_IMAGE - the name of the docker debug image to build.
+# - TAG - the name of the tag to use for the docker image
 
 SCRIPTPATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 ROOTDIR="$(dirname "$SCRIPTPATH")"
+TAG=${TAG:-latest}
 
 echo "Checking environment settings..."
 
@@ -75,36 +77,37 @@ if [[ $GCLOUD_SERVICE_KEY != "" ]]; then
   docker login -u _json_key -p "$(cat ${HOME}/gcloud-service-key.json)" https://gcr.io || exit 1
 fi
 
+gcloud auth configure-docker --quiet
+
 echo "Building docker image..."
 
 cd "${ROOTDIR}"
-docker build -t apigee-remote-service-envoy -f Dockerfile .
+docker build -t "${TARGET_DOCKER_IMAGE}" -f Dockerfile .
 
-IMAGE_ID=$(docker images apigee-remote-service-envoy --format "{{.ID}}" | head -n1)
+IMAGE_ID=$(docker images "${TARGET_DOCKER_IMAGE}" --format "{{.ID}}" | head -n1)
 
 if [[ "${IMAGE_ID}" == "" ]]; then
-  echo "No image found for apigee-remote-service-envoy. Does it exist?"
+  echo "No image found for "${TARGET_DOCKER_IMAGE}". Does it exist?"
   exit 1
 fi
 
 docker tag "${IMAGE_ID}" "${TARGET_DOCKER_IMAGE}" || exit 1
 echo "Pushing ${TARGET_DOCKER_IMAGE}..."
-gcloud auth configure-docker --quiet
-docker push "${TARGET_DOCKER_IMAGE}" || exit 1
+docker push "${TARGET_DOCKER_IMAGE}:${TAG}" || exit 1
 
 if [[ "${DEBUG}" == "1" ]]; then
-  docker build -t apigee-remote-service-envoy-debug -f Dockerfile_debug .
+  docker build -t "${TARGET_DOCKER_DEBUG_IMAGE}" -f Dockerfile_debug .
 
-  IMAGE_ID=$(docker images apigee-remote-service-envoy-debug --format "{{.ID}}" | head -n1)
+  IMAGE_ID=$(docker images "${TARGET_DOCKER_DEBUG_IMAGE}" --format "{{.ID}}" | head -n1)
 
   if [[ "${IMAGE_ID}" == "" ]]; then
-    echo "No image found for apigee-remote-service-envoy-debug. Does it exist?"
+    echo "No image found for "${TARGET_DOCKER_DEBUG_IMAGE}". Does it exist?"
     exit 1
   fi
 
   docker tag "${IMAGE_ID}" "${TARGET_DOCKER_DEBUG_IMAGE}" || exit 1
   echo "Pushing ${TARGET_DOCKER_DEBUG_IMAGE}..."
-  docker push "${TARGET_DOCKER_DEBUG_IMAGE}" || exit 1
+  docker push "${TARGET_DOCKER_DEBUG_IMAGE}:${TAG}" || exit 1
 fi
 
 if [[ "${MAKE_PUBLIC}" == "1" ]]; then
