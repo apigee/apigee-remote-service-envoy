@@ -82,31 +82,15 @@ gcloud auth configure-docker --quiet
 echo "Building docker image..."
 
 cd "${ROOTDIR}"
-docker build -t "${TARGET_DOCKER_IMAGE}" -f Dockerfile .
+docker build -t "${TARGET_DOCKER_IMAGE}:${TAG}" -f Dockerfile . || exit 1
 
-IMAGE_ID=$(docker images "${TARGET_DOCKER_IMAGE}" --format "{{.ID}}" | head -n1)
-
-if [[ "${IMAGE_ID}" == "" ]]; then
-  echo "No image found for "${TARGET_DOCKER_IMAGE}". Does it exist?"
-  exit 1
-fi
-
-docker tag "${IMAGE_ID}" "${TARGET_DOCKER_IMAGE}" || exit 1
-echo "Pushing ${TARGET_DOCKER_IMAGE}..."
+echo "Pushing ${TARGET_DOCKER_IMAGE}:${TAG}..."
 docker push "${TARGET_DOCKER_IMAGE}:${TAG}" || exit 1
 
 if [[ "${DEBUG}" == "1" ]]; then
-  docker build -t "${TARGET_DOCKER_DEBUG_IMAGE}" -f Dockerfile_debug .
+  docker build -t "${TARGET_DOCKER_DEBUG_IMAGE}:${TAG}" -f Dockerfile_debug .
 
-  IMAGE_ID=$(docker images "${TARGET_DOCKER_DEBUG_IMAGE}" --format "{{.ID}}" | head -n1)
-
-  if [[ "${IMAGE_ID}" == "" ]]; then
-    echo "No image found for "${TARGET_DOCKER_DEBUG_IMAGE}". Does it exist?"
-    exit 1
-  fi
-
-  docker tag "${IMAGE_ID}" "${TARGET_DOCKER_DEBUG_IMAGE}" || exit 1
-  echo "Pushing ${TARGET_DOCKER_DEBUG_IMAGE}..."
+  echo "Pushing ${TARGET_DOCKER_DEBUG_IMAGE}:${TAG}..."
   docker push "${TARGET_DOCKER_DEBUG_IMAGE}:${TAG}" || exit 1
 fi
 
