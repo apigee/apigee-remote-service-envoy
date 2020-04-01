@@ -1,5 +1,6 @@
-# Installs an Istio EnvoyFilter in the apigee namespace 
-# targeting httpbin for apigee authz and logging.
+# Installs an Istio EnvoyFilter in the default namespace.
+# It applies to all services in the namespace. If you wish, you
+# may tailor by specifying `workloadSelector` for specific targets.
 # Uses `apigee-remote-service-envoy.apigee:5000` as target.
 apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
@@ -7,9 +8,9 @@ metadata:
   name: apigee-remote-httpbin
   namespace: default
 spec:
-  workloadSelector:
-    labels:
-      app: httpbin
+  # workloadSelector:
+  #   labels:
+  #     app: httpbin
   configPatches:
 
   - applyTo: HTTP_FILTER
