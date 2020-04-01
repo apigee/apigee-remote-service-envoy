@@ -22,6 +22,7 @@ import (
 
 	aauth "github.com/apigee/apigee-remote-service-golib/auth"
 	"github.com/apigee/apigee-remote-service-golib/log"
+	"github.com/apigee/apigee-remote-service-golib/quota"
 	core "github.com/envoyproxy/go-control-plane/envoy/api/v2/core"
 	auth "github.com/envoyproxy/go-control-plane/envoy/service/auth/v2"
 	envoy_type "github.com/envoyproxy/go-control-plane/envoy/type"
@@ -75,15 +76,44 @@ func (a *AuthorizationServer) Check(ctx context.Context, req *auth.CheckRequest)
 
 	authContext, err := a.handler.authMan.Authenticate(a.handler, apiKey, claims, a.handler.apiKeyClaimKey)
 	if err != nil {
-		log.Errorf("authenticating: %v", err)
-		return unauthenticated(), nil
+		return internalError(err), nil
 	}
 
 	if len(authContext.APIProducts) == 0 {
 		return unauthorized(), nil
 	}
 
+	// match products
 	api := req.Attributes.Request.Http.GetHost()
+	products := a.handler.productMan.Resolve(authContext, api, path)
+	if len(products) == 0 {
+		return unauthorized(), nil
+	}
+
+	// apply quotas to all matched products
+	var quotaArgs = quota.Args{QuotaAmount: 1}
+	var exceeded bool
+	var anyError error
+	for _, p := range products {
+		if p.QuotaLimitInt > 0 {
+			result, err := a.handler.quotaMan.Apply(authContext, p, quotaArgs)
+			if err != nil {
+				log.Errorf("quota check: %v", err)
+				anyError = err
+			} else if result.Exceeded > 0 {
+				log.Debugf("quota exceeded: %v", p.Name)
+				exceeded = true
+			}
+		}
+	}
+	if anyError != nil {
+		return internalError(anyError), nil
+	}
+	if exceeded {
+		log.Debugf("quota exceeded: %v", err)
+		return quotaExceeded(), nil
+	}
+
 	return authOK(authContext, api, path), nil
 }
 
@@ -112,7 +142,7 @@ func authOK(authContext *aauth.Context, api, path string) *auth.CheckResponse {
 }
 
 func unauthenticated() *auth.CheckResponse {
-	log.Infof("unauthenticated")
+	log.Debugf("unauthenticated")
 	return &auth.CheckResponse{
 		Status: &rpcstatus.Status{
 			Code: int32(rpc.UNAUTHENTICATED),
@@ -129,7 +159,7 @@ func unauthenticated() *auth.CheckResponse {
 }
 
 func unauthorized() *auth.CheckResponse {
-	log.Infof("unauthorized")
+	log.Debugf("unauthorized")
 	return &auth.CheckResponse{
 		Status: &rpcstatus.Status{
 			Code: int32(rpc.PERMISSION_DENIED),
@@ -140,6 +170,40 @@ func unauthorized() *auth.CheckResponse {
 					Code: envoy_type.StatusCode_Unauthorized,
 				},
 				Body: "Authenticated caller is not authorized for this action",
+			},
+		},
+	}
+}
+
+func quotaExceeded() *auth.CheckResponse {
+	log.Debugf("quota exceeded")
+	return &auth.CheckResponse{
+		Status: &rpcstatus.Status{
+			Code: int32(rpc.RESOURCE_EXHAUSTED),
+		},
+		HttpResponse: &auth.CheckResponse_DeniedResponse{
+			DeniedResponse: &auth.DeniedHttpResponse{
+				Status: &envoy_type.HttpStatus{
+					Code: envoy_type.StatusCode_TooManyRequests,
+				},
+				Body: "Quota exceeded",
+			},
+		},
+	}
+}
+
+func internalError(err error) *auth.CheckResponse {
+	log.Errorf("internal error: %v", err)
+	return &auth.CheckResponse{
+		Status: &rpcstatus.Status{
+			Code: int32(rpc.INTERNAL),
+		},
+		HttpResponse: &auth.CheckResponse_DeniedResponse{
+			DeniedResponse: &auth.DeniedHttpResponse{
+				Status: &envoy_type.HttpStatus{
+					Code: envoy_type.StatusCode_InternalServerError,
+				},
+				Body: "Server error",
 			},
 		},
 	}
