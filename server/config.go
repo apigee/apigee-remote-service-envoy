@@ -18,7 +18,7 @@ import (
 	"io/ioutil"
 	"time"
 
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 // DefaultConfig returns a config with defaults set
@@ -47,50 +47,50 @@ func DefaultConfig() *Config {
 
 // Config is all config
 type Config struct {
-	Global    GlobalConfig    `yaml:"global"`
-	Tenant    TenantConfig    `yaml:"tenant"`
-	Products  ProductsConfig  `yaml:"products"`
-	Analytics AnalyticsConfig `yaml:"analytics"`
-	Auth      AuthConfig      `yaml:"auth"`
+	Global    GlobalConfig    `yaml:"global,omitempty"`
+	Tenant    TenantConfig    `yaml:"tenant,omitempty"`
+	Products  ProductsConfig  `yaml:"products,omitempty"`
+	Analytics AnalyticsConfig `yaml:"analytics,omitempty"`
+	Auth      AuthConfig      `yaml:"auth,omitempty"`
 }
 
 // GlobalConfig is global configuration for the server
 type GlobalConfig struct {
-	TempDir                   string        `yaml:"temp_dir"`
-	KeepAliveMaxConnectionAge time.Duration `yaml:"keep_alive_max_connection_age"`
+	TempDir                   string        `yaml:"temp_dir,omitempty"`
+	KeepAliveMaxConnectionAge time.Duration `yaml:"keep_alive_max_connection_age,omitempty"`
 }
 
 // TenantConfig is config relating to an Apigee tentant
 type TenantConfig struct {
-	ManagementAPI          string        `yaml:"management_api"`
+	ManagementAPI          string        `yaml:"management_api,omitempty"`
 	RemoteServiceAPI       string        `yaml:"remote_service_api"`
-	FluentdConfigFile      string        `yaml:"fluentd_config_file"`
+	FluentdConfigFile      string        `yaml:"fluentd_config_file,omitempty"`
 	OrgName                string        `yaml:"org_name"`
 	EnvName                string        `yaml:"env_name"`
 	Key                    string        `yaml:"key"`
 	Secret                 string        `yaml:"secret"`
-	ClientTimeout          time.Duration `yaml:"client_timeout"`
-	AllowUnverifiedSSLCert bool          `yaml:"allow_unverified_ssl_cert"`
+	ClientTimeout          time.Duration `yaml:"client_timeout,omitempty"`
+	AllowUnverifiedSSLCert bool          `yaml:"allow_unverified_ssl_cert,omitempty"`
 }
 
 // ProductsConfig is products-related config
 type ProductsConfig struct {
-	RefreshRate time.Duration `yaml:"refresh_rate"`
+	RefreshRate time.Duration `yaml:"refresh_rate,omitempty"`
 }
 
 // AnalyticsConfig is analytics-related config
 type AnalyticsConfig struct {
-	LegacyEndpoint     bool          `yaml:"legacy_endpoint"`
-	FileLimit          int           `yaml:"file_limit"`
-	SendChannelSize    int           `yaml:"send_channel_size"`
-	CollectionInterval time.Duration `yaml:"collection_interval"`
+	LegacyEndpoint     bool          `yaml:"legacy_endpoint,omitempty"`
+	FileLimit          int           `yaml:"file_limit,omitempty"`
+	SendChannelSize    int           `yaml:"send_channel_size,omitempty"`
+	CollectionInterval time.Duration `yaml:"collection_interval,omitempty"`
 }
 
 // AuthConfig is auth-related config
 type AuthConfig struct {
-	APIKeyClaim         string        `yaml:"api_key_claim"`
-	APIKeyCacheDuration time.Duration `yaml:"api_key_cache_duration"`
-	JWKSPollInterval    time.Duration `yaml:"jwks_poll_interval"`
+	APIKeyClaim         string        `yaml:"api_key_claim,omitempty"`
+	APIKeyCacheDuration time.Duration `yaml:"api_key_cache_duration,omitempty"`
+	JWKSPollInterval    time.Duration `yaml:"jwks_poll_interval,omitempty"`
 }
 
 // Load config

@@ -17,5 +17,5 @@ require (
 	golang.org/x/net v0.0.0-20200226121028-0de0cce0169b
 	google.golang.org/genproto v0.0.0-20200225123651-fc8f55426688
 	google.golang.org/grpc v1.27.1
-	gopkg.in/yaml.v2 v2.2.7
+	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
 )
