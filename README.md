@@ -72,21 +72,34 @@ Run with your local `config.yaml` available as `/config.yaml` via a volume mount
 
 ### Kubernetes or Istio
 
-Create a ConfigMap from your configuration:
+#### Namespace
+
+If you don't have your namespace, create it. For example:
 
     kubectl create namespace apigee
-    kubectl -n apigee create configmap apigee-remote-service-envoy --from-file=config.yaml
-
-(Alternatively, you may fill in the config in a ConfigMap yaml. 
-See: samples/istio/saas-configmap.yaml)
-
-Then, create the `apigee-remote-service-envoy` Deployment and Service: 
-
-    kubectl apply -f samples/istio/saas-apigee-remote-service-envoy.yaml
 
 Notes:
-* If you use a different namespace, be sure to change all DNS references.
-* For Hybrid you must edit and use `samples/istio/hybrid-apigee-remote-service-envoy.yaml`.
+* If you use a different namespace, be sure to change DNS references in your configuations.
+
+#### Configuration
+
+When you provisioned, you either generated a simple yaml file or a Kubernetes ConfigMap.
+Follow the appropriate step below.
+
+If you generated a ConfigMap, just apply it:
+
+    kubectl apply -f configmap.yaml
+
+If you have a simple YAML file (ie. Kubenernetes attributes), you need to create a ConfigMap
+from your YAML file:
+
+    kubectl -n apigee create configmap apigee-remote-service-envoy --from-file=config.yaml
+
+#### Deployment and Service
+
+Now create the `apigee-remote-service-envoy` Deployment and Service: 
+
+    kubectl apply -f samples/istio/saas-apigee-remote-service-envoy.yaml
 
 ## Run the Envoy Proxy
 
