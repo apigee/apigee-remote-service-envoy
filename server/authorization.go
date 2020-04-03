@@ -15,12 +15,11 @@
 package server
 
 import (
-	// "encoding/json"
-
 	"net/url"
 	"strings"
 
 	aauth "github.com/apigee/apigee-remote-service-golib/auth"
+	libAuth "github.com/apigee/apigee-remote-service-golib/auth"
 	"github.com/apigee/apigee-remote-service-golib/log"
 	"github.com/apigee/apigee-remote-service-golib/quota"
 	core "github.com/envoyproxy/go-control-plane/envoy/api/v2/core"
@@ -75,7 +74,12 @@ func (a *AuthorizationServer) Check(ctx context.Context, req *auth.CheckRequest)
 	}
 
 	authContext, err := a.handler.authMan.Authenticate(a.handler, apiKey, claims, a.handler.apiKeyClaimKey)
-	if err != nil {
+	switch err {
+	case libAuth.ErrNoAuth:
+		return unauthenticated(), nil
+	case libAuth.ErrBadAuth:
+		return unauthorized(), nil
+	case libAuth.ErrInternalError:
 		return internalError(err), nil
 	}
 
