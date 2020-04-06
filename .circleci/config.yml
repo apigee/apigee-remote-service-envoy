@@ -46,7 +46,7 @@ jobs:
       
       - run:
           name: Build and push apigee-adapter Docker image with tag latest
-          command: TAG=${CIRCLE_TAG:-nightly} MAKE_PUBLIC=1 DEBUG=1 ./bin/docker_push.sh
+          command: TAG=${CIRCLE_TAG:-latest} MAKE_PUBLIC=1 DEBUG=1 ./bin/docker_push.sh
 
   release:
 
