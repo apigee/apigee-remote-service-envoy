@@ -66,7 +66,7 @@ func (a *AuthorizationServer) Check(ctx context.Context, req *auth.CheckRequest)
 	apiKey := req.Attributes.Request.Http.Headers[apiKeyKey] // grab from header
 
 	if apiKey == "" && len(splits) > 1 { // look in query if not in header
-		if qs, err := url.ParseQuery(splits[1]); err != nil {
+		if qs, err := url.ParseQuery(splits[1]); err == nil {
 			if keys, ok := qs[apiKeyKey]; ok {
 				apiKey = keys[0]
 			}
