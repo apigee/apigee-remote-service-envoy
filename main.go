@@ -47,8 +47,8 @@ func main() {
 
 			config := server.DefaultConfig()
 			if err = config.Load(configFile); err != nil {
-				log.Errorf("Load config: %v", err)
-				panic(err)
+				log.Errorf("Unable to load config: %s:\n%v", configFile, err)
+				os.Exit(1)
 			}
 
 			// ManagementAPI and RemoteServiceAPI are the same for GCP Experience

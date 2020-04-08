@@ -15,9 +15,11 @@
 package server
 
 import (
+	"fmt"
 	"io/ioutil"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
 	"gopkg.in/yaml.v3"
 )
 
@@ -99,7 +101,33 @@ func (c *Config) Load(file string) error {
 	if err == nil {
 		err = yaml.Unmarshal(yamlFile, c)
 	}
+	if err == nil {
+		err = c.Validate()
+	}
 	return err
+}
+
+func (c *Config) Validate() error {
+	var errs error
+	if c.Tenant.RemoteServiceAPI == "" {
+		errs = multierror.Append(errs, fmt.Errorf("tenant.remote_service_api is required"))
+	}
+	if c.Tenant.ManagementAPI == "" && c.Tenant.FluentdConfigFile == "" {
+		errs = multierror.Append(errs, fmt.Errorf("tenant.management_api or tenant.fluentd_config_file is required"))
+	}
+	if c.Tenant.OrgName == "" {
+		errs = multierror.Append(errs, fmt.Errorf("tenant.org_name is required"))
+	}
+	if c.Tenant.EnvName == "" {
+		errs = multierror.Append(errs, fmt.Errorf("tenant.env_name is required"))
+	}
+	if c.Tenant.Key == "" {
+		errs = multierror.Append(errs, fmt.Errorf("tenant.key is required"))
+	}
+	if c.Tenant.Secret == "" {
+		errs = multierror.Append(errs, fmt.Errorf("tenant.secret is required"))
+	}
+	return errs
 }
 
 // # Example Config file

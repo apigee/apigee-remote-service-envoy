@@ -13,6 +13,7 @@ require (
 	github.com/envoyproxy/go-control-plane v0.9.4
 	github.com/gogo/googleapis v1.3.2
 	github.com/golang/protobuf v1.3.3
+	github.com/hashicorp/go-multierror v1.1.0
 	github.com/spf13/cobra v0.0.6
 	golang.org/x/net v0.0.0-20200226121028-0de0cce0169b
 	google.golang.org/genproto v0.0.0-20200225123651-fc8f55426688
