@@ -15,6 +15,7 @@
 package server
 
 import (
+	"context"
 	"net/url"
 	"strings"
 
@@ -26,7 +27,6 @@ import (
 	auth "github.com/envoyproxy/go-control-plane/envoy/service/auth/v2"
 	envoy_type "github.com/envoyproxy/go-control-plane/envoy/type"
 	"github.com/gogo/googleapis/google/rpc"
-	"golang.org/x/net/context"
 	rpcstatus "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc"
 )
