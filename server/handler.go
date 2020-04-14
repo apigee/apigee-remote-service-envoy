@@ -38,7 +38,9 @@ type Handler struct {
 	envName           string
 	key               string
 	secret            string
-	apiKeyClaimKey    string
+	apiKeyClaim       string
+	apiKeyHeader      string
+	targetHeader      string
 
 	productMan   *product.Manager
 	authMan      *auth.Manager
@@ -180,7 +182,9 @@ func NewHandler(config *Config) (*Handler, error) {
 		authMan:           authMan,
 		analyticsMan:      analyticsMan,
 		quotaMan:          quotaMan,
-		apiKeyClaimKey:    config.Auth.APIKeyClaim,
+		apiKeyClaim:       config.Auth.APIKeyClaim,
+		apiKeyHeader:      config.Auth.APIKeyHeader,
+		targetHeader:      config.Auth.TargetHeader,
 	}
 
 	return h, nil

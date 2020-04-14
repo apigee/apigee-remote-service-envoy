@@ -61,7 +61,7 @@ func (a *AccessLogServer) StreamAccessLogs(srv als.AccessLogService_StreamAccess
 			if header, ok := v.Request.RequestHeaders[headerContextKey]; ok {
 				api, authContext = decodeHeaderContext(a.handler, header)
 			} else { // no auth context, do our best with it
-				api = req.GetAuthority()
+				api = req.GetRequestHeaders()[a.handler.targetHeader]
 				authContext = &auth.Context{
 					Context: a.handler,
 				}

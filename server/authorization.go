@@ -43,7 +43,6 @@ func (a *AuthorizationServer) Register(s *grpc.Server, handler *Handler) {
 }
 
 const (
-	apiKeyKey            = "x-api-key"
 	jwtFilterMetadataKey = "envoy.filters.http.jwt_authn"
 )
 
@@ -63,17 +62,17 @@ func (a *AuthorizationServer) Check(ctx context.Context, req *auth.CheckRequest)
 	splits := strings.SplitN(req.Attributes.Request.Http.Path, "?", 2)
 	path := splits[0]
 
-	apiKey := req.Attributes.Request.Http.Headers[apiKeyKey] // grab from header
+	apiKey := req.Attributes.Request.Http.Headers[a.handler.apiKeyHeader] // grab from header
 
 	if apiKey == "" && len(splits) > 1 { // look in query if not in header
 		if qs, err := url.ParseQuery(splits[1]); err == nil {
-			if keys, ok := qs[apiKeyKey]; ok {
+			if keys, ok := qs[a.handler.apiKeyHeader]; ok {
 				apiKey = keys[0]
 			}
 		}
 	}
 
-	authContext, err := a.handler.authMan.Authenticate(a.handler, apiKey, claims, a.handler.apiKeyClaimKey)
+	authContext, err := a.handler.authMan.Authenticate(a.handler, apiKey, claims, a.handler.apiKeyClaim)
 	switch err {
 	case libAuth.ErrNoAuth:
 		return unauthenticated(), nil
@@ -88,7 +87,7 @@ func (a *AuthorizationServer) Check(ctx context.Context, req *auth.CheckRequest)
 	}
 
 	// match products
-	api := req.Attributes.Request.Http.GetHost()
+	api := req.Attributes.Request.Http.Headers[a.handler.targetHeader]
 	products := a.handler.productMan.Resolve(authContext, api, path)
 	if len(products) == 0 {
 		return unauthorized(), nil

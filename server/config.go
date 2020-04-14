@@ -43,6 +43,8 @@ func DefaultConfig() *Config {
 		},
 		Auth: AuthConfig{
 			APIKeyCacheDuration: 30 * time.Minute,
+			APIKeyHeader:        "x-api-key",
+			TargetHeader:        ":authority",
 		},
 	}
 }
@@ -93,6 +95,8 @@ type AuthConfig struct {
 	APIKeyClaim         string        `yaml:"api_key_claim,omitempty"`
 	APIKeyCacheDuration time.Duration `yaml:"api_key_cache_duration,omitempty"`
 	JWKSPollInterval    time.Duration `yaml:"jwks_poll_interval,omitempty"`
+	APIKeyHeader        string        `yaml:"api_key_header,omitempty"`
+	TargetHeader        string        `yaml:"target_header,omitempty"`
 }
 
 // Load config
@@ -152,3 +156,5 @@ func (c *Config) Validate() error {
 // auth:
 //   api_key_claim:
 //   api_key_cache_duration: 30m
+//   api_key_header: x-api-key
+//   api_target_header: :authority
