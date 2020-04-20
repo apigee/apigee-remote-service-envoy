@@ -27,6 +27,7 @@ metadata:
     prometheus.io/scheme: https
     prometheus.io/scrape: "true"
     prometheus.io/type: prometheusspec
+spec:
   replicas: 1
   selector:
     matchLabels:
@@ -40,7 +41,7 @@ metadata:
       containers:
       - name: apigee-remote-service-envoy
         image: "gcr.io/apigee-api-management-istio/apigee-remote-service-envoy:latest"
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always # IfNotPresent
         env:
         - name: GODEBUG # value must be 0, as apigee does not support http 2
           value: http2client=0
