@@ -60,8 +60,12 @@ func (a *AccessLogServer) StreamAccessLogs(srv als.AccessLogService_StreamAccess
 
 			if header, ok := v.Request.RequestHeaders[headerContextKey]; ok {
 				api, authContext = decodeHeaderContext(a.handler, header)
-			} else { // no auth context, do our best with it
-				api = req.GetRequestHeaders()[a.handler.targetHeader]
+			} else { // no auth context, do our best
+				if api, ok = v.Request.RequestHeaders[a.handler.targetHeader]; !ok {
+					log.Debugf("No context header %s or target header %s, skipped accesslog: %#v", a.handler.targetHeader, headerContextKey, v.Request)
+					continue
+				}
+				log.Debugf("No context header %s, using target header %s: %#v", headerContextKey, a.handler.targetHeader, v.Request)
 				authContext = &auth.Context{
 					Context: a.handler,
 				}

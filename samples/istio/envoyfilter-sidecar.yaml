@@ -71,5 +71,11 @@ spec:
                   google_grpc:
                     target_uri: apigee-remote-service-envoy.apigee:5000
                     stat_prefix: apigee-remote-service
+                    # for custom tls. in general, use Istio mtls
+                    # ssl_credentials:
+                    #   root_certs:
+                    #   private_key:
+                    #   cert_chain:
               additional_request_headers_to_log:
-              - x-apigee-hc
+              - x-apigee-hc # context header
+              - :authority # target header

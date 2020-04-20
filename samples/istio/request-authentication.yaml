@@ -16,8 +16,9 @@
 # This causes Istio to evaluate JWT tokens passed to httpbin services.
 # The `originIsOptional: true` flag will allow requests with missing or invalid JWTs
 # to continue in case a valid x-api-key value can be evaluated by Apigee.
-# You must update the issuer and jwks_uri for your environment.
 # Replaces authentication Policy in Istio 1.5+.
+
+# You must update the issuer and jwks_uri for your environment.
 apiVersion: security.istio.io/v1beta1
 kind: RequestAuthentication
 metadata:

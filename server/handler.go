@@ -31,16 +31,15 @@ import (
 
 // A Handler is the main entry
 type Handler struct {
-	managementAPI     *url.URL
-	remoteServiceAPI  *url.URL
-	fluentdConfigFile string
-	orgName           string
-	envName           string
-	key               string
-	secret            string
-	apiKeyClaim       string
-	apiKeyHeader      string
-	targetHeader      string
+	managementAPI    *url.URL
+	remoteServiceAPI *url.URL
+	orgName          string
+	envName          string
+	key              string
+	secret           string
+	apiKeyClaim      string
+	apiKeyHeader     string
+	targetHeader     string
 
 	productMan   *product.Manager
 	authMan      *auth.Manager
@@ -163,28 +162,30 @@ func NewHandler(config *Config) (*Handler, error) {
 		Secret:             config.Tenant.Secret,
 		Client:             httpClient,
 		SendChannelSize:    10,
-		FluentdConfigFile:  config.Tenant.FluentdConfigFile,
 		CollectionInterval: time.Minute,
+		FluentdEndpoint:    config.Analytics.FluentdEndpoint,
+		TLSCAFile:          config.Analytics.TLS.CAFile,
+		TLSCertFile:        config.Analytics.TLS.CertFile,
+		TLSKeyFile:         config.Analytics.TLS.KeyFile,
 	})
 	if err != nil {
 		return nil, err
 	}
 
 	h := &Handler{
-		remoteServiceAPI:  remoteServiceAPI,
-		managementAPI:     managementAPI,
-		fluentdConfigFile: config.Tenant.FluentdConfigFile,
-		orgName:           config.Tenant.OrgName,
-		envName:           config.Tenant.EnvName,
-		key:               config.Tenant.Key,
-		secret:            config.Tenant.Secret,
-		productMan:        productMan,
-		authMan:           authMan,
-		analyticsMan:      analyticsMan,
-		quotaMan:          quotaMan,
-		apiKeyClaim:       config.Auth.APIKeyClaim,
-		apiKeyHeader:      config.Auth.APIKeyHeader,
-		targetHeader:      config.Auth.TargetHeader,
+		remoteServiceAPI: remoteServiceAPI,
+		managementAPI:    managementAPI,
+		orgName:          config.Tenant.OrgName,
+		envName:          config.Tenant.EnvName,
+		key:              config.Tenant.Key,
+		secret:           config.Tenant.Secret,
+		productMan:       productMan,
+		authMan:          authMan,
+		analyticsMan:     analyticsMan,
+		quotaMan:         quotaMan,
+		apiKeyClaim:      config.Auth.APIKeyClaim,
+		apiKeyHeader:     config.Auth.APIKeyHeader,
+		targetHeader:     config.Auth.TargetHeader,
 	}
 
 	return h, nil

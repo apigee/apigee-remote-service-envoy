@@ -20,7 +20,13 @@ kind: Deployment
 metadata:
   name: apigee-remote-service-envoy
   namespace: apigee
-spec:
+  annotations:
+    sidecar.istio.io/rewriteAppHTTPProbers: "true"
+    prometheus.io/path: /metrics
+    prometheus.io/port: "5001"
+    prometheus.io/scheme: https
+    prometheus.io/scrape: "true"
+    prometheus.io/type: prometheusspec
   replicas: 1
   selector:
     matchLabels:
@@ -40,16 +46,19 @@ spec:
           value: http2client=0
         ports:
         - containerPort: 5000
-        readinessProbe:
-          exec:
-            command: ["/grpc_health_probe", "-addr=:5000"]
-          initialDelaySeconds: 5
         livenessProbe:
-          exec:
-            command: ["/grpc_health_probe", "-addr=:5000"]
-          initialDelaySeconds: 10
+          httpGet:
+            path: /healthz
+            port: 5001
+          failureThreshold: 1
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 5001
+          failureThreshold: 30
+          periodSeconds: 10
         args:
-          - --address=:5000
           - --log_level=debug
           - --config=/config/config.yaml
         resources:
@@ -63,9 +72,6 @@ spec:
         - mountPath: /config
           name: apigee-remote-service-envoy
           readOnly: true
-        - mountPath: /opt/apigee/customer
-          name: cwc-volume
-          readOnly: true
         - mountPath: /opt/apigee/tls
           name: tls-volume
           readOnly: true
@@ -73,10 +79,6 @@ spec:
       - name: apigee-remote-service-envoy
         configMap:
           name: apigee-remote-service-envoy
-      - name: cwc-volume
-        secret:
-          defaultMode: 420
-          secretName: config-apigee-runtime-theganyo-apigee-test
       - name: tls-volume
         secret:
           defaultMode: 420

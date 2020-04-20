@@ -13,10 +13,16 @@
 # limitations under the License.
 
 # Example configuration for hybrid.
-# You must update the tenant values appropriately or use the CLI to create this file.
+# You must update the values appropriately or use the CLI to create this file.
+global:
+  api_address: :5000
+  metrics_address: :5001
+  tls: # for api listener
+    ca_file: /opt/apigee/tls/ca.crt
+    cert_file: /opt/apigee/tls/tls.crt
+    key_file: /opt/apigee/tls/tls.key
 tenant:
   remote_service_api: https://apigee-runtime-theganyo-apigee-test:8443/remote-service
-  fluentd_config_file: /opt/apigee/customer/default.properties
   org_name: theganyo-apigee
   env_name: test
   key: NotReal
@@ -27,6 +33,11 @@ products:
 analytics:
   file_limit: 1024
   collection_interval: 10s
+  fluentd_endpoint: apigee-udca-theganyo-apigee-test.apigee.svc.cluster.local:20001
+  tls: # for UDCA client
+    ca_file: /opt/apigee/tls/ca.crt
+    cert_file: /opt/apigee/tls/tls.crt
+    key_file: /opt/apigee/tls/tls.key
 auth:
   api_key_cache_duration: 30m
   api_key_claim:

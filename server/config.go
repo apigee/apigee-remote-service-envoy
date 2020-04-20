@@ -29,6 +29,8 @@ func DefaultConfig() *Config {
 		Global: GlobalConfig{
 			TempDir:                   "/tmp/apigee-istio",
 			KeepAliveMaxConnectionAge: 10 * time.Minute,
+			APIAddress:                ":5000",
+			MetricsAddress:            ":5001",
 		},
 		Tenant: TenantConfig{
 			ClientTimeout: 30 * time.Second,
@@ -60,15 +62,24 @@ type Config struct {
 
 // GlobalConfig is global configuration for the server
 type GlobalConfig struct {
+	APIAddress                string        `yaml:"api_address,omitempty"`
+	MetricsAddress            string        `yaml:"metrics_address,omitempty"`
 	TempDir                   string        `yaml:"temp_dir,omitempty"`
 	KeepAliveMaxConnectionAge time.Duration `yaml:"keep_alive_max_connection_age,omitempty"`
+	TLS                       TLSConfig     `yaml:"tls,omitempty"`
+}
+
+// TLSConfig is tls configuration
+type TLSConfig struct {
+	CAFile   string `yaml:"ca_file,omitempty"`
+	KeyFile  string `yaml:"key_file,omitempty"`
+	CertFile string `yaml:"cert_file,omitempty"`
 }
 
 // TenantConfig is config relating to an Apigee tentant
 type TenantConfig struct {
 	ManagementAPI          string        `yaml:"management_api,omitempty"`
 	RemoteServiceAPI       string        `yaml:"remote_service_api"`
-	FluentdConfigFile      string        `yaml:"fluentd_config_file,omitempty"`
 	OrgName                string        `yaml:"org_name"`
 	EnvName                string        `yaml:"env_name"`
 	Key                    string        `yaml:"key"`
@@ -88,6 +99,8 @@ type AnalyticsConfig struct {
 	FileLimit          int           `yaml:"file_limit,omitempty"`
 	SendChannelSize    int           `yaml:"send_channel_size,omitempty"`
 	CollectionInterval time.Duration `yaml:"collection_interval,omitempty"`
+	FluentdEndpoint    string        `yaml:"fluentd_endpoint,omitempty"`
+	TLS                TLSConfig     `yaml:"tls,omitempty"`
 }
 
 // AuthConfig is auth-related config
@@ -111,13 +124,14 @@ func (c *Config) Load(file string) error {
 	return err
 }
 
+// Validate validates the config
 func (c *Config) Validate() error {
 	var errs error
 	if c.Tenant.RemoteServiceAPI == "" {
 		errs = multierror.Append(errs, fmt.Errorf("tenant.remote_service_api is required"))
 	}
-	if c.Tenant.ManagementAPI == "" && c.Tenant.FluentdConfigFile == "" {
-		errs = multierror.Append(errs, fmt.Errorf("tenant.management_api or tenant.fluentd_config_file is required"))
+	if c.Tenant.ManagementAPI == "" && c.Analytics.FluentdEndpoint == "" {
+		errs = multierror.Append(errs, fmt.Errorf("tenant.management_api or tenant.analytics.fluentd_endpoint is required"))
 	}
 	if c.Tenant.OrgName == "" {
 		errs = multierror.Append(errs, fmt.Errorf("tenant.org_name is required"))
@@ -131,6 +145,14 @@ func (c *Config) Validate() error {
 	if c.Tenant.Secret == "" {
 		errs = multierror.Append(errs, fmt.Errorf("tenant.secret is required"))
 	}
+	if (c.Global.TLS.CertFile != "" || c.Global.TLS.KeyFile != "") &&
+		(c.Global.TLS.CertFile == "" || c.Global.TLS.KeyFile == "") {
+		errs = multierror.Append(errs, fmt.Errorf("global.tls.cert_file and global.tls.key_file are both required if either are present"))
+	}
+	if (c.Analytics.TLS.CAFile != "" || c.Analytics.TLS.CertFile != "" || c.Analytics.TLS.KeyFile != "") &&
+		(c.Analytics.TLS.CAFile == "" || c.Analytics.TLS.CertFile == "" || c.Analytics.TLS.KeyFile == "") {
+		errs = multierror.Append(errs, fmt.Errorf("all analytics.tls options are required if any are present"))
+	}
 	return errs
 }
 
@@ -138,10 +160,15 @@ func (c *Config) Validate() error {
 // global:
 // 	 temp_dir: /tmp/apigee-istio
 //   keep_alive_max_connection_age: 10m
+//   api_address: :5000
+//   metrics_address: :5001
+//	 tls:
+//     ca_file:
+//	   cert_file:
+//	   key_file:
 // tenant:
 //   management_api: https://istioservices.apigee.net/edgemicro
-//   remote_service_api: https://myorg-test.apigee.net/istio-auth
-//   fluentd_config_file: /opt/apigee/customer/default.properties
+//   remote_service_api: https://myorg-test.apigee.net/remote-service
 //   org_name: myorg
 //   env_name: test
 //   key: mykey
@@ -153,6 +180,11 @@ func (c *Config) Validate() error {
 // analytics:
 //   legacy_endpoint: false
 //   file_limit: 1024
+//   fluentd_endpoint: apigee-udca-theganyo-apigee-test.apigee.svc.cluster.local:20001
+//	 tls:
+//     ca_file:
+//	   cert_file:
+//	   key_file:
 // auth:
 //   api_key_claim:
 //   api_key_cache_duration: 30m

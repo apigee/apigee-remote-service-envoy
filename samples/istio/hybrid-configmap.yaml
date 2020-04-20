@@ -12,11 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Example ConfigMap for apigee-remote-service-envoy configuration in Hybrid.
-# You must update the tenant values appropriately.
-# Note: Alternatively, you can use the generated config from the CLI directly.
-#       Direct the output to `config.yaml` and run the follow command on it:
-#       `kubectl -n apigee create configmap apigee-remote-service-envoy --from-file=config.yaml`
+# Example ConfigMap for an apigee-remote-service-envoy configuration in Hybrid.
+# In general, use the generated config from the CLI.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -24,10 +21,11 @@ metadata:
   namespace: apigee
 data:
   config.yaml: |
+    global:
+      api_address: :5000
+      metrics_address: :5001
     tenant:
-      # remote service should use cluster address
       remote_service_api: https://apigee-runtime-theganyo-apigee-test:8443/remote-service
-      fluentd_config_file: /opt/apigee/customer/default.properties
       org_name: theganyo-apigee
       env_name: test
       key: NotReal
@@ -38,6 +36,11 @@ data:
     analytics:
       file_limit: 1024
       collection_interval: 10s
+      fluentd_endpoint: apigee-udca-theganyo-apigee-test.apigee.svc.cluster.local:20001
+      tls:
+        ca_file: /opt/apigee/tls/ca.crt
+        cert_file: /opt/apigee/tls/tls.crt
+        key_file: /opt/apigee/tls/tls.key
     auth:
       api_key_cache_duration: 30m
       api_key_claim:

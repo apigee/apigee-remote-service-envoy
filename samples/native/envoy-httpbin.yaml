@@ -13,13 +13,6 @@
 # limitations under the License.
 
 # set up to forward to cluster: httpbin.default.svc.cluster.local
-admin:
-  access_log_path: /tmp/admin_access.log
-  address:
-    socket_address:
-      address: 127.0.0.1
-      port_value: 9000
-
 static_resources:
   listeners:
   - name: listener_0
@@ -40,10 +33,11 @@ static_resources:
               domains: ["*"]
               routes:
               - match:
-                  prefix: "/"
+                  prefix: /httpbin
                 route:
-                  cluster: backend
-                  host_rewrite: httpbin.default.svc.cluster.local
+                  host_rewrite: httpbin.org
+                  prefix_rewrite: /
+                  cluster: httpbin
                   
           http_filters:
           - name: envoy.ext_authz
@@ -63,20 +57,33 @@ static_resources:
                     cluster_name: apigee-remote-service-envoy
                 log_name: apigee-remote-service-envoy
               additional_request_headers_to_log:
-              - x-apigee-hc
+              - x-apigee-hc # context header
+              - :authority # target header
 
   clusters:
     
-  - name: backend
+  # define cluster for httpbin
+  - name: httpbin
     connect_timeout: 2s
-    type: STRICT_DNS
+    type: LOGICAL_DNS
     dns_lookup_family: V4_ONLY
     lb_policy: ROUND_ROBIN
-    hosts:
-    - socket_address:
-        address: 127.0.0.1
-        port_value: 11000
+    load_assignment:
+      cluster_name: httpbin
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: httpbin.org
+                port_value: 443
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext            
+        sni: httpbin.org
 
+  # define cluster for remote service
   - name: apigee-remote-service-envoy
     type: static
     http2_protocol_options: {}
@@ -103,3 +110,12 @@ static_resources:
           service_name: "envoy.service.auth.v2alpha.Authorization"
           authority: "server.domain.com"
     connect_timeout: 0.25s
+    # for custom SSL connection to remote-service
+    # transport_socket: 
+    #   name: envoy.transport_sockets.tls
+    #   typed_config:
+    #     "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+    #     common_tls_context:
+    #       tls_certificates: 
+    #       - certificate_chain: { filename: "/tls.crt" }
+    #         private_key: { filename: "/tls.key" }

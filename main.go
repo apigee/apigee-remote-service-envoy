@@ -15,22 +15,33 @@
 package main
 
 import (
-	"fmt"
+	"context"
+	"crypto/tls"
 	"net"
+	"net/http"
 	"os"
 
 	"github.com/apigee/apigee-remote-service-envoy/server"
 	"github.com/apigee/apigee-remote-service-golib/log"
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/health"
-	hproto "google.golang.org/grpc/health/grpc_health_v1"
+	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/keepalive"
 )
 
-var address string
-var logLevel string
-var configFile string
+const (
+	prometheusPath = "/metrics"
+)
+
+var (
+	logLevel   string
+	configFile string
+)
 
 func main() {
 
@@ -39,53 +50,116 @@ func main() {
 
 			log.Log.SetLevel(log.ParseLevel(logLevel))
 
-			lis, err := net.Listen("tcp", address)
-			if err != nil {
-				log.Errorf("failed to listen: %v", err)
-				panic(err)
-			}
-
 			config := server.DefaultConfig()
-			if err = config.Load(configFile); err != nil {
+			if err := config.Load(configFile); err != nil {
 				log.Errorf("Unable to load config: %s:\n%v", configFile, err)
 				os.Exit(1)
 			}
 
 			// ManagementAPI and RemoteServiceAPI are the same for GCP Experience
-			if config.Tenant.ManagementAPI == "" && config.Tenant.FluentdConfigFile != "" {
+			if config.Tenant.ManagementAPI == "" && config.Analytics.FluentdEndpoint != "" {
 				config.Tenant.ManagementAPI = config.Tenant.RemoteServiceAPI
 			}
 
 			log.Debugf("Config: %#v", config)
 
-			s := grpc.NewServer(grpc.KeepaliveParams(keepalive.ServerParameters{
-				MaxConnectionAge: config.Global.KeepAliveMaxConnectionAge,
-			}))
-
-			handler, err := server.NewHandler(config)
-			if err != nil {
-				log.Errorf("NewHandler: %v", err)
-				panic(err)
-			}
-
-			as := &server.AuthorizationServer{}
-			as.Register(s, handler)
-
-			ls := &server.AccessLogServer{}
-			ls.Register(s, handler)
-
-			health := health.NewServer()
-			health.SetServingStatus("", hproto.HealthCheckResponse_SERVING)
-			hproto.RegisterHealthServer(s, health)
-
-			fmt.Printf("listening on :%v\n", lis.Addr())
-			s.Serve(lis)
+			serve(config)
+			select {} // infinite loop
 		},
 	}
-	rootCmd.Flags().StringVarP(&address, "address", "a", ":5000", `Address to use for Adapter's gRPC API`)
 	rootCmd.Flags().StringVarP(&logLevel, "log_level", "l", "info", `Logging level`)
 	rootCmd.Flags().StringVarP(&configFile, "config", "c", "config.yaml", `Config file`)
 
 	rootCmd.SetArgs(os.Args[1:])
 	rootCmd.Execute()
+}
+
+func serve(config *server.Config) {
+
+	registry := prometheus.NewRegistry()
+	grpcMetrics := grpc_prometheus.NewServerMetrics()
+	registry.MustRegister(grpcMetrics)
+
+	// gRPC server
+	opts := []grpc.ServerOption{
+		grpc.KeepaliveParams(keepalive.ServerParameters{
+			MaxConnectionAge: config.Global.KeepAliveMaxConnectionAge,
+		}),
+		grpc.StreamInterceptor(grpcMetrics.StreamServerInterceptor()),
+		grpc.UnaryInterceptor(grpcMetrics.UnaryServerInterceptor()),
+	}
+
+	if config.Global.TLS.CertFile != "" {
+		creds, err := credentials.NewServerTLSFromFile(config.Global.TLS.CertFile, config.Global.TLS.KeyFile)
+		if err != nil {
+			panic(err)
+		}
+		opts = append(opts, grpc.Creds(creds))
+	}
+	grpcServer := grpc.NewServer(opts...)
+
+	// Apigee Remote Service
+	rsHandler, err := server.NewHandler(config)
+	if err != nil {
+		log.Errorf("gRPC NewHandler: %v", err)
+		panic(err)
+	}
+	as := &server.AuthorizationServer{}
+	as.Register(grpcServer, rsHandler)
+	ls := &server.AccessLogServer{}
+	ls.Register(grpcServer, rsHandler)
+
+	// health
+	health := health.NewServer()
+	health.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
+	grpc_health_v1.RegisterHealthServer(grpcServer, health)
+
+	// grpc listener
+	grpcListener, err := net.Listen("tcp", config.Global.APIAddress)
+	if err != nil {
+		panic(err)
+	}
+
+	log.Infof("listening: %s\n", config.Global.APIAddress)
+	go grpcServer.Serve(grpcListener)
+
+	// prometheus listener
+	metricsListener, err := net.Listen("tcp", config.Global.MetricsAddress)
+	if err != nil {
+		panic(err)
+	}
+
+	mux := http.NewServeMux()
+	mux.Handle(prometheusPath, promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		in := &grpc_health_v1.HealthCheckRequest{}
+		response, err := health.Check(context.Background(), in)
+		if err != nil {
+			w.Write([]byte(err.Error()))
+		} else {
+			if response.Status != grpc_health_v1.HealthCheckResponse_SERVING {
+				w.WriteHeader(500)
+			}
+			w.Write([]byte(response.Status.String()))
+		}
+	})
+
+	httpServer := &http.Server{
+		Addr:    config.Global.MetricsAddress,
+		Handler: mux,
+	}
+	if config.Global.TLS.CertFile != "" {
+		cert, err := tls.LoadX509KeyPair(config.Global.TLS.CertFile, config.Global.TLS.KeyFile)
+		if err != nil {
+			panic(err)
+		}
+		httpServer.TLSConfig = &tls.Config{
+			Certificates: []tls.Certificate{cert},
+			NextProtos:   []string{"h2"},
+		}
+		metricsListener = tls.NewListener(metricsListener, httpServer.TLSConfig)
+	}
+
+	log.Infof("listening: %s\n", config.Global.MetricsAddress)
+	go httpServer.Serve(metricsListener)
 }

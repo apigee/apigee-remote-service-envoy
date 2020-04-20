@@ -13,8 +13,9 @@ apigee-remote-service-envoy
 *.out
 coverage.txt
 
+# Misc
 config.yaml
-test.yaml
+*.vscode
 
 # Distribution
 dist/
