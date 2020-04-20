@@ -4,7 +4,7 @@
 *.dll
 *.so
 *.dylib
-apigee-remote-service-envoy
+*.vscode
 
 # Test binary, built with `go test -c`
 *.test
@@ -13,10 +13,11 @@ apigee-remote-service-envoy
 *.out
 coverage.txt
 
-# Misc
-config.yaml
-*.vscode
-
 # Distribution
 dist/
 temp/
+
+# Misc
+apigee-remote-service-envoy
+/config.yaml
+/configmap.yaml
