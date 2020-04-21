@@ -24,7 +24,6 @@ import (
 	"github.com/apigee/apigee-remote-service-envoy/server"
 	"github.com/apigee/apigee-remote-service-golib/log"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
@@ -76,17 +75,13 @@ func main() {
 
 func serve(config *server.Config) {
 
-	registry := prometheus.NewRegistry()
-	grpcMetrics := grpc_prometheus.NewServerMetrics()
-	registry.MustRegister(grpcMetrics)
-
 	// gRPC server
 	opts := []grpc.ServerOption{
 		grpc.KeepaliveParams(keepalive.ServerParameters{
 			MaxConnectionAge: config.Global.KeepAliveMaxConnectionAge,
 		}),
-		grpc.StreamInterceptor(grpcMetrics.StreamServerInterceptor()),
-		grpc.UnaryInterceptor(grpcMetrics.UnaryServerInterceptor()),
+		grpc.StreamInterceptor(grpc_prometheus.StreamServerInterceptor),
+		grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor),
 	}
 
 	if config.Global.TLS.CertFile != "" {
@@ -97,6 +92,7 @@ func serve(config *server.Config) {
 		opts = append(opts, grpc.Creds(creds))
 	}
 	grpcServer := grpc.NewServer(opts...)
+	grpc_prometheus.Register(grpcServer)
 
 	// Apigee Remote Service
 	rsHandler, err := server.NewHandler(config)
@@ -130,7 +126,7 @@ func serve(config *server.Config) {
 	}
 
 	mux := http.NewServeMux()
-	mux.Handle(prometheusPath, promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
+	mux.Handle(prometheusPath, promhttp.Handler())
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		in := &grpc_health_v1.HealthCheckRequest{}
 		response, err := health.Check(context.Background(), in)
