@@ -31,15 +31,16 @@ import (
 
 // A Handler is the main entry
 type Handler struct {
-	managementAPI    *url.URL
-	remoteServiceAPI *url.URL
-	orgName          string
-	envName          string
-	key              string
-	secret           string
-	apiKeyClaim      string
-	apiKeyHeader     string
-	targetHeader     string
+	managementAPI      *url.URL
+	remoteServiceAPI   *url.URL
+	orgName            string
+	envName            string
+	key                string
+	secret             string
+	apiKeyClaim        string
+	apiKeyHeader       string
+	targetHeader       string
+	rejectUnauthorized bool
 
 	productMan   *product.Manager
 	authMan      *auth.Manager
@@ -173,19 +174,20 @@ func NewHandler(config *Config) (*Handler, error) {
 	}
 
 	h := &Handler{
-		remoteServiceAPI: remoteServiceAPI,
-		managementAPI:    managementAPI,
-		orgName:          config.Tenant.OrgName,
-		envName:          config.Tenant.EnvName,
-		key:              config.Tenant.Key,
-		secret:           config.Tenant.Secret,
-		productMan:       productMan,
-		authMan:          authMan,
-		analyticsMan:     analyticsMan,
-		quotaMan:         quotaMan,
-		apiKeyClaim:      config.Auth.APIKeyClaim,
-		apiKeyHeader:     config.Auth.APIKeyHeader,
-		targetHeader:     config.Auth.TargetHeader,
+		remoteServiceAPI:   remoteServiceAPI,
+		managementAPI:      managementAPI,
+		orgName:            config.Tenant.OrgName,
+		envName:            config.Tenant.EnvName,
+		key:                config.Tenant.Key,
+		secret:             config.Tenant.Secret,
+		productMan:         productMan,
+		authMan:            authMan,
+		analyticsMan:       analyticsMan,
+		quotaMan:           quotaMan,
+		apiKeyClaim:        config.Auth.APIKeyClaim,
+		apiKeyHeader:       config.Auth.APIKeyHeader,
+		targetHeader:       config.Auth.TargetHeader,
+		rejectUnauthorized: config.Auth.RejectUnauthorized,
 	}
 
 	return h, nil

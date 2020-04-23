@@ -15,67 +15,71 @@
 package server
 
 import (
-	"encoding/base64"
-	"encoding/json"
+	"strings"
 
 	"github.com/apigee/apigee-remote-service-golib/auth"
 	"github.com/apigee/apigee-remote-service-golib/log"
+	core "github.com/envoyproxy/go-control-plane/envoy/api/v2/core"
 )
 
-const headerContextKey = "x-apigee-hc"
+const headerAuthorized = "x-apigee-authorized"
+const headerAccessToken = "x-apigee-accesstoken"
+const headerAPI = "x-apigee-api"
+const headerAPIProducts = "x-apigee-apiproducts"
+const headerApplication = "x-apigee-application"
+const headerClientID = "x-apigee-clientid"
+const headerDeveloperEmail = "x-apigee-developeremail"
+const headerEnvironment = "x-apigee-enviroment"
+const headerOrganization = "x-apigee-organization"
+const headerScopes = "x-apigee-scopes"
 
-// note: authContext Scopes, Expires, and APIKey are not needed for ax
-type headerContext struct {
-	DeveloperEmail string   `json:"Dev"`
-	Application    string   `json:"App"`
-	AccessToken    string   `json:"Tok"`
-	ClientID       string   `json:"CID"`
-	Organization   string   `json:"Org"`
-	Environment    string   `json:"Env"`
-	API            string   `json:"API"`
-	APIProducts    []string `json:"Pro"`
-}
-
-func makeHeaderContext(api string, ac *auth.Context) *headerContext {
+func makeMetadataHeaders(api string, ac *auth.Context) []*core.HeaderValueOption {
 	if ac == nil {
 		return nil
 	}
-	return &headerContext{
-		AccessToken:    ac.AccessToken,
-		Application:    ac.Application,
-		API:            api,
-		APIProducts:    ac.APIProducts,
-		ClientID:       ac.ClientID,
-		DeveloperEmail: ac.DeveloperEmail,
-		Environment:    ac.Environment(),
-		Organization:   ac.Organization(),
+
+	return []*core.HeaderValueOption{
+		header(headerAccessToken, ac.AccessToken),
+		header(headerAPI, api),
+		header(headerAPIProducts, strings.Join(ac.APIProducts, ",")),
+		header(headerApplication, ac.Application),
+		header(headerClientID, ac.ClientID),
+		header(headerDeveloperEmail, ac.DeveloperEmail),
+		header(headerEnvironment, ac.Environment()),
+		header(headerOrganization, ac.Organization()),
+		header(headerScopes, strings.Join(ac.Scopes, ",")),
 	}
 }
 
-func (hc *headerContext) encode() string {
-	msg, err := json.Marshal(hc)
-	if err != nil {
-		log.Errorf("encode header: %v", err)
-		return ""
+func header(key, value string) *core.HeaderValueOption {
+	return &core.HeaderValueOption{
+		Header: &core.HeaderValue{
+			Key:   key,
+			Value: value,
+		},
 	}
-	return base64.StdEncoding.EncodeToString([]byte(msg))
 }
 
-func decodeHeaderContext(h *Handler, data string) (string, *auth.Context) {
-	hc := &headerContext{}
-	msg, err := base64.StdEncoding.DecodeString(data)
-	if err != nil {
-		log.Errorf("decode header: %v", err)
-	} else {
-		json.Unmarshal(msg, hc)
+func (a *AccessLogServer) decodeMetadataHeaders(headers map[string]string) (string, *auth.Context) {
+
+	h := a.handler
+	api, ok := headers[headerAPI]
+	if !ok {
+		if api, ok = headers[h.targetHeader]; ok {
+			log.Debugf("No context header %s, using target header: %s", headerAPI, h.targetHeader)
+		} else {
+			log.Debugf("No context header %s or target header: %", headerAPI, h.targetHeader)
+			return "", nil
+		}
 	}
 
-	return hc.API, &auth.Context{
+	// org and env already set
+	return api, &auth.Context{
 		Context:        h,
-		AccessToken:    hc.AccessToken,
-		Application:    hc.Application,
-		APIProducts:    hc.APIProducts,
-		ClientID:       hc.ClientID,
-		DeveloperEmail: hc.DeveloperEmail,
+		AccessToken:    headers[headerAccessToken],
+		APIProducts:    strings.Split(headers[headerAPIProducts], ","),
+		Application:    headers[headerApplication],
+		ClientID:       headers[headerClientID],
+		DeveloperEmail: headers[headerDeveloperEmail],
 	}
 }

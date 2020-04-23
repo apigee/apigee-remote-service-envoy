@@ -18,7 +18,6 @@ import (
 	"strings"
 
 	"github.com/apigee/apigee-remote-service-golib/analytics"
-	"github.com/apigee/apigee-remote-service-golib/auth"
 	"github.com/apigee/apigee-remote-service-golib/log"
 	als "github.com/envoyproxy/go-control-plane/envoy/service/accesslog/v2"
 	"github.com/golang/protobuf/ptypes"
@@ -53,26 +52,14 @@ func (a *AccessLogServer) StreamAccessLogs(srv als.AccessLogService_StreamAccess
 
 		for _, v := range msg.HttpLogs.LogEntry {
 			req := v.Request
-			cp := v.CommonProperties
-
-			var api string
-			var authContext *auth.Context
-
-			if header, ok := v.Request.RequestHeaders[headerContextKey]; ok {
-				api, authContext = decodeHeaderContext(a.handler, header)
-			} else { // no auth context, do our best
-				if api, ok = v.Request.RequestHeaders[a.handler.targetHeader]; !ok {
-					log.Debugf("No context header %s or target header %s, skipped accesslog: %#v", a.handler.targetHeader, headerContextKey, v.Request)
-					continue
-				}
-				log.Debugf("No context header %s, using target header %s: %#v", headerContextKey, a.handler.targetHeader, v.Request)
-				authContext = &auth.Context{
-					Context: a.handler,
-				}
+			api, authContext := a.decodeMetadataHeaders(req.RequestHeaders)
+			if api == "" {
+				log.Debugf("Unknown target, skipped accesslog: %#v", v.Request)
+				continue
 			}
 
+			cp := v.CommonProperties
 			requestPath := strings.SplitN(req.Path, "?", 2)[0] // Apigee doesn't want query params in requestPath
-
 			record := analytics.Record{
 				ClientReceivedStartTimestamp: timeToUnix(cp.StartTime),
 				ClientReceivedEndTimestamp:   add(cp.StartTime, cp.TimeToLastRxByte),

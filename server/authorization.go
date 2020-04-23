@@ -31,6 +31,10 @@ import (
 	"google.golang.org/grpc"
 )
 
+const (
+	jwtFilterMetadataKey = "envoy.filters.http.jwt_authn"
+)
+
 // AuthorizationServer server
 type AuthorizationServer struct {
 	handler *Handler
@@ -42,12 +46,14 @@ func (a *AuthorizationServer) Register(s *grpc.Server, handler *Handler) {
 	a.handler = handler
 }
 
-const (
-	jwtFilterMetadataKey = "envoy.filters.http.jwt_authn"
-)
-
 // Check does check
 func (a *AuthorizationServer) Check(ctx context.Context, req *auth.CheckRequest) (*auth.CheckResponse, error) {
+
+	api, ok := req.Attributes.Request.Http.Headers[a.handler.targetHeader]
+	if !ok {
+		log.Debugf("missing target header %s", a.handler.targetHeader)
+		return a.unauthenticated(), nil
+	}
 
 	// check for JWT from Envoy filter
 	protoBufStruct := req.Attributes.GetMetadataContext().GetFilterMetadata()[jwtFilterMetadataKey]
@@ -59,13 +65,13 @@ func (a *AuthorizationServer) Check(ctx context.Context, req *auth.CheckRequest)
 		claims = DecodeToMap(v.GetStructValue())
 	}
 
-	splits := strings.SplitN(req.Attributes.Request.Http.Path, "?", 2)
-	path := splits[0]
+	splitPath := strings.SplitN(req.Attributes.Request.Http.Path, "?", 2)
+	path := splitPath[0]
 
-	apiKey := req.Attributes.Request.Http.Headers[a.handler.apiKeyHeader] // grab from header
+	apiKey, ok := req.Attributes.Request.Http.Headers[a.handler.apiKeyHeader] // grab from header
 
-	if apiKey == "" && len(splits) > 1 { // look in query if not in header
-		if qs, err := url.ParseQuery(splits[1]); err == nil {
+	if !ok && len(splitPath) > 1 { // look in querystring if not in header
+		if qs, err := url.ParseQuery(splitPath[1]); err == nil {
 			if keys, ok := qs[a.handler.apiKeyHeader]; ok {
 				apiKey = keys[0]
 			}
@@ -75,22 +81,21 @@ func (a *AuthorizationServer) Check(ctx context.Context, req *auth.CheckRequest)
 	authContext, err := a.handler.authMan.Authenticate(a.handler, apiKey, claims, a.handler.apiKeyClaim)
 	switch err {
 	case libAuth.ErrNoAuth:
-		return unauthenticated(), nil
+		return a.unauthenticated(), nil
 	case libAuth.ErrBadAuth:
-		return unauthorized(), nil
+		return a.unauthorized(authContext, api), nil
 	case libAuth.ErrInternalError:
-		return internalError(err), nil
+		return a.internalError(err), nil
 	}
 
 	if len(authContext.APIProducts) == 0 {
-		return unauthorized(), nil
+		return a.unauthorized(authContext, api), nil
 	}
 
 	// match products
-	api := req.Attributes.Request.Http.Headers[a.handler.targetHeader]
 	products := a.handler.productMan.Resolve(authContext, api, path)
 	if len(products) == 0 {
-		return unauthorized(), nil
+		return a.unauthorized(authContext, api), nil
 	}
 
 	// apply quotas to all matched products
@@ -110,20 +115,24 @@ func (a *AuthorizationServer) Check(ctx context.Context, req *auth.CheckRequest)
 		}
 	}
 	if anyError != nil {
-		return internalError(anyError), nil
+		return a.internalError(anyError), nil
 	}
 	if exceeded {
-		log.Debugf("quota exceeded: %v", err)
-		return quotaExceeded(), nil
+		return a.quotaExceeded(authContext, api), nil
 	}
 
-	return authOK(authContext, api, path), nil
+	return a.authOK(authContext, api), nil
 }
 
-func authOK(authContext *aauth.Context, api, path string) *auth.CheckResponse {
+func (a *AuthorizationServer) authOK(authContext *aauth.Context, api string) *auth.CheckResponse {
 
-	hc := makeHeaderContext(api, authContext)
-	data := hc.encode()
+	headers := makeMetadataHeaders(api, authContext)
+	headers = append(headers, &core.HeaderValueOption{
+		Header: &core.HeaderValue{
+			Key:   headerAuthorized,
+			Value: "true",
+		},
+	})
 
 	return &auth.CheckResponse{
 		Status: &rpcstatus.Status{
@@ -131,82 +140,57 @@ func authOK(authContext *aauth.Context, api, path string) *auth.CheckResponse {
 		},
 		HttpResponse: &auth.CheckResponse_OkResponse{
 			OkResponse: &auth.OkHttpResponse{
-				Headers: []*core.HeaderValueOption{
-					{
-						Header: &core.HeaderValue{
-							Key:   headerContextKey,
-							Value: data,
-						},
+				Headers: headers,
+			},
+		},
+	}
+}
+
+func (a *AuthorizationServer) unauthenticated() *auth.CheckResponse {
+	return a.createDenyResponse(nil, "", rpc.UNAUTHENTICATED)
+}
+
+func (a *AuthorizationServer) internalError(err error) *auth.CheckResponse {
+	log.Errorf("sending internal error: %v", err)
+	return a.createDenyResponse(nil, "", rpc.INTERNAL)
+}
+
+func (a *AuthorizationServer) unauthorized(authContext *aauth.Context, api string) *auth.CheckResponse {
+	return a.createDenyResponse(authContext, api, rpc.PERMISSION_DENIED)
+}
+
+func (a *AuthorizationServer) quotaExceeded(authContext *aauth.Context, api string) *auth.CheckResponse {
+	return a.createDenyResponse(authContext, api, rpc.RESOURCE_EXHAUSTED)
+}
+
+func (a *AuthorizationServer) createDenyResponse(authContext *aauth.Context, api string, code rpc.Code) *auth.CheckResponse {
+
+	if a.handler.rejectUnauthorized || authContext == nil { // send reject
+		log.Debugf("sending denied: %s", code.String())
+
+		return &auth.CheckResponse{
+			Status: &rpcstatus.Status{
+				Code: int32(code),
+			},
+			HttpResponse: &auth.CheckResponse_DeniedResponse{
+				DeniedResponse: &auth.DeniedHttpResponse{
+					Status: &envoy_type.HttpStatus{
+						Code: envoy_type.StatusCode(code),
 					},
+					Body: code.String(),
 				},
 			},
-		},
+		}
 	}
-}
 
-func unauthenticated() *auth.CheckResponse {
-	log.Debugf("unauthenticated")
+	log.Debugf("sending ok (actual: %s)", code.String())
 	return &auth.CheckResponse{
 		Status: &rpcstatus.Status{
-			Code: int32(rpc.UNAUTHENTICATED),
+			Code: int32(rpc.OK),
 		},
-		HttpResponse: &auth.CheckResponse_DeniedResponse{
-			DeniedResponse: &auth.DeniedHttpResponse{
-				Status: &envoy_type.HttpStatus{
-					Code: envoy_type.StatusCode_Unauthorized,
-				},
-				Body: "Authorization malformed or not provided",
-			},
-		},
-	}
-}
-
-func unauthorized() *auth.CheckResponse {
-	log.Debugf("unauthorized")
-	return &auth.CheckResponse{
-		Status: &rpcstatus.Status{
-			Code: int32(rpc.PERMISSION_DENIED),
-		},
-		HttpResponse: &auth.CheckResponse_DeniedResponse{
-			DeniedResponse: &auth.DeniedHttpResponse{
-				Status: &envoy_type.HttpStatus{
-					Code: envoy_type.StatusCode_Unauthorized,
-				},
-				Body: "Authenticated caller is not authorized for this action",
-			},
-		},
-	}
-}
-
-func quotaExceeded() *auth.CheckResponse {
-	log.Debugf("quota exceeded")
-	return &auth.CheckResponse{
-		Status: &rpcstatus.Status{
-			Code: int32(rpc.RESOURCE_EXHAUSTED),
-		},
-		HttpResponse: &auth.CheckResponse_DeniedResponse{
-			DeniedResponse: &auth.DeniedHttpResponse{
-				Status: &envoy_type.HttpStatus{
-					Code: envoy_type.StatusCode_TooManyRequests,
-				},
-				Body: "Quota exceeded",
-			},
-		},
-	}
-}
-
-func internalError(err error) *auth.CheckResponse {
-	log.Errorf("internal error: %v", err)
-	return &auth.CheckResponse{
-		Status: &rpcstatus.Status{
-			Code: int32(rpc.INTERNAL),
-		},
-		HttpResponse: &auth.CheckResponse_DeniedResponse{
-			DeniedResponse: &auth.DeniedHttpResponse{
-				Status: &envoy_type.HttpStatus{
-					Code: envoy_type.StatusCode_InternalServerError,
-				},
-				Body: "Server error",
+		HttpResponse: &auth.CheckResponse_OkResponse{
+			OkResponse: &auth.OkHttpResponse{
+				Headers: makeMetadataHeaders(api, authContext),
 			},
 		},
 	}

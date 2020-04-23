@@ -50,6 +50,30 @@ spec:
           metadata_context_namespaces:
             - envoy.filters.http.jwt_authn
 
+  - applyTo: HTTP_FILTER
+    match:
+      context: SIDECAR_INBOUND
+      listener:
+        filterChain:
+          filter:
+            name: envoy.http_connection_manager
+            subFilter:
+              name: envoy.ext_authz
+    
+    patch:
+      operation: INSERT_AFTER
+      value:
+        name: envoy.filters.http.rbac
+        config:
+          rules:
+            action: ALLOW
+            policies:
+              apigee-connector:
+                principals:
+                - any: true
+                permissions:
+                - header: { "name": "X-Apigee-Authorized" }
+
   - applyTo: NETWORK_FILTER
     match:
       context: SIDECAR_INBOUND
@@ -77,5 +101,11 @@ spec:
                     #   private_key:
                     #   cert_chain:
               additional_request_headers_to_log:
-              - x-apigee-hc # context header
-              - :authority # target header
+              - :authority # default target header
+              # context headers
+              - x-apigee-accesstoken
+              - x-apigee-api
+              - x-apigee-apiproducts
+              - x-apigee-application
+              - x-apigee-clientid
+              - x-apigee-developeremail
