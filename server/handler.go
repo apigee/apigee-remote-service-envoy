@@ -31,7 +31,7 @@ import (
 
 // A Handler is the main entry
 type Handler struct {
-	managementAPI      *url.URL
+	internalAPI        *url.URL
 	remoteServiceAPI   *url.URL
 	orgName            string
 	envName            string
@@ -48,9 +48,9 @@ type Handler struct {
 	quotaMan     *quota.Manager
 }
 
-// ManagementAPI is the management base
-func (h *Handler) ManagementAPI() *url.URL {
-	return h.managementAPI
+// InternalAPI is the internal api base (legacy)
+func (h *Handler) InternalAPI() *url.URL {
+	return h.internalAPI
 }
 
 // RemoteServiceAPI is the remote service base
@@ -81,10 +81,10 @@ func (h *Handler) Secret() string {
 // NewHandler creates a handler
 func NewHandler(config *Config) (*Handler, error) {
 
-	var managementAPI, remoteServiceAPI *url.URL
+	var internalAPI, remoteServiceAPI *url.URL
 	var err error
-	if config.Tenant.ManagementAPI != "" {
-		managementAPI, err = url.Parse(config.Tenant.ManagementAPI)
+	if config.Tenant.InternalAPI != "" {
+		internalAPI, err = url.Parse(config.Tenant.InternalAPI)
 		if err != nil {
 			return nil, err
 		}
@@ -158,7 +158,7 @@ func NewHandler(config *Config) (*Handler, error) {
 		LegacyEndpoint:     false,
 		BufferPath:         analyticsDir,
 		StagingFileLimit:   2024,
-		BaseURL:            managementAPI,
+		BaseURL:            internalAPI,
 		Key:                config.Tenant.Key,
 		Secret:             config.Tenant.Secret,
 		Client:             httpClient,
@@ -175,7 +175,7 @@ func NewHandler(config *Config) (*Handler, error) {
 
 	h := &Handler{
 		remoteServiceAPI:   remoteServiceAPI,
-		managementAPI:      managementAPI,
+		internalAPI:        internalAPI,
 		orgName:            config.Tenant.OrgName,
 		envName:            config.Tenant.EnvName,
 		key:                config.Tenant.Key,

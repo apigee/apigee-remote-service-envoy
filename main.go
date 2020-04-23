@@ -55,19 +55,14 @@ func main() {
 				os.Exit(1)
 			}
 
-			// ManagementAPI and RemoteServiceAPI are the same for GCP Experience
-			if config.Tenant.ManagementAPI == "" && config.Analytics.FluentdEndpoint != "" {
-				config.Tenant.ManagementAPI = config.Tenant.RemoteServiceAPI
-			}
-
 			log.Debugf("Config: %#v", config)
 
 			serve(config)
 			select {} // infinite loop
 		},
 	}
-	rootCmd.Flags().StringVarP(&logLevel, "log_level", "l", "info", `Logging level`)
-	rootCmd.Flags().StringVarP(&configFile, "config", "c", "config.yaml", `Config file`)
+	rootCmd.Flags().StringVarP(&logLevel, "log_level", "l", "info", "Logging level")
+	rootCmd.Flags().StringVarP(&configFile, "config", "c", "config.yaml", "Config file")
 
 	rootCmd.SetArgs(os.Args[1:])
 	rootCmd.Execute()

@@ -79,7 +79,7 @@ type TLSConfig struct {
 
 // TenantConfig is config relating to an Apigee tentant
 type TenantConfig struct {
-	ManagementAPI          string        `yaml:"management_api,omitempty"`
+	InternalAPI            string        `yaml:"internal_api,omitempty"`
 	RemoteServiceAPI       string        `yaml:"remote_service_api"`
 	OrgName                string        `yaml:"org_name"`
 	EnvName                string        `yaml:"env_name"`
@@ -132,8 +132,8 @@ func (c *Config) Validate() error {
 	if c.Tenant.RemoteServiceAPI == "" {
 		errs = multierror.Append(errs, fmt.Errorf("tenant.remote_service_api is required"))
 	}
-	if c.Tenant.ManagementAPI == "" && c.Analytics.FluentdEndpoint == "" {
-		errs = multierror.Append(errs, fmt.Errorf("tenant.management_api or tenant.analytics.fluentd_endpoint is required"))
+	if c.Tenant.InternalAPI == "" && c.Analytics.FluentdEndpoint == "" {
+		errs = multierror.Append(errs, fmt.Errorf("tenant.internal_api or tenant.analytics.fluentd_endpoint is required"))
 	}
 	if c.Tenant.OrgName == "" {
 		errs = multierror.Append(errs, fmt.Errorf("tenant.org_name is required"))
@@ -169,7 +169,7 @@ func (c *Config) Validate() error {
 //	   cert_file:
 //	   key_file:
 // tenant:
-//   management_api: https://istioservices.apigee.net/edgemicro
+//   internal_api: https://istioservices.apigee.net/edgemicro
 //   remote_service_api: https://myorg-test.apigee.net/remote-service
 //   org_name: myorg
 //   env_name: test
