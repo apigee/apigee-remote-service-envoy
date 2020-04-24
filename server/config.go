@@ -158,38 +158,42 @@ func (c *Config) Validate() error {
 	return errs
 }
 
-// # Example Config file
-// global:
-// 	 temp_dir: /tmp/apigee-istio
-//   keep_alive_max_connection_age: 10m
-//   api_address: :5000
-//   metrics_address: :5001
-//	 tls:
-//     ca_file:
-//	   cert_file:
-//	   key_file:
-// tenant:
-//   internal_api: https://istioservices.apigee.net/edgemicro
-//   remote_service_api: https://myorg-test.apigee.net/remote-service
-//   org_name: myorg
-//   env_name: test
-//   key: mykey
-//   secret: mysecret
-//   client_timeout: 30s
-//   allow_Unverified_ssl_cert: false
-// products:
-//   refresh_rate: 2m
-// analytics:
-//   legacy_endpoint: false
-//   file_limit: 1024
-//   fluentd_endpoint: apigee-udca-theganyo-apigee-test.apigee.svc.cluster.local:20001
-//	 tls:
-//     ca_file:
-//	   cert_file:
-//	   key_file:
-// auth:
-//   api_key_claim:
-//   api_key_cache_duration: 30m
-//   api_key_header: x-api-key
-//   api_target_header: :authority
-//   reject_unauthorized: true
+/*
+# Full Config example
+global:
+	temp_dir: /tmp/apigee-istio
+  keep_alive_max_connection_age: 10m
+  api_address: :5000
+  metrics_address: :5001
+	  tls:
+	    cert_file:
+	    key_file:
+tenant:
+  internal_api: https://istioservices.apigee.net/edgemicro
+  remote_service_api: https://myorg-test.apigee.net/remote-service
+  org_name: myorg
+  env_name: test
+  key: mykey
+  secret: mysecret
+  client_timeout: 30s
+  allow_Unverified_ssl_cert: false
+products:
+  refresh_rate: 2m
+analytics:
+  legacy_endpoint: false
+  file_limit: 1024
+  send_channel_size: 10
+  collection_interval: 10s
+  fluentd_endpoint: apigee-udca-theganyo-apigee-test.apigee.svc.cluster.local:20001
+	  tls:
+      ca_file: /opt/apigee/tls/ca.crt
+	    cert_file: /opt/apigee/tls/tls.crt
+	    key_file: /opt/apigee/tls/tls.key
+auth:
+  api_key_claim:
+  api_key_cache_duration: 30m
+  api_key_header: x-api-key
+  api_target_header: :authority
+  reject_unauthorized: true
+  jwks_poll_interval: don't use
+*/

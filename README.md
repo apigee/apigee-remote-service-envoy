@@ -13,7 +13,6 @@ Apigee integration for Envoy.
 2. Configure and run [apigee-remote-service-envoy](run-apigee-remote-service-envoy) 
 3. Configure and run [Envoy](run-the-envoy-proxy)
 
-
 ## Choose your target
 
 For standalone, it's often simplest to use an existing service:
@@ -97,9 +96,19 @@ from your YAML file:
 
 #### Deployment and Service
 
-Now create the `apigee-remote-service-envoy` Deployment and Service: 
+Now create the `apigee-remote-service-envoy` Deployment and Service.
+
+#### Apigee SaaS
+
+Edit `samples/istio/saas-apigee-remote-service-envoy.yaml` to set the image to your version.
 
     kubectl apply -f samples/istio/saas-apigee-remote-service-envoy.yaml
+
+#### Apigee Hybrid
+
+Edit `samples/istio/hybrid-apigee-remote-service-envoy.yaml` to set the image to your version.
+
+    kubectl apply -f samples/istio/hybrid-apigee-remote-service-envoy.yaml
 
 ## Run the Envoy Proxy
 
@@ -113,14 +122,14 @@ for Envoy deployment. Bare Envoy and Istio are described below.
 ## Native Envoy
 
 Just get Envoy and run with configuration! There's an example 
-[here](samples/native/envoy-config.yaml). Edit the file to set your target and remote 
-service clusters and run.
+[here](samples/native/envoy-httpbin.yaml). Edit the file to set your target and remote 
+service clusters and run:
 
-    envoy-static -c envoy-config.yaml
+    envoy-static -c samples/native/envoy-httpbin.yaml
 
 ## Istio 
 
-Apply the EnvoyFilter:
+In Istio, you'll apply the EnvoyFilter:
 
     kubectl apply -f samples/istio/envoyfilter-sidecar.yaml
 
