@@ -80,7 +80,7 @@ We'll create an API Product, Developer, and App that will control access.
 * Set `Access` to `Private`.
 * Set the `Quota` to `5` requests every `1` `minute`.
 * Add a `Path` with the `+Custom Resource` button. Set the path to `/`.
-* Create a `Custom attribute` with key `apigee-remote-service-targets` and value `httpbin.default.svc.cluster.local`.
+* Create a `Custom attribute` with key: `apigee-remote-service-targets` and value: `httpbin.default.svc.cluster.local`.
 * Click the blue `Save` button.
 
 Note: You can also use the `apigee-remote-sevice-cli` command to set service targets. Note that the value we used
@@ -92,7 +92,7 @@ is the just the DNS name of the httpbin service we created in Kubernetes.
 * Use whatever values you wish. Be creative.
 * Save the Developer.
 
-3. Create an App.
+2. Create an App.
 
 * Click on `Apps` in the left menu and click the blue `+ App` button.
 * In the `App Details` section, set the name to `httpbin`.
@@ -101,7 +101,7 @@ is the just the DNS name of the httpbin service we created in Kubernetes.
 * Choose the `httpbin` product and click the blue `Add` button.
 * Click the blue `Create` button.
 
-1. Obtain Credentials
+3. Obtain Credentials
 
 By creating an App, you've created a set of credentials that grant the `Developer` you created 
 access to your `API Product`. Note: The Credentials status should say `Approved`.
@@ -120,11 +120,12 @@ You should now be able to access your service again. Just include the API Key in
 
 That's the basics! There's a lot more you can do including:
 
-* Hitting the quota. (We set it to 5 per minute, try it out.)
-* Generating and use JWT tokens with OAuth scopes
-* Access analytics (see the `Analyze` menu in the Apigee UI)
-* Create custom rules for access
+* Hit the quota. (We set it to 5 per minute, run that curl a few more times.)
+* Generate and use JWT tokens with OAuth scopes.
+* Access analytics (see the `Analyze` menu in the Apigee UI).
+* Use the CLI to control bindings.
+* Create custom authorization rules.
 
-But that's another doc.
+But that's in another doc.
 
 Enjoy!
