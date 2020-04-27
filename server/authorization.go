@@ -25,7 +25,6 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/quota"
 	core "github.com/envoyproxy/go-control-plane/envoy/api/v2/core"
 	auth "github.com/envoyproxy/go-control-plane/envoy/service/auth/v2"
-	envoy_type "github.com/envoyproxy/go-control-plane/envoy/type"
 	"github.com/gogo/googleapis/google/rpc"
 	rpcstatus "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc"
@@ -171,14 +170,6 @@ func (a *AuthorizationServer) createDenyResponse(authContext *aauth.Context, api
 		return &auth.CheckResponse{
 			Status: &rpcstatus.Status{
 				Code: int32(code),
-			},
-			HttpResponse: &auth.CheckResponse_DeniedResponse{
-				DeniedResponse: &auth.DeniedHttpResponse{
-					Status: &envoy_type.HttpStatus{
-						Code: envoy_type.StatusCode(code),
-					},
-					Body: code.String(),
-				},
 			},
 		}
 	}
