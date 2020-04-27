@@ -47,13 +47,39 @@ static_resources:
                   cluster: httpbin
                   
           http_filters:
+          - name: envoy.filters.http.jwt_authn
+            config:
+              providers:
+                apigee:
+                  issuer: https://theganyo1-eval-test.apigee.net/remote-service/token
+                  audiences:
+                  - remote-service-client
+                  remote_jwks:
+                    http_uri:
+                      uri: https://theganyo1-eval-test.apigee.net/remote-service/certs
+                      cluster: apigee-auth-service
+                      timeout: 5s
+                    cache_duration:
+                      seconds: 300
+                  payload_in_metadata: apigee
+              rules:
+              - match:
+                  prefix: /
+                requires:
+                  requires_any:
+                    requirements:
+                    - provider_name: apigee
+                    - allow_missing: {}
+
           - name: envoy.ext_authz
             config:
               grpc_service:
                 envoy_grpc:
                   cluster_name: apigee-remote-service-envoy
                 timeout: 1s                
-          
+              metadata_context_namespaces:
+              - envoy.filters.http.jwt_authn
+
           - name: envoy.filters.http.rbac
             config:
               rules:
@@ -144,3 +170,23 @@ static_resources:
     #       tls_certificates: 
     #       - certificate_chain: { filename: "/tls.crt" }
     #         private_key: { filename: "/tls.key" }
+
+  - name: apigee-auth-service
+    connect_timeout: 2s
+    type: LOGICAL_DNS
+    dns_lookup_family: V4_ONLY
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: apigee-auth-service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: theganyo1-eval-test.apigee.net
+                port_value: 443
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+        sni: theganyo1-eval-test.apigee.net
