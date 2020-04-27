@@ -12,7 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# set up to forward to cluster: httpbin.default.svc.cluster.local
+# This example forwards to httpbin.org.
+# The Apigee API Product must be bound to `httpbin.org`.
+# You may use either JWT or API Key to authenticate.
+# Before use, you must edit and change:
+# 1. all references to `theganyo1-eval-test.apigee.net` to your Apigee runtime.
+# 2. the apigee-remote-service-envoy cluster's `socket_address` to service location.
+
 admin:
   access_log_path: /tmp/admin_access.log
   address:
@@ -42,11 +48,22 @@ static_resources:
               - match:
                   prefix: /httpbin
                 route:
-                  host_rewrite: httpbin.org
                   prefix_rewrite: /
                   cluster: httpbin
-                  
+                per_filter_config:
+                  envoy.filters.http.dynamic_forward_proxy: # rewrite :authority for Apigee product check
+                    host_rewrite: httpbin.org
+
           http_filters:
+
+          # rewrite :authority for Apigee product check
+          - name: envoy.filters.http.dynamic_forward_proxy
+            config:
+              dns_cache_config: 
+                name: dynamic_forward_proxy_cache_config
+                dns_lookup_family: "V4_ONLY"
+
+          # evaluate JWT tokens, allow_missing allows API Key also
           - name: envoy.filters.http.jwt_authn
             config:
               providers:
@@ -71,6 +88,7 @@ static_resources:
                     - provider_name: apigee
                     - allow_missing: {}
 
+          # evaluate Apigee rules
           - name: envoy.ext_authz
             config:
               grpc_service:
@@ -80,6 +98,7 @@ static_resources:
               metadata_context_namespaces:
               - envoy.filters.http.jwt_authn
 
+          # evaluate RBAC (necessary for Apigee config: reject_unauthorized == false)
           - name: envoy.filters.http.rbac
             config:
               rules:
@@ -94,6 +113,8 @@ static_resources:
           - name: envoy.filters.http.router
 
           access_log: 
+
+          # collect Apigee analytics
           - name: envoy.http_grpc_access_log 
             config:
               common_config:
@@ -113,7 +134,7 @@ static_resources:
 
   clusters:
     
-  # define cluster for httpbin
+  # define cluster for httpbin.org target
   - name: httpbin
     connect_timeout: 2s
     type: LOGICAL_DNS
@@ -134,7 +155,7 @@ static_resources:
         "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
         sni: httpbin.org
 
-  # define cluster for remote service
+  # define cluster for Apigee remote service
   - name: apigee-remote-service-envoy
     type: static
     http2_protocol_options: {}
@@ -157,9 +178,7 @@ static_resources:
         no_traffic_interval: 5s
         unhealthy_threshold: 1
         healthy_threshold: 3
-        grpc_health_check:
-          service_name: "envoy.service.auth.v2alpha.Authorization"
-          authority: "server.domain.com"
+        grpc_health_check: {}
     connect_timeout: 0.25s
     # for custom SSL connection to remote-service
     # transport_socket: 
@@ -171,6 +190,7 @@ static_resources:
     #       - certificate_chain: { filename: "/tls.crt" }
     #         private_key: { filename: "/tls.key" }
 
+  # define cluster for Apigee JWKS certs
   - name: apigee-auth-service
     connect_timeout: 2s
     type: LOGICAL_DNS
