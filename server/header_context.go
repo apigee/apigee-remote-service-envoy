@@ -60,9 +60,8 @@ func header(key, value string) *core.HeaderValueOption {
 	}
 }
 
-func (a *AccessLogServer) decodeMetadataHeaders(headers map[string]string) (string, *auth.Context) {
+func (h *Handler) decodeMetadataHeaders(headers map[string]string) (string, *auth.Context) {
 
-	h := a.handler
 	api, ok := headers[headerAPI]
 	if !ok {
 		if api, ok = headers[h.targetHeader]; ok {
@@ -81,5 +80,6 @@ func (a *AccessLogServer) decodeMetadataHeaders(headers map[string]string) (stri
 		Application:    headers[headerApplication],
 		ClientID:       headers[headerClientID],
 		DeveloperEmail: headers[headerDeveloperEmail],
+		Scopes:         strings.Split(headers[headerScopes], ","),
 	}
 }

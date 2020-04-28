@@ -52,7 +52,7 @@ func (a *AccessLogServer) StreamAccessLogs(srv als.AccessLogService_StreamAccess
 
 		for _, v := range msg.HttpLogs.LogEntry {
 			req := v.Request
-			api, authContext := a.decodeMetadataHeaders(req.RequestHeaders)
+			api, authContext := a.handler.decodeMetadataHeaders(req.RequestHeaders)
 			if api == "" {
 				log.Debugf("Unknown target, skipped accesslog: %#v", v.Request)
 				continue
@@ -61,14 +61,14 @@ func (a *AccessLogServer) StreamAccessLogs(srv als.AccessLogService_StreamAccess
 			cp := v.CommonProperties
 			requestPath := strings.SplitN(req.Path, "?", 2)[0] // Apigee doesn't want query params in requestPath
 			record := analytics.Record{
-				ClientReceivedStartTimestamp: timeToUnix(cp.StartTime),
-				ClientReceivedEndTimestamp:   add(cp.StartTime, cp.TimeToLastRxByte),
-				ClientSentStartTimestamp:     add(cp.StartTime, cp.TimeToFirstUpstreamTxByte),
-				ClientSentEndTimestamp:       add(cp.StartTime, cp.TimeToLastUpstreamTxByte),
-				TargetReceivedStartTimestamp: add(cp.StartTime, cp.TimeToFirstUpstreamRxByte),
-				TargetReceivedEndTimestamp:   add(cp.StartTime, cp.TimeToLastUpstreamRxByte),
-				TargetSentStartTimestamp:     add(cp.StartTime, cp.TimeToFirstDownstreamTxByte),
-				TargetSentEndTimestamp:       add(cp.StartTime, cp.TimeToLastDownstreamTxByte),
+				ClientReceivedStartTimestamp: pbTimestampToUnix(cp.StartTime),
+				ClientReceivedEndTimestamp:   pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToLastRxByte),
+				ClientSentStartTimestamp:     pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToFirstUpstreamTxByte),
+				ClientSentEndTimestamp:       pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToLastUpstreamTxByte),
+				TargetReceivedStartTimestamp: pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToFirstUpstreamRxByte),
+				TargetReceivedEndTimestamp:   pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToLastUpstreamRxByte),
+				TargetSentStartTimestamp:     pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToFirstDownstreamTxByte),
+				TargetSentEndTimestamp:       pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToLastDownstreamTxByte),
 				APIProxy:                     api,
 				RequestURI:                   req.Path,
 				RequestPath:                  requestPath,
@@ -111,25 +111,25 @@ func (a *AccessLogServer) StreamAccessLogs(srv als.AccessLogService_StreamAccess
 }
 
 // timeToUnix converts a time to a UNIX timestamp in milliseconds.
-func timeToUnix(ts *timestamp.Timestamp) int64 {
+func pbTimestampToUnix(ts *timestamp.Timestamp) int64 {
 	t, err := ptypes.Timestamp(ts)
 	if err != nil {
-		panic(err)
+		return 0
 	}
 	return t.UnixNano() / 1000000
 }
 
-func add(ts *timestamp.Timestamp, d *duration.Duration) int64 {
+func pbTimestampAddDurationUnix(ts *timestamp.Timestamp, d *duration.Duration) int64 {
 	t, err := ptypes.Timestamp(ts)
 	if err != nil {
-		panic(err)
+		return 0
 	}
 	if d == nil {
 		return t.UnixNano() / 1000000
 	}
 	du, err := ptypes.Duration(d)
 	if err != nil {
-		panic(err)
+		return 0
 	}
 	return t.Add(du).UnixNano() / 1000000
 }

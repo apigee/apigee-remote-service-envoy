@@ -13,6 +13,7 @@ require (
 	github.com/envoyproxy/go-control-plane v0.9.5
 	github.com/gogo/googleapis v1.3.2
 	github.com/golang/protobuf v1.4.0
+	github.com/google/go-cmp v0.4.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/hashicorp/go-multierror v1.1.0
 	github.com/prometheus/client_golang v1.5.1
