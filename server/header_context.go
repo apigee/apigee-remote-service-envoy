@@ -29,7 +29,7 @@ const headerAPIProducts = "x-apigee-apiproducts"
 const headerApplication = "x-apigee-application"
 const headerClientID = "x-apigee-clientid"
 const headerDeveloperEmail = "x-apigee-developeremail"
-const headerEnvironment = "x-apigee-enviroment"
+const headerEnvironment = "x-apigee-environment"
 const headerOrganization = "x-apigee-organization"
 const headerScopes = "x-apigee-scopes"
 
