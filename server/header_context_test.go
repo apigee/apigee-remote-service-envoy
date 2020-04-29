@@ -71,3 +71,37 @@ func TestMetadataHeaders(t *testing.T) {
 		t.Errorf("\ngot:\n%#v,\nwant\n%#v\n", *ac2, *ac)
 	}
 }
+
+func TestMetadataHeadersExceptions(t *testing.T) {
+	opts := makeMetadataHeaders("api", nil)
+	if opts != nil {
+		t.Errorf("should return nil if no context")
+	}
+
+	h := &Handler{
+		orgName: "org",
+		envName: "env",
+	}
+	h.targetHeader = "target"
+	header := map[string]string{"target": "target"}
+	api, ac := h.decodeMetadataHeaders(header)
+	if api != "target" {
+		t.Errorf("got: %s, want: %s", api, "target")
+	}
+	if ac.Organization() != h.orgName {
+		t.Errorf("got: %s, want: %s", ac.Organization(), h.orgName)
+	}
+	if ac.Environment() != h.envName {
+		t.Errorf("got: %s, want: %s", ac.Environment(), h.envName)
+	}
+
+	h.targetHeader = "missing"
+	api, ac = h.decodeMetadataHeaders(header)
+	if api != "" {
+		t.Errorf("api should be empty")
+	}
+	if ac != nil {
+		t.Errorf("authContext should be nil")
+	}
+
+}

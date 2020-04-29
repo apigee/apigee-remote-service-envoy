@@ -16,6 +16,7 @@ package server
 
 import (
 	"crypto/tls"
+	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -88,11 +89,17 @@ func NewHandler(config *Config) (*Handler, error) {
 		if err != nil {
 			return nil, err
 		}
+		if internalAPI.Scheme == "" {
+			return nil, fmt.Errorf("invalid URL: %s", config.Tenant.InternalAPI)
+		}
 	}
 	if config.Tenant.RemoteServiceAPI != "" {
 		remoteServiceAPI, err = url.Parse(config.Tenant.RemoteServiceAPI)
 		if err != nil {
 			return nil, err
+		}
+		if remoteServiceAPI.Scheme == "" {
+			return nil, fmt.Errorf("invalid URL: %s", config.Tenant.RemoteServiceAPI)
 		}
 	}
 

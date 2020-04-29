@@ -147,3 +147,51 @@ func TestValidate(t *testing.T) {
 		equal(t, e.Error(), wantErrs[i])
 	}
 }
+
+func TestValidateTLS(t *testing.T) {
+	config := DefaultConfig()
+	config.Tenant = TenantConfig{
+		InternalAPI:      "http://localhost/remote-service",
+		RemoteServiceAPI: "http://localhost/remote-service",
+		OrgName:          "org",
+		EnvName:          "env",
+		Key:              "key",
+		Secret:           "secret",
+	}
+
+	opts := [][]string{
+		{"x", "", "x", "", ""},
+		{"", "x", "", "x", ""},
+		{"", "x", "", "", "x"},
+		{"", "x", "x", "", "x"},
+		{"", "x", "", "x", "x"},
+		{"", "x", "x", "x", ""},
+	}
+
+	for i, o := range opts {
+		t.Logf("round %d", i)
+		config.Global.TLS.CertFile = o[0]
+		config.Global.TLS.KeyFile = o[1]
+		config.Analytics.TLS.CAFile = o[2]
+		config.Analytics.TLS.CertFile = o[3]
+		config.Analytics.TLS.KeyFile = o[4]
+
+		err := config.Validate()
+		if err == nil {
+			t.Fatal("should have gotten errors")
+		}
+		wantErrs := []string{
+			"global.tls.cert_file and global.tls.key_file are both required if either are present",
+			"all analytics.tls options are required if any are present",
+		}
+		merr := err.(*multierror.Error)
+		if merr.Len() != len(wantErrs) {
+			t.Fatalf("got %d errors, want: %d, errors: %s", merr.Len(), len(wantErrs), merr)
+		}
+
+		errs := merr.Errors
+		for i, e := range errs {
+			equal(t, e.Error(), wantErrs[i])
+		}
+	}
+}
