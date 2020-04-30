@@ -45,7 +45,6 @@ spec:
         app: httpbin
         version: v1
     spec:
-      serviceAccountName: httpbin
       containers:
       - image: docker.io/kennethreitz/httpbin
         imagePullPolicy: IfNotPresent
