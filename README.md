@@ -27,8 +27,8 @@ Or, to avoid an external network, you can run httpbin in docker:
 If you're using Istio, deploy httpbin with a sidecar:
 
     kubectl label namespace default istio-injection=enabled
-    kubectl apply -f samples/httpbin.yaml
-    kubectl apply -f samples/httpbin-gateway.yaml
+    kubectl apply -f samples/istio/httpbin.yaml
+    kubectl apply -f samples/istio/httpbin-gateway.yaml
 
 ## Install the remote-service proxy
 
