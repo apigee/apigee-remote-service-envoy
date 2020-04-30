@@ -5,8 +5,8 @@
 We'll just install httpbin as a sample in the default namespace:
 
     kubectl label namespace default istio-injection=enabled
-    kubectl apply -f samples/httpbin.yaml
-    kubectl apply -f samples/httpbin-gateway.yaml
+    kubectl apply -f samples/istio/httpbin.yaml
+    kubectl apply -f samples/istio/httpbin-gateway.yaml
 
 You should be able to reach this target using your Hybrid virtualhost hostAlias:
 
