@@ -49,61 +49,65 @@ func (a *AccessLogServer) StreamAccessLogs(srv als.AccessLogService_StreamAccess
 	switch msg := msg.GetLogEntries().(type) {
 
 	case *als.StreamAccessLogsMessage_HttpLogs:
+		return a.handleHTTPLogs(msg)
 
-		for _, v := range msg.HttpLogs.LogEntry {
-			req := v.Request
-			api, authContext := a.handler.decodeMetadataHeaders(req.RequestHeaders)
-			if api == "" {
-				log.Debugf("Unknown target, skipped accesslog: %#v", v.Request)
-				continue
-			}
+	case *als.StreamAccessLogsMessage_TcpLogs:
+		log.Warnf("TcpLogs not supported: %#v", msg)
+	}
 
-			cp := v.CommonProperties
-			requestPath := strings.SplitN(req.Path, "?", 2)[0] // Apigee doesn't want query params in requestPath
-			record := analytics.Record{
-				ClientReceivedStartTimestamp: pbTimestampToUnix(cp.StartTime),
-				ClientReceivedEndTimestamp:   pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToLastRxByte),
-				ClientSentStartTimestamp:     pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToFirstUpstreamTxByte),
-				ClientSentEndTimestamp:       pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToLastUpstreamTxByte),
-				TargetReceivedStartTimestamp: pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToFirstUpstreamRxByte),
-				TargetReceivedEndTimestamp:   pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToLastUpstreamRxByte),
-				TargetSentStartTimestamp:     pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToFirstDownstreamTxByte),
-				TargetSentEndTimestamp:       pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToLastDownstreamTxByte),
-				APIProxy:                     api,
-				RequestURI:                   req.Path,
-				RequestPath:                  requestPath,
-				RequestVerb:                  req.RequestMethod.String(),
-				UserAgent:                    req.UserAgent,
-				ResponseStatusCode:           int(v.Response.ResponseCode.Value),
-				GatewaySource:                gatewaySource,
-				ClientIP:                     req.GetForwardedFor(),
-			}
+	return nil
+}
 
-			// TODO: not terribly efficient, but changing the impl requires a rewrite as
-			// it assumes the same authContext for all records and we shouldn't
-			records := []analytics.Record{record}
-			err := a.handler.analyticsMan.SendRecords(authContext, records)
-			if err != nil {
-				log.Warnf("Unable to send ax: %v", err)
-			}
+func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLogs) error {
 
-			// the following could replace: record.EnsureFields() in SendRecords() if we address the above
-			// record.GatewayFlowID = uuid.New().String()
-			// record.DeveloperEmail = authContext.DeveloperEmail
-			// record.DeveloperApp = authContext.Application
-			// record.AccessToken = authContext.AccessToken
-			// record.ClientID = authContext.ClientID
-			// record.Organization = authContext.Organization
-			// record.Environment = authContext.Environment
-			// if len(authContext.APIProducts) > 0 {
-			// 	record.APIProduct = authContext.APIProducts[0]
-			// }
+	for _, v := range msg.HttpLogs.LogEntry {
+		req := v.Request
+		api, authContext := a.handler.decodeMetadataHeaders(req.RequestHeaders)
+		if api == "" {
+			log.Debugf("Unknown target, skipped accesslog: %#v", v.Request)
+			continue
 		}
 
-	// TODO: support TcpLogs?
-	case *als.StreamAccessLogsMessage_TcpLogs:
-		for _, v := range msg.TcpLogs.LogEntry {
-			log.Warnf("TcpLogs not supported: %#v", v)
+		cp := v.CommonProperties
+		requestPath := strings.SplitN(req.Path, "?", 2)[0] // Apigee doesn't want query params in requestPath
+		record := analytics.Record{
+			ClientReceivedStartTimestamp: pbTimestampToUnix(cp.StartTime),
+			ClientReceivedEndTimestamp:   pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToLastRxByte),
+			ClientSentStartTimestamp:     pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToFirstUpstreamTxByte),
+			ClientSentEndTimestamp:       pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToLastUpstreamTxByte),
+			TargetReceivedStartTimestamp: pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToFirstUpstreamRxByte),
+			TargetReceivedEndTimestamp:   pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToLastUpstreamRxByte),
+			TargetSentStartTimestamp:     pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToFirstDownstreamTxByte),
+			TargetSentEndTimestamp:       pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToLastDownstreamTxByte),
+			APIProxy:                     api,
+			RequestURI:                   req.Path,
+			RequestPath:                  requestPath,
+			RequestVerb:                  req.RequestMethod.String(),
+			UserAgent:                    req.UserAgent,
+			ResponseStatusCode:           int(v.Response.ResponseCode.Value),
+			GatewaySource:                gatewaySource,
+			ClientIP:                     req.GetForwardedFor(),
+		}
+
+		// the following could replace: record.EnsureFields() in SendRecords() if we address the above
+		// record.GatewayFlowID = uuid.New().String()
+		record.DeveloperEmail = authContext.DeveloperEmail
+		record.DeveloperApp = authContext.Application
+		record.AccessToken = authContext.AccessToken
+		record.ClientID = authContext.ClientID
+		record.Organization = authContext.Organization()
+		record.Environment = authContext.Environment()
+		if len(authContext.APIProducts) > 0 {
+			record.APIProduct = authContext.APIProducts[0]
+		}
+
+		// TODO: not terribly efficient, but changing the impl requires a rewrite as
+		// it assumes the same authContext for all records and we shouldn't
+		records := []analytics.Record{record}
+		err := a.handler.analyticsMan.SendRecords(authContext, records)
+		if err != nil {
+			log.Warnf("Unable to send ax: %v", err)
+			return err
 		}
 	}
 
@@ -124,12 +128,9 @@ func pbTimestampAddDurationUnix(ts *timestamp.Timestamp, d *duration.Duration) i
 	if err != nil {
 		return 0
 	}
-	if d == nil {
-		return t.UnixNano() / 1000000
-	}
 	du, err := ptypes.Duration(d)
 	if err != nil {
-		return 0
+		du = 0
 	}
 	return t.Add(du).UnixNano() / 1000000
 }
