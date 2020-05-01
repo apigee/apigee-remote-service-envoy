@@ -20,10 +20,11 @@ metadata:
   namespace: default
   labels:
     app: httpbin
+    managed-by: apigee
 spec:
   ports:
   - name: http
-    port: 8000
+    port: 80
     targetPort: 80
   selector:
     app: httpbin

@@ -22,9 +22,9 @@ metadata:
   name: apigee-remote-httpbin
   namespace: default
 spec:
-  # workloadSelector:
-  #   labels:
-  #     app: httpbin
+  workloadSelector:
+    labels:
+      managed-by: apigee
   configPatches:
 
   - applyTo: HTTP_FILTER
