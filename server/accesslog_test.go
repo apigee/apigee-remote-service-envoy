@@ -53,7 +53,7 @@ func TestHandleHTTPAccessLogs(t *testing.T) {
 		headerDeveloperEmail: "email@google.com",
 		headerEnvironment:    "env",
 		headerOrganization:   "org",
-		headerScopes:         "scope1,scope2",
+		headerScope:          "scope1 scope2",
 	}
 
 	path := "path"

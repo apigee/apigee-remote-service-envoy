@@ -60,7 +60,7 @@ func TestMetadataHeaders(t *testing.T) {
 	equal(headerDeveloperEmail, ac.DeveloperEmail)
 	equal(headerEnvironment, ac.Environment())
 	equal(headerOrganization, ac.Organization())
-	equal(headerScopes, strings.Join(ac.Scopes, ","))
+	equal(headerScope, strings.Join(ac.Scopes, " "))
 
 	api2, ac2 := h.decodeMetadataHeaders(headers)
 	if api != api2 {

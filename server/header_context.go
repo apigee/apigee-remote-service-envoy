@@ -31,7 +31,7 @@ const headerClientID = "x-apigee-clientid"
 const headerDeveloperEmail = "x-apigee-developeremail"
 const headerEnvironment = "x-apigee-environment"
 const headerOrganization = "x-apigee-organization"
-const headerScopes = "x-apigee-scopes"
+const headerScope = "x-apigee-scope"
 
 func makeMetadataHeaders(api string, ac *auth.Context) []*core.HeaderValueOption {
 	if ac == nil {
@@ -47,7 +47,7 @@ func makeMetadataHeaders(api string, ac *auth.Context) []*core.HeaderValueOption
 		header(headerDeveloperEmail, ac.DeveloperEmail),
 		header(headerEnvironment, ac.Environment()),
 		header(headerOrganization, ac.Organization()),
-		header(headerScopes, strings.Join(ac.Scopes, ",")),
+		header(headerScope, strings.Join(ac.Scopes, " ")),
 	}
 }
 
@@ -80,6 +80,6 @@ func (h *Handler) decodeMetadataHeaders(headers map[string]string) (string, *aut
 		Application:    headers[headerApplication],
 		ClientID:       headers[headerClientID],
 		DeveloperEmail: headers[headerDeveloperEmail],
-		Scopes:         strings.Split(headers[headerScopes], ","),
+		Scopes:         strings.Split(headers[headerScope], " "),
 	}
 }
