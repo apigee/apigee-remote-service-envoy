@@ -27,8 +27,8 @@ You'll need it to configure your Apigee Remote Service in the following steps.
 
 ### Istio Sidecar with Apigee Hybrid
 
-[Getting Started with Hybrid](docs/apigee-remote-service-envoy/docs/demo-hybrid.md)
+[Getting Started with Hybrid](docs/demo-hybrid.md)
 
 ### Native Envoy with Apigee SaaS
 
-[Getting Started with SaaS](docs/apigee-remote-service-envoy/docs/demo-native.md)
+[Getting Started with SaaS](docs/demo-native.md)
