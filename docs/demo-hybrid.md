@@ -1,5 +1,10 @@
 # Getting Started with Hybrid
 
+## Provision the remote-service proxy on Apigee
+
+If you haven't already, follow the [instructions](../../../../apigee-remote-service-cli#apigee-hybrid) 
+to install the CLI and provision the proxy for Apigee Hybrid.
+
 ## Deploy a target in Istio
 
 We'll install httpbin as a sample in the default namespace:
@@ -13,19 +18,6 @@ Now let's start a curl client inside the mesh and make a call to it:
     curl -i httpbin.default.svc.cluster.local/headers
 
 Keep your curl client running. We'll use it again later.
-
-## Provision the remote-service proxy on Apigee
-
-Part of the provisioning the Remote Service system is to install an Apigee proxy. 
-This proxy, called `remote-service`, will a runtime API to the Apigee Remote Service
-that allows it access to API Product and App configuration, authentication services,
-and quota maintenance services.
-
-Follow the [instructions](../../../../apigee-remote-service-cli#apigee-hybrid) to 
-install the CLI and provision the proxy for Apigee Hybrid.
-
-When you've completed provisioning, you will have a `config.yaml` file that will contain 
-a Kubernetes ConfigMap definition. We'll use that in the next step.
 
 ## Run Apigee Remote Service for Envoy in your mesh
 
