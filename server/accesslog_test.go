@@ -92,7 +92,7 @@ func TestHandleHTTPAccessLogs(t *testing.T) {
 		},
 	}
 
-	testAnalyticsMan := &testAM{}
+	testAnalyticsMan := &testAnalyticsMan{}
 	server := AccessLogServer{
 		handler: &Handler{
 			orgName:      headers[headerOrganization],
@@ -231,17 +231,17 @@ func TestAddDurationUnix(t *testing.T) {
 	}
 }
 
-type testAM struct {
+type testAnalyticsMan struct {
 	analytics.Manager
 	records []analytics.Record
 }
 
-func (a *testAM) Start() error {
+func (a *testAnalyticsMan) Start() error {
 	a.records = []analytics.Record{}
 	return nil
 }
-func (a *testAM) Close() {}
-func (a *testAM) SendRecords(ctx *auth.Context, records []analytics.Record) error {
+func (a *testAnalyticsMan) Close() {}
+func (a *testAnalyticsMan) SendRecords(ctx *auth.Context, records []analytics.Record) error {
 	a.records = append(a.records, records...)
 	return nil
 }

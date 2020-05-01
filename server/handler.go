@@ -43,10 +43,10 @@ type Handler struct {
 	targetHeader       string
 	rejectUnauthorized bool
 
-	productMan   *product.Manager
-	authMan      *auth.Manager
+	productMan   product.Manager
+	authMan      auth.Manager
 	analyticsMan analytics.Manager
-	quotaMan     *quota.Manager
+	quotaMan     quota.Manager
 }
 
 // InternalAPI is the internal api base (legacy)
