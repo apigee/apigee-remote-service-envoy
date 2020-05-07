@@ -18,6 +18,7 @@ package server
 import (
 	"context"
 	"errors"
+	"net/http"
 	"testing"
 
 	"github.com/apigee/apigee-remote-service-golib/auth"
@@ -165,6 +166,10 @@ func TestCheck(t *testing.T) {
 	}
 	if resp.Status.Code != int32(rpc.RESOURCE_EXHAUSTED) {
 		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.RESOURCE_EXHAUSTED))
+	}
+	code := resp.HttpResponse.(*v2.CheckResponse_DeniedResponse).DeniedResponse.Status.Code
+	if code != http.StatusTooManyRequests {
+		t.Errorf("got: %d, want: %d", code, http.StatusTooManyRequests)
 	}
 	testQuotaMan.exceeded = 0
 

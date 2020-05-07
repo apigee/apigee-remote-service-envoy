@@ -25,6 +25,7 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/quota"
 	core "github.com/envoyproxy/go-control-plane/envoy/api/v2/core"
 	auth "github.com/envoyproxy/go-control-plane/envoy/service/auth/v2"
+	envoy_type "github.com/envoyproxy/go-control-plane/envoy/type"
 	"github.com/gogo/googleapis/google/rpc"
 	rpcstatus "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc"
@@ -164,16 +165,30 @@ func (a *AuthorizationServer) quotaExceeded(authContext *aauth.Context, api stri
 
 func (a *AuthorizationServer) createDenyResponse(authContext *aauth.Context, api string, code rpc.Code) *auth.CheckResponse {
 
-	if a.handler.rejectUnauthorized || authContext == nil { // send reject
+	if a.handler.rejectUnauthorized || authContext == nil { // send reject to client
 		log.Debugf("sending denied: %s", code.String())
 
-		return &auth.CheckResponse{
+		response := &auth.CheckResponse{
 			Status: &rpcstatus.Status{
 				Code: int32(code),
 			},
 		}
+
+		// Envoy doesn't map this code, force it
+		if code == rpc.RESOURCE_EXHAUSTED {
+			response.HttpResponse = &auth.CheckResponse_DeniedResponse{
+				DeniedResponse: &auth.DeniedHttpResponse{
+					Status: &envoy_type.HttpStatus{
+						Code: envoy_type.StatusCode_TooManyRequests,
+					},
+				},
+			}
+		}
+
+		return response
 	}
 
+	// allow request to continue upstream
 	log.Debugf("sending ok (actual: %s)", code.String())
 	return &auth.CheckResponse{
 		Status: &rpcstatus.Status{
