@@ -175,6 +175,7 @@ func NewHandler(config *Config) (*Handler, error) {
 		TLSCAFile:          config.Analytics.TLS.CAFile,
 		TLSCertFile:        config.Analytics.TLS.CertFile,
 		TLSKeyFile:         config.Analytics.TLS.KeyFile,
+		TLSSkipVerify:      config.Analytics.TLS.AllowUnverifiedSSLCert,
 	})
 	if err != nil {
 		return nil, err

@@ -2,7 +2,7 @@ module github.com/apigee/apigee-remote-service-envoy
 
 go 1.13
 
-replace github.com/apigee/apigee-remote-service-golib => github.com/theganyo/apigee-remote-service-golib v0.0.4-dev
+replace github.com/apigee/apigee-remote-service-golib => github.com/theganyo/apigee-remote-service-golib v0.0.4-dev.0.20200508224846-ca63c647648e
 
 // replace github.com/apigee/apigee-remote-service-golib => ../apigee-remote-service-golib
 

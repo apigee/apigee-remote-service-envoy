@@ -63,18 +63,25 @@ type Config struct {
 
 // GlobalConfig is global configuration for the server
 type GlobalConfig struct {
-	APIAddress                string        `yaml:"api_address,omitempty"`
-	MetricsAddress            string        `yaml:"metrics_address,omitempty"`
-	TempDir                   string        `yaml:"temp_dir,omitempty"`
-	KeepAliveMaxConnectionAge time.Duration `yaml:"keep_alive_max_connection_age,omitempty"`
-	TLS                       TLSConfig     `yaml:"tls,omitempty"`
+	APIAddress                string            `yaml:"api_address,omitempty"`
+	MetricsAddress            string            `yaml:"metrics_address,omitempty"`
+	TempDir                   string            `yaml:"temp_dir,omitempty"`
+	KeepAliveMaxConnectionAge time.Duration     `yaml:"keep_alive_max_connection_age,omitempty"`
+	TLS                       TLSListenerConfig `yaml:"tls,omitempty"`
 }
 
-// TLSConfig is tls configuration
-type TLSConfig struct {
-	CAFile   string `yaml:"ca_file,omitempty"`
+// TLSListenerConfig is tls configuration
+type TLSListenerConfig struct {
 	KeyFile  string `yaml:"key_file,omitempty"`
 	CertFile string `yaml:"cert_file,omitempty"`
+}
+
+// TLSClientConfig is mtls configuration
+type TLSClientConfig struct {
+	CAFile                 string `yaml:"ca_file,omitempty"`
+	KeyFile                string `yaml:"key_file,omitempty"`
+	CertFile               string `yaml:"cert_file,omitempty"`
+	AllowUnverifiedSSLCert bool   `yaml:"allow_unverified_ssl_cert,omitempty"`
 }
 
 // TenantConfig is config relating to an Apigee tentant
@@ -96,12 +103,12 @@ type ProductsConfig struct {
 
 // AnalyticsConfig is analytics-related config
 type AnalyticsConfig struct {
-	LegacyEndpoint     bool          `yaml:"legacy_endpoint,omitempty"`
-	FileLimit          int           `yaml:"file_limit,omitempty"`
-	SendChannelSize    int           `yaml:"send_channel_size,omitempty"`
-	CollectionInterval time.Duration `yaml:"collection_interval,omitempty"`
-	FluentdEndpoint    string        `yaml:"fluentd_endpoint,omitempty"`
-	TLS                TLSConfig     `yaml:"tls,omitempty"`
+	LegacyEndpoint     bool            `yaml:"legacy_endpoint,omitempty"`
+	FileLimit          int             `yaml:"file_limit,omitempty"`
+	SendChannelSize    int             `yaml:"send_channel_size,omitempty"`
+	CollectionInterval time.Duration   `yaml:"collection_interval,omitempty"`
+	FluentdEndpoint    string          `yaml:"fluentd_endpoint,omitempty"`
+	TLS                TLSClientConfig `yaml:"tls,omitempty"`
 }
 
 // AuthConfig is auth-related config
