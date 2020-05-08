@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -37,6 +38,13 @@ const (
 	prometheusPath = "/metrics"
 )
 
+// populated via ldflags
+var (
+	version = "dev"
+	commit  = "unknown"
+	date    = "unknown"
+)
+
 var (
 	logLevel   string
 	configFile string
@@ -48,6 +56,8 @@ func main() {
 		Run: func(cmd *cobra.Command, args []string) {
 
 			log.Log.SetLevel(log.ParseLevel(logLevel))
+
+			fmt.Printf("apigee-remote-service-envoy version %s %s [%s]\n", version, date, commit)
 
 			config := server.DefaultConfig()
 			if err := config.Load(configFile); err != nil {
