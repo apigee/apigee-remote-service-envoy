@@ -45,7 +45,7 @@ When ready, just run:
 
 ## Configure your Apigee API Product(s)
 
-A sample script you can follow is provided [here](../apigee-products.md#sample).
+A sample script you can follow is provided [here](apigee-products.md#sample).
 Get your API Key following that process and return here for the next step.
 
 ## Use your API Key for authorization
