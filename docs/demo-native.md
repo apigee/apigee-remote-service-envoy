@@ -35,13 +35,23 @@ Run with your local `config.yaml` available as `/config.yaml` via a volume mount
 
 ## Run your Envoy Proxy
 
-There's an example of how to configure Envoy [here](../samples/native/envoy-httpbin.yaml).
+### Get Envoy
 
-Edit the file to set your Apigee runtime and cluster information.
+Grab an Envoy [binary](https://www.getenvoy.io/) or [build](https://www.envoyproxy.io/docs/envoy/latest/install/building)
+or use [docker](https://www.envoyproxy.io/docs/envoy/latest/install/building#pre-built-binaries).
 
-When ready, just run:
+### Create an Envoy config file
+
+There's an sample configuration [here](../samples/native/envoy-httpbin.yaml). 
+Edit that sample file to set your Apigee runtime and cluster information.
+
+### Run Envoy
+
+When it's prepared, just run:
 
     envoy -c samples/native/envoy-httpbin.yaml
+
+(or run your docker image with it)
 
 ## Configure your Apigee API Product(s)
 
