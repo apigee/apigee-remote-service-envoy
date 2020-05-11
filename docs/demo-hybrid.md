@@ -43,9 +43,9 @@ Before we can do that, however, you'll need to make a couple of changes to the s
 Edit `samples/istio/hybrid-apigee-remote-service-envoy.yaml` and make the following
 changes:
 
-1. Set the `image:` to reference proper $RELEASE tag (see [releases](../../releases).
+1. Set the `image:` to reference a proper $VERSION tag (see [releases](../../../releases).
 
-    image: "gcr.io/theganyo-playground/apigee-remote-service-envoy:$RELEASE"
+    image: "gcr.io/apigee-api-management-istio/apigee-remote-service-envoy:${VERSION}"
 
 2. Set the `secretName` in `tls-volume` to your organization and environment.
 
