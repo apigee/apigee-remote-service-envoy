@@ -75,47 +75,10 @@ Go back to the Kubernetes `curl` client we started and try it:
 
 Your target is now managed by Apigee!
 
-## Configure an Apigee API Product
+## Configure your Apigee API Product(s)
 
-Policy is defined in Apigee API Products and enforced by the Apigee Remote Service.
-We need to create an API Product to define that policy.
-
-Log into your [Apigee UI](https://apigee.google.com/).
-
-Click on `API Products` then click the blue `+ API Product` button.
-
-* In the `Product Details` section, set the name to `httpbin`.
-* Select your environment(s).
-* Set `Access` to `Private`.
-* Set the `Quota` to `5` requests every `1` `minute`.
-* Add a `Path` with the `+Custom Resource` button. Set the path to `/`.
-* Create a `Custom attribute` with key: `apigee-remote-service-targets` and value: `httpbin.default.svc.cluster.local`.
-* Click the blue `Save` button.
-
-(Note that the value we used in the attributes is the simply the fully qualified DNS name 
-of the httpbin service we created in Kubernetes.)
-
-Now, we'll create a Developer to grant access to:
-
-* Click on `Developers` in the left menu and click the blue `+ Developer` button.
-* Use whatever values you wish. Be creative.
-* Save the Developer.
-
-Finally, let's create an App for that Developer that will have access to our API Product:
-
-* Click on `Apps` in the left menu and click the blue `+ App` button.
-* In the `App Details` section, set the name to `httpbin`.
-* Select the `Developer` you created above.
-* In the `Credentials` section, click the blue `Add Product` button.
-* Choose the `httpbin` product and click the blue `Add` button.
-* Click the blue `Create` button.
-
-The Credentials status now should say `Approved`. By creating an App, we've created a set 
-of Credentials associated with the API Products! These credentials will grant us access 
-to the targets of the API Products.
-
-* Click the `Show` button next to the `Key`. That's your App's API Key.
-* You can use this key in Apigee managed requests for authorization. Save the key.
+A sample script you can follow is provided [here](../apigee-products.md#sample).
+Get your API Key following that process and return here for the next step.
 
 ## Use your API Key for authorization
 
