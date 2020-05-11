@@ -35,7 +35,7 @@ Run with your local `config.yaml` available as `/config.yaml` via a volume mount
 
 ## Run your Envoy Proxy
 
-There's an example of how to configure Envoy [here](samples/native/envoy-httpbin.yaml).
+There's an example of how to configure Envoy [here](../samples/native/envoy-httpbin.yaml).
 
 Edit the file to set your Apigee runtime and cluster information.
 
