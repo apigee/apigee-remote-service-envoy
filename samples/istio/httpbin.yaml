@@ -20,7 +20,6 @@ metadata:
   namespace: default
   labels:
     app: httpbin
-    managed-by: apigee
 spec:
   ports:
   - name: http
@@ -45,6 +44,7 @@ spec:
       labels:
         app: httpbin
         version: v1
+        managed-by: apigee
     spec:
       containers:
       - image: docker.io/kennethreitz/httpbin
