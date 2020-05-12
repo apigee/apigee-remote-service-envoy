@@ -49,7 +49,7 @@ changes:
 
 2. Set the `secretName` in `tls-volume` to your organization and environment.
 
-      - name: tls-volume
+       name: tls-volume
         secret:
           defaultMode: 420
           secretName: apigee-runtime-$ORG-$ENV-tls
@@ -66,7 +66,7 @@ All we need to do is apply an EnvoyFilter for Istio to discover:
     kubectl apply -f samples/istio/envoyfilter-sidecar.yaml
 
 This filter will apply Apigee management to all services in the default namespace
-that have the `managed-by: apigee` label--as our `httpbin` example does.
+that have the `managed-by: apigee` label (as our `httpbin` example does).
 
 Once applied, you should get an authorization error when calling your `httpbin` target.
 Go back to the Kubernetes `curl` client we started and try it:
