@@ -14,7 +14,7 @@ We'll install httpbin as a sample in the default namespace:
 
 Now let's start a curl client inside the mesh and make a call to it:
 
-    kubernetes run -it curl --image=curlimages/curl --restart=Never -- sh
+    kubectl run -it curl --image=curlimages/curl --restart=Never -- sh
     curl -i httpbin.default.svc.cluster.local/headers
 
 Keep your curl client running. We'll use it again later.
