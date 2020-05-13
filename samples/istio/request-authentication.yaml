@@ -29,8 +29,8 @@ spec:
     matchLabels:
       app: httpbin
   jwtRules:
-  - issuer: https://theganyo-apigee.hybrid.e2e.apigeeks.net/remote-service/token
-    jwksUri: https://theganyo-apigee.hybrid.e2e.apigeeks.net/remote-service/certs
+  - issuer: https://org-env.hybrid.e2e.apigeeks.net/remote-service/token
+    jwksUri: https://org-env.hybrid.e2e.apigeeks.net/remote-service/certs
 ---
 apiVersion: security.istio.io/v1beta1
 kind: AuthorizationPolicy

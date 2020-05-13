@@ -33,9 +33,9 @@ global:
     key_file: tls.key
 tenant:
   internal_api: https://istioservices.apigee.net/edgemicro
-  remote_service_api: https://myorg-test.apigee.net/remote-service
-  org_name: myorg
-  env_name: test
+  remote_service_api: https://org-test.apigee.net/remote-service
+  org_name: org
+  env_name: env
   key: mykey
   secret: mysecret
   client_timeout: 30s
@@ -47,7 +47,7 @@ analytics:
   file_limit: 1024
   send_channel_size: 10
   collection_interval: 10s
-  fluentd_endpoint: apigee-udca-theganyo-apigee-test.apigee.svc.cluster.local:20001
+  fluentd_endpoint: apigee-udca-myorg-test.apigee.svc.cluster.local:20001
   tls:
     ca_file: /opt/apigee/tls/ca.crt
     cert_file: /opt/apigee/tls/tls.crt
@@ -71,9 +71,9 @@ func TestDefaultConfig(t *testing.T) {
 	const minConfig = `
     tenant:
       internal_api: https://istioservices.apigee.net/edgemicro
-      remote_service_api: https://myorg-test.apigee.net/remote-service
-      org_name: myorg
-      env_name: test
+      remote_service_api: https://org-test.apigee.net/remote-service
+      org_name: org
+      env_name: env
       key: mykey
       secret: mysecret
   `

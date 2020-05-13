@@ -16,9 +16,9 @@
 # You must update the tenant values appropriately.
 tenant:
   internal_api: https://istioservices.apigee.net/edgemicro
-  remote_service_api: https://theganyo1-eval-test.apigee.net/istio-auth
-  org_name: theganyo1-eval
-  env_name: test
+  remote_service_api: https://org.apigee.net/istio-auth
+  org_name: org
+  env_name: env
   key: NotReal
   secret: NotReal
 products:

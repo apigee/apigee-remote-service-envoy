@@ -83,7 +83,7 @@ spec:
       - name: tls-volume
         secret:
           defaultMode: 420
-          secretName: apigee-runtime-theganyo-apigee-test-tls
+          secretName: apigee-runtime-org-env-tls
 ---
 apiVersion: v1
 kind: Service

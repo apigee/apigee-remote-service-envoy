@@ -22,9 +22,9 @@ global:
     cert_file: /opt/apigee/tls/tls.crt
     key_file: /opt/apigee/tls/tls.key
 tenant:
-  remote_service_api: https://apigee-runtime-theganyo-apigee-test:8443/remote-service
-  org_name: theganyo-apigee
-  env_name: test
+  remote_service_api: https://org.hybrid.e2e.apigeeks.net:8443/remote-service
+  org_name: org
+  env_name: env
   key: NotReal
   secret: NotReal
   allow_unverified_ssl_cert: true # required for local cluster access to hybrid runtime
@@ -33,7 +33,7 @@ products:
 analytics:
   file_limit: 1024
   collection_interval: 10s
-  fluentd_endpoint: apigee-udca-theganyo-apigee-test.apigee.svc.cluster.local:20001
+  fluentd_endpoint: apigee-udca-org-env.apigee.svc.cluster.local:20001
   tls: # for UDCA client
     ca_file: /opt/apigee/tls/ca.crt
     cert_file: /opt/apigee/tls/tls.crt

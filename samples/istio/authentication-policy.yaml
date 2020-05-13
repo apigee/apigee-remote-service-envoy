@@ -33,6 +33,6 @@ spec:
   originIsOptional: true
   origins:
   - jwt:
-      issuer: https://theganyo-apigee.hybrid.e2e.apigeeks.net/remote-service/token
-      jwks_uri: https://theganyo-apigee.hybrid.e2e.apigeeks.net/remote-service/certs
+      issuer: https://org-env.hybrid.e2e.apigeeks.net/remote-service/token
+      jwks_uri: https://org-env.hybrid.e2e.apigeeks.net/remote-service/certs
   principalBinding: USE_ORIGIN

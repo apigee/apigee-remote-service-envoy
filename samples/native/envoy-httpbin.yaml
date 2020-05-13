@@ -16,7 +16,7 @@
 # The Apigee API Product must be bound to `httpbin.org`.
 # You may use either JWT or API Key to authenticate.
 # Before use, you must edit and change:
-# 1. all references to `theganyo1-eval-test.apigee.net` to your Apigee runtime.
+# 1. all references to `org.apigee.net` to your Apigee runtime.
 # 2. the apigee-remote-service-envoy cluster's `socket_address` to service location.
 
 admin:
@@ -68,12 +68,12 @@ static_resources:
             config:
               providers:
                 apigee:
-                  issuer: https://theganyo1-eval-test.apigee.net/remote-service/token
+                  issuer: https://org.apigee.net/remote-service/token
                   audiences:
                   - remote-service-client
                   remote_jwks:
                     http_uri:
-                      uri: https://theganyo1-eval-test.apigee.net/remote-service/certs
+                      uri: https://org.apigee.net/remote-service/certs
                       cluster: apigee-auth-service
                       timeout: 5s
                     cache_duration:
@@ -203,10 +203,10 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: theganyo1-eval-test.apigee.net
+                address: org.apigee.net
                 port_value: 443
     transport_socket:
       name: envoy.transport_sockets.tls
       typed_config:
         "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
-        sni: theganyo1-eval-test.apigee.net
+        sni: org.apigee.net

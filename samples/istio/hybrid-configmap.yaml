@@ -25,9 +25,9 @@ data:
       api_address: :5000
       metrics_address: :5001
     tenant:
-      remote_service_api: https://apigee-runtime-theganyo-apigee-test:8443/remote-service
-      org_name: theganyo-apigee
-      env_name: test
+      remote_service_api: https://apigee-runtime-org-env:8443/remote-service
+      org_name: org
+      env_name: env
       key: NotReal
       secret: NotReal
       allow_unverified_ssl_cert: true # required for local cluster access to hybrid runtime
@@ -36,7 +36,7 @@ data:
     analytics:
       file_limit: 1024
       collection_interval: 10s
-      fluentd_endpoint: apigee-udca-theganyo-apigee-test.apigee.svc.cluster.local:20001
+      fluentd_endpoint: apigee-udca-org-env.apigee.svc.cluster.local:20001
       tls:
         ca_file: /opt/apigee/tls/ca.crt
         cert_file: /opt/apigee/tls/tls.crt
