@@ -77,6 +77,7 @@ workflows:
             tags:
               only: /.*/
       - release:
+          context: apigee-remote-service
           requires:
             - build
           filters: # Only run on git tag pushes

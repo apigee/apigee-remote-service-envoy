@@ -1,6 +1,6 @@
-[![<CirclCI>](https://circleci.com/gh/theganyo/apigee-remote-service-envoy.svg?style=svg)](https://circleci.com/gh/theganyo/apigee-remote-service-envoy)
-[![Go Report Card](https://goreportcard.com/badge/github.com/theganyo/apigee-remote-service-envoy)](https://goreportcard.com/report/github.com/theganyo/apigee-remote-service-envoy)
-[![codecov.io](https://codecov.io/github/theganyo/apigee-remote-service-envoy/coverage.svg?branch=master)](https://codecov.io/github/theganyo/apigee-remote-service-envoy?branch=master)
+[![<CirclCI>](https://circleci.com/gh/apigee/apigee-remote-service-envoy.svg?style=svg)](https://circleci.com/gh/apigee/apigee-remote-service-envoy)
+[![Go Report Card](https://goreportcard.com/badge/github.com/apigee/apigee-remote-service-envoy)](https://goreportcard.com/report/github.com/apigee/apigee-remote-service-envoy)
+[![codecov.io](https://codecov.io/github/apigee/apigee-remote-service-envoy/coverage.svg?branch=master)](https://codecov.io/github/apigee/apigee-remote-service-envoy?branch=master)
 
 # Apigee Remote Service for Envoy
 
