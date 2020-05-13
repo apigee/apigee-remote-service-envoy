@@ -73,6 +73,7 @@ workflows:
   build-and-release:
     jobs:
       - build:
+          context: apigee-remote-service
           filters:  # required since `release` has tag filters AND requires `build`
             tags:
               only: /.*/
