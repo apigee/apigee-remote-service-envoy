@@ -32,3 +32,11 @@ You'll need it to configure your Apigee Remote Service in the following steps.
 ### Native Envoy with Apigee SaaS
 
 [Getting Started with SaaS](docs/demo-native.md)
+
+## Support
+
+Issues filed on Github are not subject to service level agreements (SLAs) and responses should be
+assumed to be on an ad-hoc volunteer basis. The [Apigee community board](https://community.apigee.com/) 
+is recommended as for community support and is regularly checked by Apigee experts.
+
+Apigee customers should use [formal support channels](https://cloud.google.com/apigee/support).
