@@ -162,14 +162,14 @@ func NewHandler(config *Config) (*Handler, error) {
 	}
 
 	analyticsMan, err := analytics.NewManager(analytics.Options{
-		LegacyEndpoint:     false,
+		LegacyEndpoint:     config.Analytics.LegacyEndpoint,
 		BufferPath:         analyticsDir,
-		StagingFileLimit:   2024,
+		StagingFileLimit:   config.Analytics.FileLimit,
 		BaseURL:            internalAPI,
 		Key:                config.Tenant.Key,
 		Secret:             config.Tenant.Secret,
 		Client:             httpClient,
-		SendChannelSize:    10,
+		SendChannelSize:    config.Analytics.SendChannelSize,
 		CollectionInterval: time.Minute,
 		FluentdEndpoint:    config.Analytics.FluentdEndpoint,
 		TLSCAFile:          config.Analytics.TLS.CAFile,
