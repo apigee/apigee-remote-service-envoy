@@ -14,7 +14,7 @@ You may run either a native binary or on Docker.
 
 ### Native
 
-The Github [releases](../../releases) contains binaries for common platforms.
+The Github [releases](../../../releases) contains binaries for common platforms.
 
 Just take your `config.yaml` and run:
 
