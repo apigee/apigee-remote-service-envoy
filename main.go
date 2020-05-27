@@ -27,6 +27,8 @@ import (
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/health"
@@ -47,6 +49,7 @@ var (
 
 var (
 	logLevel   string
+	logJSON    bool
 	configFile string
 )
 
@@ -55,7 +58,36 @@ func main() {
 	rootCmd := &cobra.Command{
 		Run: func(cmd *cobra.Command, args []string) {
 
-			log.Log.SetLevel(log.ParseLevel(logLevel))
+			logLevel := log.ParseLevel(logLevel)
+
+			// use zap logger instead of default
+			var zapConfig zap.Config
+			if logJSON {
+				zapConfig = zap.NewProductionConfig()
+			} else { // console
+				zapConfig = zap.NewDevelopmentConfig()
+				zapConfig.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+			}
+			var zapLevel zapcore.Level
+			switch logLevel {
+			case log.Debug:
+				zapLevel = zap.DebugLevel
+			case log.Info:
+				zapLevel = zap.InfoLevel
+			case log.Warn:
+				zapLevel = zap.WarnLevel
+			case log.Error:
+				zapLevel = zap.ErrorLevel
+			}
+			zapConfig.Level = zap.NewAtomicLevelAt(zapLevel)
+
+			logger, _ := zapConfig.Build(zap.AddCallerSkip(2))
+			defer logger.Sync()
+			sugaredLogger := logger.Sugar()
+			log.Log = &log.LevelWrapper{
+				Logger:   sugaredLogger,
+				LogLevel: logLevel,
+			}
 
 			fmt.Printf("apigee-remote-service-envoy version %s %s [%s]\n", version, date, commit)
 
@@ -72,6 +104,7 @@ func main() {
 		},
 	}
 	rootCmd.Flags().StringVarP(&logLevel, "log_level", "l", "info", "Logging level")
+	rootCmd.Flags().BoolVarP(&logJSON, "json_log", "j", false, "Log as JSON")
 	rootCmd.Flags().StringVarP(&configFile, "config", "c", "config.yaml", "Config file")
 
 	rootCmd.SetArgs(os.Args[1:])
@@ -121,7 +154,7 @@ func serve(config *server.Config) {
 		panic(err)
 	}
 
-	log.Infof("listening: %s\n", config.Global.APIAddress)
+	log.Infof("listening: %s", config.Global.APIAddress)
 	go grpcServer.Serve(grpcListener)
 
 	// prometheus listener
@@ -161,6 +194,6 @@ func serve(config *server.Config) {
 		metricsListener = tls.NewListener(metricsListener, httpServer.TLSConfig)
 	}
 
-	log.Infof("listening: %s\n", config.Global.MetricsAddress)
+	log.Infof("listening: %s", config.Global.MetricsAddress)
 	go httpServer.Serve(metricsListener)
 }
