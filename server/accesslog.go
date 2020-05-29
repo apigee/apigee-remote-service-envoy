@@ -73,12 +73,12 @@ func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLo
 		record := analytics.Record{
 			ClientReceivedStartTimestamp: pbTimestampToUnix(cp.StartTime),
 			ClientReceivedEndTimestamp:   pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToLastRxByte),
-			ClientSentStartTimestamp:     pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToFirstUpstreamTxByte),
-			ClientSentEndTimestamp:       pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToLastUpstreamTxByte),
+			TargetSentStartTimestamp:     pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToFirstUpstreamTxByte),
+			TargetSentEndTimestamp:       pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToLastUpstreamTxByte),
 			TargetReceivedStartTimestamp: pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToFirstUpstreamRxByte),
 			TargetReceivedEndTimestamp:   pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToLastUpstreamRxByte),
-			TargetSentStartTimestamp:     pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToFirstDownstreamTxByte),
-			TargetSentEndTimestamp:       pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToLastDownstreamTxByte),
+			ClientSentStartTimestamp:     pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToFirstDownstreamTxByte),
+			ClientSentEndTimestamp:       pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToLastDownstreamTxByte),
 			APIProxy:                     api,
 			RequestURI:                   req.Path,
 			RequestPath:                  requestPath,
@@ -118,6 +118,7 @@ func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLo
 func pbTimestampToUnix(ts *timestamp.Timestamp) int64 {
 	t, err := ptypes.Timestamp(ts)
 	if err != nil {
+		log.Debugf("invalid timestamp: %s", err)
 		return 0
 	}
 	return t.UnixNano() / 1000000
@@ -126,6 +127,7 @@ func pbTimestampToUnix(ts *timestamp.Timestamp) int64 {
 func pbTimestampAddDurationUnix(ts *timestamp.Timestamp, d *duration.Duration) int64 {
 	t, err := ptypes.Timestamp(ts)
 	if err != nil {
+		log.Debugf("invalid timestamp: %s", err)
 		return 0
 	}
 	du, err := ptypes.Duration(d)
