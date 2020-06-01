@@ -36,7 +36,7 @@ func TestCheck(t *testing.T) {
 
 	jwtClaims := &pb.Struct{
 		Fields: map[string]*pb.Value{
-			"s": &pb.Value{
+			"s": {
 				Kind: &pb.Value_StringValue{StringValue: "x"},
 			},
 		},
