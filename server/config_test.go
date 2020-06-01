@@ -39,7 +39,7 @@ tenant:
   key: mykey
   secret: mysecret
   client_timeout: 30s
-  allow_Unverified_ssl_cert: false
+  allow_unverified_ssl_cert: false
 products:
   refresh_rate: 2m
 analytics:
@@ -52,6 +52,7 @@ analytics:
     ca_file: /opt/apigee/tls/ca.crt
     cert_file: /opt/apigee/tls/tls.crt
     key_file: /opt/apigee/tls/tls.key
+    allow_unverified_ssl_cert: false
 auth:
   api_key_claim: claim
   api_key_cache_duration: 30m
