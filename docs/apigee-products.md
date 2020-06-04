@@ -70,12 +70,11 @@ Click on `API Products` then click the blue `+ API Product` button.
 * Select your environment(s).
 * Set `Access` to `Private`.
 * Set the `Quota` to `5` requests every `1` `minute`.
-* Add a `Path` with the `+Custom Resource` button. Set the path to `/`.
-* Create a `Custom attribute` with key: `apigee-remote-service-targets` and value: `httpbin.org,httpbin.default.svc.cluster.local`.
+* Under `Apigee remote service targets`, add your two targets.
+* Both `httpbin.org` and `httpbin.default.svc.cluster.local` can use `/` as path.
 * Click the blue `Save` button.
 
-(Note that the value we used in the attributes is the simply the fully qualified DNS name 
-of the httpbin service we created in Kubernetes.)
+(Note that the values used as target names are simply DNS host names.)
 
 Now, we'll create a Developer to grant access to:
 
