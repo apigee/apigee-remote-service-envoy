@@ -1,5 +1,5 @@
 ---
-name: Issue report
+name: New report
 about: File an issue to help improve the product
 title: 'Issue report'
 labels: ''
