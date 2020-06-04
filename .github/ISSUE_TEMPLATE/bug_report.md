@@ -7,10 +7,11 @@ assignees: ''
 
 ---
 
-Issues filed on Github are not subject to service level agreements (SLAs) and responses should be
-assumed to be on an ad-hoc volunteer basis. The Apigee community board is recommended as for
-community support and is regularly checked by Apigee experts. Apigee customers should use formal 
-support channels. See the `Get Help` page in the wiki for more information.
+Issues filed on Github are not subject to service level agreements (SLAs) and responses 
+should be assumed to be on an ad-hoc volunteer basis. The Apigee community board is 
+recommended for community support and is regularly checked by Apigee experts. Apigee
+customers should use formal support channels. 
+See the `Get help!` page in the wiki for more information.
 
 ---
 ### Describe your issue
