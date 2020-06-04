@@ -1,7 +1,7 @@
 ---
-name: New report
-about: File an issue to help improve the product
-title: 'Issue report'
+name: New bug report
+about: File an bug or support request
+title: 'Bug report'
 labels: ''
 assignees: ''
 
