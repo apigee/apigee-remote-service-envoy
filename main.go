@@ -143,6 +143,8 @@ func serve(config *server.Config) {
 	ls := &server.AccessLogServer{}
 	ls.Register(grpcServer, rsHandler)
 
+	promhttp.InstrumentRoundTripperCounter()
+
 	// health
 	health := health.NewServer()
 	health.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
