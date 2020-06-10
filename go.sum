@@ -8,6 +8,8 @@ github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf/go.mod h1:ybxpYRF
 github.com/alecthomas/units v0.0.0-20190717042225-c3de453c63f4/go.mod h1:ybxpYRFXyAe+OPACYpWeL0wqObRcbAqCMya13uyzqw0=
 github.com/apigee/apigee-remote-service-golib v1.0.0-beta.2 h1:d8qTRKSCJZd49gNNmJQ7KD3xnlY2HE+eD8hg8lDFEcY=
 github.com/apigee/apigee-remote-service-golib v1.0.0-beta.2/go.mod h1:1Y8IJBsjT19gv+pRgmvKNF2FoMguc181K9syiGq2IsY=
+github.com/apigee/apigee-remote-service-golib v1.0.0-beta.3 h1:h9iW3CskMbBl8BecUQU4eOP2fAwZcJcnotox0H14I5U=
+github.com/apigee/apigee-remote-service-golib v1.0.0-beta.3/go.mod h1:1Y8IJBsjT19gv+pRgmvKNF2FoMguc181K9syiGq2IsY=
 github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6/go.mod h1:grANhF5doyWs3UAsr3K4I6qtAmlQcZDesFNEHPZAzj8=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
 github.com/beorn7/perks v1.0.0 h1:HWo1m869IqiPhD389kmkxeTalrjNbbJTC8LXupb+sl0=
