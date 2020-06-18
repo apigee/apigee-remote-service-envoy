@@ -16,8 +16,10 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
 	aauth "github.com/apigee/apigee-remote-service-golib/auth"
 	libAuth "github.com/apigee/apigee-remote-service-golib/auth"
@@ -27,6 +29,8 @@ import (
 	auth "github.com/envoyproxy/go-control-plane/envoy/service/auth/v2"
 	envoy_type "github.com/envoyproxy/go-control-plane/envoy/type"
 	"github.com/gogo/googleapis/google/rpc"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	rpcstatus "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc"
 )
@@ -49,10 +53,13 @@ func (a *AuthorizationServer) Register(s *grpc.Server, handler *Handler) {
 // Check does check
 func (a *AuthorizationServer) Check(ctx context.Context, req *auth.CheckRequest) (*auth.CheckResponse, error) {
 
+	tracker := prometheusRequestTracker(a.handler)
+	defer tracker.record()
+
 	api, ok := req.Attributes.Request.Http.Headers[a.handler.targetHeader]
 	if !ok {
 		log.Debugf("missing target header %s", a.handler.targetHeader)
-		return a.unauthenticated(), nil
+		return a.unauthorized(tracker), nil
 	}
 
 	// check for JWT from Envoy filter
@@ -81,21 +88,21 @@ func (a *AuthorizationServer) Check(ctx context.Context, req *auth.CheckRequest)
 	authContext, err := a.handler.authMan.Authenticate(a.handler, apiKey, claims, a.handler.apiKeyClaim)
 	switch err {
 	case libAuth.ErrNoAuth:
-		return a.unauthenticated(), nil
+		return a.unauthorized(tracker), nil
 	case libAuth.ErrBadAuth:
-		return a.unauthorized(authContext, api), nil
+		return a.denied(tracker, authContext, api), nil
 	case libAuth.ErrInternalError:
-		return a.internalError(err), nil
+		return a.internalError(tracker, err), nil
 	}
 
 	if len(authContext.APIProducts) == 0 {
-		return a.unauthorized(authContext, api), nil
+		return a.denied(tracker, authContext, api), nil
 	}
 
 	// match products
 	products := a.handler.productMan.Resolve(authContext, api, path)
 	if len(products) == 0 {
-		return a.unauthorized(authContext, api), nil
+		return a.denied(tracker, authContext, api), nil
 	}
 
 	// apply quotas to all matched products
@@ -115,16 +122,16 @@ func (a *AuthorizationServer) Check(ctx context.Context, req *auth.CheckRequest)
 		}
 	}
 	if anyError != nil {
-		return a.internalError(anyError), nil
+		return a.internalError(tracker, anyError), nil
 	}
 	if exceeded {
-		return a.quotaExceeded(authContext, api), nil
+		return a.quotaExceeded(tracker, authContext, api), nil
 	}
 
-	return a.authOK(authContext, api), nil
+	return a.authOK(tracker, authContext, api), nil
 }
 
-func (a *AuthorizationServer) authOK(authContext *aauth.Context, api string) *auth.CheckResponse {
+func (a *AuthorizationServer) authOK(tracker *prometheusRequestMetricTracker, authContext *aauth.Context, api string) *auth.CheckResponse {
 
 	headers := makeMetadataHeaders(api, authContext)
 	headers = append(headers, &core.HeaderValueOption{
@@ -134,6 +141,7 @@ func (a *AuthorizationServer) authOK(authContext *aauth.Context, api string) *au
 		},
 	})
 
+	tracker.statusCode = envoy_type.StatusCode_OK
 	return &auth.CheckResponse{
 		Status: &rpcstatus.Status{
 			Code: int32(rpc.OK),
@@ -146,24 +154,39 @@ func (a *AuthorizationServer) authOK(authContext *aauth.Context, api string) *au
 	}
 }
 
-func (a *AuthorizationServer) unauthenticated() *auth.CheckResponse {
-	return a.createDenyResponse(nil, "", rpc.UNAUTHENTICATED)
+func (a *AuthorizationServer) unauthorized(tracker *prometheusRequestMetricTracker) *auth.CheckResponse {
+	return a.createDenyResponse(tracker, nil, "", rpc.UNAUTHENTICATED)
 }
 
-func (a *AuthorizationServer) internalError(err error) *auth.CheckResponse {
+func (a *AuthorizationServer) internalError(tracker *prometheusRequestMetricTracker, err error) *auth.CheckResponse {
 	log.Errorf("sending internal error: %v", err)
-	return a.createDenyResponse(nil, "", rpc.INTERNAL)
+	return a.createDenyResponse(tracker, nil, "", rpc.INTERNAL)
 }
 
-func (a *AuthorizationServer) unauthorized(authContext *aauth.Context, api string) *auth.CheckResponse {
-	return a.createDenyResponse(authContext, api, rpc.PERMISSION_DENIED)
+func (a *AuthorizationServer) denied(tracker *prometheusRequestMetricTracker, authContext *aauth.Context, api string) *auth.CheckResponse {
+	return a.createDenyResponse(tracker, authContext, api, rpc.PERMISSION_DENIED)
 }
 
-func (a *AuthorizationServer) quotaExceeded(authContext *aauth.Context, api string) *auth.CheckResponse {
-	return a.createDenyResponse(authContext, api, rpc.RESOURCE_EXHAUSTED)
+func (a *AuthorizationServer) quotaExceeded(tracker *prometheusRequestMetricTracker, authContext *aauth.Context, api string) *auth.CheckResponse {
+	return a.createDenyResponse(tracker, authContext, api, rpc.RESOURCE_EXHAUSTED)
 }
 
-func (a *AuthorizationServer) createDenyResponse(authContext *aauth.Context, api string, code rpc.Code) *auth.CheckResponse {
+func (a *AuthorizationServer) createDenyResponse(tracker *prometheusRequestMetricTracker, authContext *aauth.Context, api string, code rpc.Code) *auth.CheckResponse {
+
+	// use intended code, not OK
+	switch code {
+	case rpc.UNAUTHENTICATED:
+		tracker.statusCode = envoy_type.StatusCode_Unauthorized
+
+	case rpc.INTERNAL:
+		tracker.statusCode = envoy_type.StatusCode_InternalServerError
+
+	case rpc.PERMISSION_DENIED:
+		tracker.statusCode = envoy_type.StatusCode_Forbidden
+
+	case rpc.RESOURCE_EXHAUSTED: // Envoy doesn't automatically map this code, force it
+		tracker.statusCode = envoy_type.StatusCode_TooManyRequests
+	}
 
 	if a.handler.rejectUnauthorized || authContext == nil { // send reject to client
 		log.Debugf("sending denied: %s", code.String())
@@ -174,12 +197,12 @@ func (a *AuthorizationServer) createDenyResponse(authContext *aauth.Context, api
 			},
 		}
 
-		// Envoy doesn't map this code, force it
+		// Envoy doesn't automatically map this code, force it
 		if code == rpc.RESOURCE_EXHAUSTED {
 			response.HttpResponse = &auth.CheckResponse_DeniedResponse{
 				DeniedResponse: &auth.DeniedHttpResponse{
 					Status: &envoy_type.HttpStatus{
-						Code: envoy_type.StatusCode_TooManyRequests,
+						Code: tracker.statusCode,
 					},
 				},
 			}
@@ -200,4 +223,36 @@ func (a *AuthorizationServer) createDenyResponse(authContext *aauth.Context, api
 			},
 		},
 	}
+}
+
+// prometheus metrics
+var (
+	prometheusAuthSeconds = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Subsystem: "auth",
+		Name:      "requests_seconds",
+		Help:      "Time taken to process authorization requests by code",
+		Buckets:   prometheus.DefBuckets,
+	}, []string{"org", "env", "code"})
+)
+
+type prometheusRequestMetricTracker struct {
+	handler    *Handler
+	startTime  time.Time
+	statusCode envoy_type.StatusCode
+}
+
+// set statusCode before calling record()
+func prometheusRequestTracker(h *Handler) *prometheusRequestMetricTracker {
+	return &prometheusRequestMetricTracker{
+		handler:    h,
+		startTime:  time.Now(),
+		statusCode: envoy_type.StatusCode_InternalServerError,
+	}
+}
+
+// set statusCode before calling
+func (t *prometheusRequestMetricTracker) record() {
+	codeLabel := fmt.Sprintf("%d", t.statusCode)
+	httpDuration := time.Since(t.startTime)
+	prometheusAuthSeconds.WithLabelValues(t.handler.orgName, t.handler.envName, codeLabel).Observe(httpDuration.Seconds())
 }

@@ -28,6 +28,9 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/auth"
 	"github.com/apigee/apigee-remote-service-golib/product"
 	"github.com/apigee/apigee-remote-service-golib/quota"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // A Handler is the main entry
@@ -119,17 +122,15 @@ func NewHandler(config *Config) (*Handler, error) {
 			TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
 		}
 	}
-	httpClient := &http.Client{
-		Timeout:   config.Tenant.ClientTimeout,
-		Transport: tr,
-	}
 
 	productMan, err := product.NewManager(product.Options{
-		Client:      httpClient,
+		Client:      instrumentedClientFor(config, "products", tr),
 		BaseURL:     remoteServiceAPI,
 		RefreshRate: config.Products.RefreshRate,
 		Key:         config.Tenant.Key,
 		Secret:      config.Tenant.Secret,
+		Org:         config.Tenant.OrgName,
+		Env:         config.Tenant.EnvName,
 	})
 	if err != nil {
 		return nil, err
@@ -137,8 +138,10 @@ func NewHandler(config *Config) (*Handler, error) {
 
 	authMan, err := auth.NewManager(auth.Options{
 		PollInterval:        config.Auth.JWKSPollInterval,
-		Client:              httpClient,
+		Client:              instrumentedClientFor(config, "auth", tr),
 		APIKeyCacheDuration: config.Auth.APIKeyCacheDuration,
+		Org:                 config.Tenant.OrgName,
+		Env:                 config.Tenant.EnvName,
 	})
 	if err != nil {
 		return nil, err
@@ -146,9 +149,11 @@ func NewHandler(config *Config) (*Handler, error) {
 
 	quotaMan, err := quota.NewManager(quota.Options{
 		BaseURL: remoteServiceAPI,
-		Client:  httpClient,
+		Client:  instrumentedClientFor(config, "quotas", tr),
 		Key:     config.Tenant.Key,
 		Secret:  config.Tenant.Secret,
+		Org:     config.Tenant.OrgName,
+		Env:     config.Tenant.EnvName,
 	})
 	if err != nil {
 		return nil, err
@@ -168,7 +173,7 @@ func NewHandler(config *Config) (*Handler, error) {
 		BaseURL:            internalAPI,
 		Key:                config.Tenant.Key,
 		Secret:             config.Tenant.Secret,
-		Client:             httpClient,
+		Client:             instrumentedClientFor(config, "analytics", tr),
 		SendChannelSize:    config.Analytics.SendChannelSize,
 		CollectionInterval: time.Minute,
 		FluentdEndpoint:    config.Analytics.FluentdEndpoint,
@@ -200,3 +205,22 @@ func NewHandler(config *Config) (*Handler, error) {
 
 	return h, nil
 }
+
+func instrumentedClientFor(config *Config, api string, rt http.RoundTripper) *http.Client {
+	promLabels := prometheus.Labels{"org": config.Tenant.OrgName, "env": config.Tenant.EnvName, "api": api}
+	observer := prometheusApigeeRequests.MustCurryWith(promLabels)
+	rt = promhttp.InstrumentRoundTripperDuration(observer, rt)
+	return &http.Client{
+		Timeout:   config.Tenant.ClientTimeout,
+		Transport: rt,
+	}
+}
+
+var (
+	prometheusApigeeRequests = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Subsystem: "apigee",
+		Name:      "requests_seconds",
+		Help:      "Time taken to make apigee requests by code",
+		Buckets:   prometheus.DefBuckets,
+	}, []string{"org", "env", "api", "code", "method"})
+)

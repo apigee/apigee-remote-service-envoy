@@ -23,6 +23,8 @@ import (
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/duration"
 	"github.com/golang/protobuf/ptypes/timestamp"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"google.golang.org/grpc"
 )
 
@@ -49,10 +51,15 @@ func (a *AccessLogServer) StreamAccessLogs(srv als.AccessLogService_StreamAccess
 	switch msg := msg.GetLogEntries().(type) {
 
 	case *als.StreamAccessLogsMessage_HttpLogs:
-		return a.handleHTTPLogs(msg)
+		status := "ok"
+		if err := a.handleHTTPLogs(msg); err != nil {
+			status = "error"
+		}
+		prometheusAnalyticsRequests.WithLabelValues(a.handler.orgName, a.handler.envName, status).Inc()
+		return err
 
 	case *als.StreamAccessLogsMessage_TcpLogs:
-		log.Warnf("TcpLogs not supported: %#v", msg)
+		log.Infof("TcpLogs not supported: %#v", msg)
 	}
 
 	return nil
@@ -136,3 +143,11 @@ func pbTimestampAddDurationUnix(ts *timestamp.Timestamp, d *duration.Duration) i
 	}
 	return t.Add(du).UnixNano() / 1000000
 }
+
+var (
+	prometheusAnalyticsRequests = promauto.NewCounterVec(prometheus.CounterOpts{
+		Subsystem: "analytics",
+		Name:      "analytics_requests_count",
+		Help:      "Total number of analytics streaming requests received",
+	}, []string{"org", "env", "status"})
+)
