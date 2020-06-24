@@ -39,14 +39,18 @@ spec:
           value: http2client=0
         ports:
         - containerPort: 5000
-        readinessProbe:
-          exec:
-            command: ["/grpc_health_probe", "-addr=:5000"]
-          initialDelaySeconds: 5
         livenessProbe:
-          exec:
-            command: ["/grpc_health_probe", "-addr=:5000"]
-          initialDelaySeconds: 10
+          httpGet:
+            path: /healthz
+            port: 5001
+          failureThreshold: 1
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 5001
+          failureThreshold: 30
+          periodSeconds: 10
         args:
           - --log_level=debug
           - --config=/config/config.yaml
