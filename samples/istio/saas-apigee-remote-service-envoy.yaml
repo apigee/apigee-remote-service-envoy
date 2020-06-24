@@ -48,7 +48,6 @@ spec:
             command: ["/grpc_health_probe", "-addr=:5000"]
           initialDelaySeconds: 10
         args:
-          - --address=:5000
           - --log_level=debug
           - --config=/config/config.yaml
         resources:
