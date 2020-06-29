@@ -15,14 +15,22 @@
 package server
 
 import (
+	"bytes"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/pem"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"testing"
 
+	"github.com/apigee/apigee-remote-service-envoy/testutil"
 	"github.com/hashicorp/go-multierror"
+	"gopkg.in/yaml.v3"
 )
 
-const allConfigOptions = `
+const (
+	allConfigOptions = `
 global:
   temp_dir: /tmp/apigee-istio
   keep_alive_max_connection_age: 10m
@@ -59,10 +67,12 @@ auth:
   api_key_header: x-api-key
   api_target_header: :authority
   reject_unauthorized: true
-  jwks_poll_interval: 0s
-`
+  jwks_poll_interval: 0s`
+)
 
-func TestDefaultConfig(t *testing.T) {
+// TODO: Test multi-file (as in Kubernetes)
+
+func TestHybridConfig(t *testing.T) {
 	tf, err := ioutil.TempFile("", "")
 	if err != nil {
 		t.Fatal(err)
@@ -71,55 +81,87 @@ func TestDefaultConfig(t *testing.T) {
 
 	const minConfig = `
     tenant:
-      internal_api: https://istioservices.apigee.net/edgemicro
       remote_service_api: https://org-test.apigee.net/remote-service
       org_name: org
       env_name: env
-      key: mykey
-      secret: mysecret
-  `
-	if _, err := tf.WriteString(minConfig); err != nil {
-		t.Fatal(err)
-	}
-
-	c := DefaultConfig()
-	if err := c.Load(tf.Name()); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := c.Validate(); err != nil {
-		t.Fatalf("config should be valid, got: %s", err)
-	}
-}
-
-func TestLoad(t *testing.T) {
-	tf, err := ioutil.TempFile("", "")
+    analytics:
+      fluentd_endpoint: apigee-udca-myorg-test.apigee.svc.cluster.local:20001`
+	configCRD := makeConfigCRD(minConfig)
+	secretCRD, err := makeSecretCRD()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tf.Name())
+	configMapYAML, err := makeYAML(configCRD, secretCRD)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	if _, err := tf.WriteString(allConfigOptions); err != nil {
+	if _, err := tf.WriteString(configMapYAML); err != nil {
 		t.Fatal(err)
 	}
 	if err := tf.Close(); err != nil {
 		t.Fatal(err)
 	}
 
+	// TODO: remove
+	bytes, err := ioutil.ReadFile(tf.Name())
+	t.Logf("contents:\n%s", bytes)
+
+	c := DefaultConfig()
+	if err := c.Load(tf.Name(), "xxx"); err != nil {
+		t.Fatal(err)
+	}
+
+	equal(t, c.Tenant.PrivateKeyID, "kid")
+}
+
+func TestLoadUnifiedConfig(t *testing.T) {
+	tf, err := ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tf.Name())
+
+	configCRD := makeConfigCRD(allConfigOptions) // TODO: fix this, having `internal_api` will skip loading secret
+	secretCRD, err := makeSecretCRD()
+	if err != nil {
+		t.Fatal(err)
+	}
+	configMapYAML, err := makeYAML(configCRD, secretCRD)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := tf.WriteString(configMapYAML); err != nil {
+		t.Fatal(err)
+	}
+	if err := tf.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	// TODO: remove
 	bytes, err := ioutil.ReadFile(tf.Name())
 	t.Logf("contents:\n%s", bytes)
 
 	c := &Config{}
-	if err := c.Load(tf.Name()); err != nil {
+	if err := c.Load(tf.Name(), "xxx"); err != nil {
 		t.Fatal(err)
 	}
 
+	equal(t, c.Global.Namespace, "apigee")
 	equal(t, c.Global.TempDir, "/tmp/apigee-istio")
 }
 
-func equal(t *testing.T, got, want string) {
-	if got != want {
-		t.Errorf("got: '%s', want: '%s'", got, want)
+func makeConfigCRD(config string) *ConfigMapCRD {
+	data := map[string]string{"config.yaml": config}
+	return &ConfigMapCRD{
+		APIVersion: "v1",
+		Kind:       "ConfigMap",
+		Metadata: Metadata{
+			Name:      "apigee-remote-service-envoy",
+			Namespace: "apigee",
+		},
+		Data: data,
 	}
 }
 
@@ -135,8 +177,6 @@ func TestValidate(t *testing.T) {
 		"tenant.internal_api or tenant.analytics.fluentd_endpoint is required",
 		"tenant.org_name is required",
 		"tenant.env_name is required",
-		"tenant.key is required",
-		"tenant.secret is required",
 	}
 	merr := err.(*multierror.Error)
 	if merr.Len() != len(wantErrs) {
@@ -194,5 +234,49 @@ func TestValidateTLS(t *testing.T) {
 		for i, e := range errs {
 			equal(t, e.Error(), wantErrs[i])
 		}
+	}
+}
+
+func makeSecretCRD() (*SecretCRD, error) {
+	kid := "kid"
+	privateKey, jwksBuf, err := testutil.GenerateKeyAndJWKs(kid)
+	if err != nil {
+		return nil, err
+	}
+	pkBytes := pem.EncodeToMemory(&pem.Block{Type: PEMKeyType, Bytes: x509.MarshalPKCS1PrivateKey(privateKey)})
+
+	data := map[string]string{
+		SecretJKWSKey:    base64.StdEncoding.EncodeToString(jwksBuf),
+		SecretPrivateKey: base64.StdEncoding.EncodeToString(pkBytes),
+		SecretKIDKey:     base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf(SecretKIDFormat, kid))),
+	}
+
+	return &SecretCRD{
+		APIVersion: "v1",
+		Kind:       "Secret",
+		Type:       "Opaque",
+		Metadata: Metadata{
+			Name:      "org-env-policy-secret",
+			Namespace: "apigee",
+		},
+		Data: data,
+	}, nil
+}
+
+func makeYAML(crds ...interface{}) (string, error) {
+	var yamlBuffer bytes.Buffer
+	yamlEncoder := yaml.NewEncoder(&yamlBuffer)
+	yamlEncoder.SetIndent(2)
+	for _, crd := range crds {
+		if err := yamlEncoder.Encode(crd); err != nil {
+			return "", err
+		}
+	}
+	return yamlBuffer.String(), nil
+}
+
+func equal(t *testing.T, got, want string) {
+	if got != want {
+		t.Errorf("got: '%s', want: '%s'", got, want)
 	}
 }
