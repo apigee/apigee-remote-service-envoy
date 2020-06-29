@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"testing"
 
 	"github.com/apigee/apigee-remote-service-envoy/testutil"
@@ -68,25 +69,80 @@ auth:
   api_target_header: :authority
   reject_unauthorized: true
   jwks_poll_interval: 0s`
+
+	configMapConfigKey = "config.yaml"
 )
 
-// TODO: Test multi-file (as in Kubernetes)
+func TestPlatformDetect(t *testing.T) {
+	// OPDK
+	config := &Config{
+		Tenant: TenantConfig{
+			InternalAPI: "x",
+		},
+	}
+	if config.IsGCPManaged() {
+		t.Fatalf("expected !config.isGCPExperience")
+	}
+	if config.IsApigeeManaged() {
+		t.Fatalf("expected !config.IsApigeeManaged")
+	}
+	if !config.IsOPDK() {
+		t.Fatalf("expected config.IsOPDK")
+	}
 
-func TestHybridConfig(t *testing.T) {
+	// Legacy SaaS
+	config.Tenant.InternalAPI = LegacySaaSInternalBase
+	if config.IsGCPManaged() {
+		t.Fatalf("expected !config.isGCPExperience")
+	}
+	if !config.IsApigeeManaged() {
+		t.Fatalf("expected config.IsApigeeManaged")
+	}
+	if config.IsOPDK() {
+		t.Fatalf("expected !config.IsOPDK")
+	}
+
+	// Legacy SaaS
+	config.Tenant.InternalAPI = LegacySaaSInternalBase
+	if config.IsGCPManaged() {
+		t.Fatalf("expected !config.isGCPExperience")
+	}
+	if !config.IsApigeeManaged() {
+		t.Fatalf("expected config.IsApigeeManaged")
+	}
+	if config.IsOPDK() {
+		t.Fatalf("expected !config.IsOPDK")
+	}
+
+	// GCP
+	config.Tenant.InternalAPI = ""
+	if !config.IsGCPManaged() {
+		t.Fatalf("expected config.isGCPExperience")
+	}
+	if config.IsApigeeManaged() {
+		t.Fatalf("expected !config.IsApigeeManaged")
+	}
+	if config.IsOPDK() {
+		t.Fatalf("expected !config.IsOPDK")
+	}
+
+}
+
+func TestHybridSingleFile(t *testing.T) {
 	tf, err := ioutil.TempFile("", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.Remove(tf.Name())
 
-	const minConfig = `
+	const config = `
     tenant:
       remote_service_api: https://org-test.apigee.net/remote-service
       org_name: org
       env_name: env
     analytics:
       fluentd_endpoint: apigee-udca-myorg-test.apigee.svc.cluster.local:20001`
-	configCRD := makeConfigCRD(minConfig)
+	configCRD := makeConfigCRD(config)
 	secretCRD, err := makeSecretCRD()
 	if err != nil {
 		t.Fatal(err)
@@ -102,10 +158,6 @@ func TestHybridConfig(t *testing.T) {
 	if err := tf.Close(); err != nil {
 		t.Fatal(err)
 	}
-
-	// TODO: remove
-	bytes, err := ioutil.ReadFile(tf.Name())
-	t.Logf("contents:\n%s", bytes)
 
 	c := DefaultConfig()
 	if err := c.Load(tf.Name(), "xxx"); err != nil {
@@ -115,14 +167,64 @@ func TestHybridConfig(t *testing.T) {
 	equal(t, c.Tenant.PrivateKeyID, "kid")
 }
 
-func TestLoadUnifiedConfig(t *testing.T) {
+func TestMultifileConfig(t *testing.T) {
 	tf, err := ioutil.TempFile("", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.Remove(tf.Name())
 
-	configCRD := makeConfigCRD(allConfigOptions) // TODO: fix this, having `internal_api` will skip loading secret
+	const config = `
+    tenant:
+      remote_service_api: https://org-test.apigee.net/remote-service
+      org_name: org
+      env_name: env
+    analytics:
+      fluentd_endpoint: apigee-udca-myorg-test.apigee.svc.cluster.local:20001`
+	configCRD := makeConfigCRD(config)
+	if _, err := tf.WriteString(configCRD.Data[configMapConfigKey]); err != nil {
+		t.Fatal(err)
+	}
+	if err := tf.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	secretDir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(secretDir)
+
+	secretCRD, err := makeSecretCRD()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for k, v := range secretCRD.Data {
+		data, err := base64.StdEncoding.DecodeString(v)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := ioutil.WriteFile(path.Join(secretDir, k), data, os.ModePerm); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	c := DefaultConfig()
+	if err := c.Load(tf.Name(), secretDir); err != nil {
+		t.Fatal(err)
+	}
+
+	equal(t, c.Tenant.PrivateKeyID, "kid")
+}
+
+func TestLoadLegacyConfig(t *testing.T) {
+	tf, err := ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tf.Name())
+
+	configCRD := makeConfigCRD(allConfigOptions)
 	secretCRD, err := makeSecretCRD()
 	if err != nil {
 		t.Fatal(err)
@@ -138,10 +240,6 @@ func TestLoadUnifiedConfig(t *testing.T) {
 	if err := tf.Close(); err != nil {
 		t.Fatal(err)
 	}
-
-	// TODO: remove
-	bytes, err := ioutil.ReadFile(tf.Name())
-	t.Logf("contents:\n%s", bytes)
 
 	c := &Config{}
 	if err := c.Load(tf.Name(), "xxx"); err != nil {
@@ -153,7 +251,7 @@ func TestLoadUnifiedConfig(t *testing.T) {
 }
 
 func makeConfigCRD(config string) *ConfigMapCRD {
-	data := map[string]string{"config.yaml": config}
+	data := map[string]string{configMapConfigKey: config}
 	return &ConfigMapCRD{
 		APIVersion: "v1",
 		Kind:       "ConfigMap",

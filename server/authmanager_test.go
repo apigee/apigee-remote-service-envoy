@@ -33,9 +33,6 @@ func TestStaticAuthManager(t *testing.T) {
 			InternalAPI: "x",
 		},
 	}
-	if config.IsGCPManaged() {
-		t.Fatalf("expected !config.isGCPExperience")
-	}
 	m, err := NewAuthManager(config)
 	if err != nil {
 		t.Fatalf("expected nil error, got: %s", err)
