@@ -39,8 +39,6 @@ type Handler struct {
 	remoteServiceAPI   *url.URL
 	orgName            string
 	envName            string
-	key                string
-	secret             string
 	apiKeyClaim        string
 	apiKeyHeader       string
 	targetHeader       string
@@ -70,16 +68,6 @@ func (h *Handler) Organization() string {
 // Environment is the tenant environment
 func (h *Handler) Environment() string {
 	return h.envName
-}
-
-// Key is the access key for the remote service
-func (h *Handler) Key() string {
-	return h.key
-}
-
-// Secret is the access secret for the remote service
-func (h *Handler) Secret() string {
-	return h.secret
 }
 
 // NewHandler creates a handler
@@ -123,12 +111,16 @@ func NewHandler(config *Config) (*Handler, error) {
 		}
 	}
 
+	// add authorization to transport
+	tr, err = AuthorizationRoundTripper(config, tr)
+	if err != nil {
+		return nil, err
+	}
+
 	productMan, err := product.NewManager(product.Options{
 		Client:      instrumentedClientFor(config, "products", tr),
 		BaseURL:     remoteServiceAPI,
 		RefreshRate: config.Products.RefreshRate,
-		Key:         config.Tenant.Key,
-		Secret:      config.Tenant.Secret,
 		Org:         config.Tenant.OrgName,
 		Env:         config.Tenant.EnvName,
 	})
@@ -150,8 +142,6 @@ func NewHandler(config *Config) (*Handler, error) {
 	quotaMan, err := quota.NewManager(quota.Options{
 		BaseURL: remoteServiceAPI,
 		Client:  instrumentedClientFor(config, "quotas", tr),
-		Key:     config.Tenant.Key,
-		Secret:  config.Tenant.Secret,
 		Org:     config.Tenant.OrgName,
 		Env:     config.Tenant.EnvName,
 	})
@@ -171,8 +161,6 @@ func NewHandler(config *Config) (*Handler, error) {
 		BufferPath:         analyticsDir,
 		StagingFileLimit:   config.Analytics.FileLimit,
 		BaseURL:            internalAPI,
-		Key:                config.Tenant.Key,
-		Secret:             config.Tenant.Secret,
 		Client:             instrumentedClientFor(config, "analytics", tr),
 		SendChannelSize:    config.Analytics.SendChannelSize,
 		CollectionInterval: time.Minute,
@@ -191,8 +179,6 @@ func NewHandler(config *Config) (*Handler, error) {
 		internalAPI:        internalAPI,
 		orgName:            config.Tenant.OrgName,
 		envName:            config.Tenant.EnvName,
-		key:                config.Tenant.Key,
-		secret:             config.Tenant.Secret,
 		productMan:         productMan,
 		authMan:            authMan,
 		analyticsMan:       analyticsMan,

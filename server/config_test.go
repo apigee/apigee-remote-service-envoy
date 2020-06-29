@@ -15,14 +15,23 @@
 package server
 
 import (
+	"bytes"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/pem"
+	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"testing"
 
+	"github.com/apigee/apigee-remote-service-envoy/testutil"
 	"github.com/hashicorp/go-multierror"
+	"gopkg.in/yaml.v3"
 )
 
-const allConfigOptions = `
+const (
+	allConfigOptions = `
 global:
   temp_dir: /tmp/apigee-istio
   keep_alive_max_connection_age: 10m
@@ -59,67 +68,198 @@ auth:
   api_key_header: x-api-key
   api_target_header: :authority
   reject_unauthorized: true
-  jwks_poll_interval: 0s
-`
+  jwks_poll_interval: 0s`
 
-func TestDefaultConfig(t *testing.T) {
+	configMapConfigKey = "config.yaml"
+)
+
+func TestPlatformDetect(t *testing.T) {
+	// OPDK
+	config := &Config{
+		Tenant: TenantConfig{
+			InternalAPI: "x",
+		},
+	}
+	if config.IsGCPManaged() {
+		t.Fatalf("expected !config.isGCPExperience")
+	}
+	if config.IsApigeeManaged() {
+		t.Fatalf("expected !config.IsApigeeManaged")
+	}
+	if !config.IsOPDK() {
+		t.Fatalf("expected config.IsOPDK")
+	}
+
+	// Legacy SaaS
+	config.Tenant.InternalAPI = LegacySaaSInternalBase
+	if config.IsGCPManaged() {
+		t.Fatalf("expected !config.isGCPExperience")
+	}
+	if !config.IsApigeeManaged() {
+		t.Fatalf("expected config.IsApigeeManaged")
+	}
+	if config.IsOPDK() {
+		t.Fatalf("expected !config.IsOPDK")
+	}
+
+	// Legacy SaaS
+	config.Tenant.InternalAPI = LegacySaaSInternalBase
+	if config.IsGCPManaged() {
+		t.Fatalf("expected !config.isGCPExperience")
+	}
+	if !config.IsApigeeManaged() {
+		t.Fatalf("expected config.IsApigeeManaged")
+	}
+	if config.IsOPDK() {
+		t.Fatalf("expected !config.IsOPDK")
+	}
+
+	// GCP
+	config.Tenant.InternalAPI = ""
+	if !config.IsGCPManaged() {
+		t.Fatalf("expected config.isGCPExperience")
+	}
+	if config.IsApigeeManaged() {
+		t.Fatalf("expected !config.IsApigeeManaged")
+	}
+	if config.IsOPDK() {
+		t.Fatalf("expected !config.IsOPDK")
+	}
+
+}
+
+func TestHybridSingleFile(t *testing.T) {
 	tf, err := ioutil.TempFile("", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.Remove(tf.Name())
 
-	const minConfig = `
+	const config = `
     tenant:
-      internal_api: https://istioservices.apigee.net/edgemicro
       remote_service_api: https://org-test.apigee.net/remote-service
       org_name: org
       env_name: env
-      key: mykey
-      secret: mysecret
-  `
-	if _, err := tf.WriteString(minConfig); err != nil {
-		t.Fatal(err)
-	}
-
-	c := DefaultConfig()
-	if err := c.Load(tf.Name()); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := c.Validate(); err != nil {
-		t.Fatalf("config should be valid, got: %s", err)
-	}
-}
-
-func TestLoad(t *testing.T) {
-	tf, err := ioutil.TempFile("", "")
+    analytics:
+      fluentd_endpoint: apigee-udca-myorg-test.apigee.svc.cluster.local:20001`
+	configCRD := makeConfigCRD(config)
+	secretCRD, err := makeSecretCRD()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tf.Name())
+	configMapYAML, err := makeYAML(configCRD, secretCRD)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	if _, err := tf.WriteString(allConfigOptions); err != nil {
+	if _, err := tf.WriteString(configMapYAML); err != nil {
 		t.Fatal(err)
 	}
 	if err := tf.Close(); err != nil {
 		t.Fatal(err)
 	}
 
-	bytes, err := ioutil.ReadFile(tf.Name())
-	t.Logf("contents:\n%s", bytes)
-
-	c := &Config{}
-	if err := c.Load(tf.Name()); err != nil {
+	c := DefaultConfig()
+	if err := c.Load(tf.Name(), "xxx"); err != nil {
 		t.Fatal(err)
 	}
 
+	equal(t, c.Tenant.PrivateKeyID, "kid")
+}
+
+func TestMultifileConfig(t *testing.T) {
+	tf, err := ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tf.Name())
+
+	const config = `
+    tenant:
+      remote_service_api: https://org-test.apigee.net/remote-service
+      org_name: org
+      env_name: env
+    analytics:
+      fluentd_endpoint: apigee-udca-myorg-test.apigee.svc.cluster.local:20001`
+	configCRD := makeConfigCRD(config)
+	if _, err := tf.WriteString(configCRD.Data[configMapConfigKey]); err != nil {
+		t.Fatal(err)
+	}
+	if err := tf.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	secretDir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(secretDir)
+
+	secretCRD, err := makeSecretCRD()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for k, v := range secretCRD.Data {
+		data, err := base64.StdEncoding.DecodeString(v)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := ioutil.WriteFile(path.Join(secretDir, k), data, os.ModePerm); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	c := DefaultConfig()
+	if err := c.Load(tf.Name(), secretDir); err != nil {
+		t.Fatal(err)
+	}
+
+	equal(t, c.Tenant.PrivateKeyID, "kid")
+}
+
+func TestLoadLegacyConfig(t *testing.T) {
+	tf, err := ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tf.Name())
+
+	configCRD := makeConfigCRD(allConfigOptions)
+	secretCRD, err := makeSecretCRD()
+	if err != nil {
+		t.Fatal(err)
+	}
+	configMapYAML, err := makeYAML(configCRD, secretCRD)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := tf.WriteString(configMapYAML); err != nil {
+		t.Fatal(err)
+	}
+	if err := tf.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	c := &Config{}
+	if err := c.Load(tf.Name(), "xxx"); err != nil {
+		t.Fatal(err)
+	}
+
+	equal(t, c.Global.Namespace, "apigee")
 	equal(t, c.Global.TempDir, "/tmp/apigee-istio")
 }
 
-func equal(t *testing.T, got, want string) {
-	if got != want {
-		t.Errorf("got: '%s', want: '%s'", got, want)
+func makeConfigCRD(config string) *ConfigMapCRD {
+	data := map[string]string{configMapConfigKey: config}
+	return &ConfigMapCRD{
+		APIVersion: "v1",
+		Kind:       "ConfigMap",
+		Metadata: Metadata{
+			Name:      "apigee-remote-service-envoy",
+			Namespace: "apigee",
+		},
+		Data: data,
 	}
 }
 
@@ -135,8 +275,6 @@ func TestValidate(t *testing.T) {
 		"tenant.internal_api or tenant.analytics.fluentd_endpoint is required",
 		"tenant.org_name is required",
 		"tenant.env_name is required",
-		"tenant.key is required",
-		"tenant.secret is required",
 	}
 	merr := err.(*multierror.Error)
 	if merr.Len() != len(wantErrs) {
@@ -194,5 +332,49 @@ func TestValidateTLS(t *testing.T) {
 		for i, e := range errs {
 			equal(t, e.Error(), wantErrs[i])
 		}
+	}
+}
+
+func makeSecretCRD() (*SecretCRD, error) {
+	kid := "kid"
+	privateKey, jwksBuf, err := testutil.GenerateKeyAndJWKs(kid)
+	if err != nil {
+		return nil, err
+	}
+	pkBytes := pem.EncodeToMemory(&pem.Block{Type: PEMKeyType, Bytes: x509.MarshalPKCS1PrivateKey(privateKey)})
+
+	data := map[string]string{
+		SecretJKWSKey:    base64.StdEncoding.EncodeToString(jwksBuf),
+		SecretPrivateKey: base64.StdEncoding.EncodeToString(pkBytes),
+		SecretKIDKey:     base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf(SecretKIDFormat, kid))),
+	}
+
+	return &SecretCRD{
+		APIVersion: "v1",
+		Kind:       "Secret",
+		Type:       "Opaque",
+		Metadata: Metadata{
+			Name:      "org-env-policy-secret",
+			Namespace: "apigee",
+		},
+		Data: data,
+	}, nil
+}
+
+func makeYAML(crds ...interface{}) (string, error) {
+	var yamlBuffer bytes.Buffer
+	yamlEncoder := yaml.NewEncoder(&yamlBuffer)
+	yamlEncoder.SetIndent(2)
+	for _, crd := range crds {
+		if err := yamlEncoder.Encode(crd); err != nil {
+			return "", err
+		}
+	}
+	return yamlBuffer.String(), nil
+}
+
+func equal(t *testing.T, got, want string) {
+	if got != want {
+		t.Errorf("got: '%s', want: '%s'", got, want)
 	}
 }

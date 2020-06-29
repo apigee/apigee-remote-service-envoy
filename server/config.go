@@ -15,13 +15,25 @@
 package server
 
 import (
+	"bytes"
+	"crypto/rsa"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"path"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
+	"github.com/lestrrat-go/jwx/jwk"
+	"github.com/pkg/errors"
+	"github.com/prometheus/common/log"
 	"gopkg.in/yaml.v3"
 )
+
+// LegacySaaSInternalBase is the internal API used for auth and analytics
+const LegacySaaSInternalBase = "https://istioservices.apigee.net/edgemicro"
 
 // DefaultConfig returns a config with defaults set
 func DefaultConfig() *Config {
@@ -33,7 +45,9 @@ func DefaultConfig() *Config {
 			MetricsAddress:            ":5001",
 		},
 		Tenant: TenantConfig{
-			ClientTimeout: 30 * time.Second,
+			ClientTimeout:       30 * time.Second,
+			InternalJWTDuration: 10 * time.Minute,
+			InternalJWTRefresh:  30 * time.Second,
 		},
 		Products: ProductsConfig{
 			RefreshRate: 2 * time.Minute,
@@ -68,6 +82,7 @@ type GlobalConfig struct {
 	TempDir                   string            `yaml:"temp_dir,omitempty"`
 	KeepAliveMaxConnectionAge time.Duration     `yaml:"keep_alive_max_connection_age,omitempty"`
 	TLS                       TLSListenerConfig `yaml:"tls,omitempty"`
+	Namespace                 string            `yaml:"-"`
 }
 
 // TLSListenerConfig is tls configuration
@@ -86,14 +101,19 @@ type TLSClientConfig struct {
 
 // TenantConfig is config relating to an Apigee tentant
 type TenantConfig struct {
-	InternalAPI            string        `yaml:"internal_api,omitempty"`
-	RemoteServiceAPI       string        `yaml:"remote_service_api"`
-	OrgName                string        `yaml:"org_name"`
-	EnvName                string        `yaml:"env_name"`
-	Key                    string        `yaml:"key"`
-	Secret                 string        `yaml:"secret"`
-	ClientTimeout          time.Duration `yaml:"client_timeout,omitempty"`
-	AllowUnverifiedSSLCert bool          `yaml:"allow_unverified_ssl_cert,omitempty"`
+	InternalAPI            string          `yaml:"internal_api,omitempty"`
+	RemoteServiceAPI       string          `yaml:"remote_service_api"`
+	OrgName                string          `yaml:"org_name"`
+	EnvName                string          `yaml:"env_name"`
+	Key                    string          `yaml:"key,omitempty"`
+	Secret                 string          `yaml:"secret,omitempty"`
+	ClientTimeout          time.Duration   `yaml:"client_timeout,omitempty"`
+	AllowUnverifiedSSLCert bool            `yaml:"allow_unverified_ssl_cert,omitempty"`
+	PrivateKey             *rsa.PrivateKey `yaml:"-"`
+	PrivateKeyID           string          `yaml:"-"`
+	JWKS                   *jwk.Set        `yaml:"-"`
+	InternalJWTDuration    time.Duration   `yaml:"-"`
+	InternalJWTRefresh     time.Duration   `yaml:"-"`
 }
 
 // ProductsConfig is products-related config
@@ -122,15 +142,90 @@ type AuthConfig struct {
 }
 
 // Load config
-func (c *Config) Load(file string) error {
-	yamlFile, err := ioutil.ReadFile(file)
-	if err == nil {
-		err = yaml.Unmarshal(yamlFile, c)
+func (c *Config) Load(configFile, policySecretPath string) error {
+	log.Debugf("reading config from: %s", configFile)
+	yamlFile, err := ioutil.ReadFile(configFile)
+	if err != nil {
+		return err
 	}
-	if err == nil {
-		err = c.Validate()
+
+	// attempt load from CRD
+	var key, kidProps, jwksBytes []byte
+	configMap := &ConfigMapCRD{}
+	secret := &SecretCRD{}
+	var configBytes []byte
+	decoder := yaml.NewDecoder(bytes.NewReader(yamlFile))
+	if decoder.Decode(configMap) == nil && configMap.Kind == "ConfigMap" {
+		configBytes = []byte(configMap.Data["config.yaml"])
+		if configBytes != nil {
+			if err = yaml.Unmarshal(configBytes, c); err != nil {
+				return errors.Wrap(err, "bad config file format")
+			}
+			c.Global.Namespace = configMap.Metadata.Namespace
+		}
+
+		if decoder.Decode(secret) == nil && secret.Kind == "Secret" {
+			key, _ = base64.StdEncoding.DecodeString(secret.Data[SecretPrivateKey])
+			kidProps, _ = base64.StdEncoding.DecodeString(secret.Data[SecretKIDKey])
+			jwksBytes, _ = base64.StdEncoding.DecodeString(secret.Data[SecretJKWSKey])
+
+			if key == nil || kidProps == nil || jwksBytes == nil { // all or nothing
+				key = nil
+				kidProps = nil
+				jwksBytes = nil
+			}
+		}
 	}
-	return err
+
+	// didn't load, try as simple config file
+	if configBytes == nil {
+		if err = yaml.Unmarshal(yamlFile, c); err != nil {
+			return errors.Wrap(err, "bad config file format")
+		}
+	}
+
+	if err = c.Validate(); err != nil {
+		return err
+	}
+
+	// if no Secret, try files in policySecretPath
+	if c.IsGCPManaged() {
+
+		if policySecretPath != "" && key == nil {
+			if key, err = ioutil.ReadFile(path.Join(policySecretPath, SecretPrivateKey)); err == nil {
+				if kidProps, err = ioutil.ReadFile(path.Join(policySecretPath, SecretKIDKey)); err == nil {
+					jwksBytes, err = ioutil.ReadFile(path.Join(policySecretPath, SecretJKWSKey))
+				}
+			}
+		}
+		if err != nil {
+			return err
+		}
+
+		c.Tenant.PrivateKeyID = strings.Split(string(kidProps), "=")[1] // assumes just single property
+		jwks := &jwk.Set{}
+		if err = json.Unmarshal(jwksBytes, jwks); err == nil {
+			c.Tenant.JWKS = jwks
+			c.Tenant.PrivateKey, err = loadPrivateKey(key, "")
+		}
+	}
+
+	return c.Validate()
+}
+
+// IsGCPManaged is true for hybrid and NG SaaS
+func (c *Config) IsGCPManaged() bool {
+	return c.Tenant.InternalAPI == ""
+}
+
+// IsApigeeManaged is true for legacy SaaS
+func (c *Config) IsApigeeManaged() bool {
+	return c.Tenant.InternalAPI == LegacySaaSInternalBase
+}
+
+// IsOPDK is true for OPDK installs
+func (c *Config) IsOPDK() bool {
+	return !c.IsGCPManaged() && !c.IsApigeeManaged()
 }
 
 // Validate validates the config
@@ -148,12 +243,6 @@ func (c *Config) Validate() error {
 	if c.Tenant.EnvName == "" {
 		errs = multierror.Append(errs, fmt.Errorf("tenant.env_name is required"))
 	}
-	if c.Tenant.Key == "" {
-		errs = multierror.Append(errs, fmt.Errorf("tenant.key is required"))
-	}
-	if c.Tenant.Secret == "" {
-		errs = multierror.Append(errs, fmt.Errorf("tenant.secret is required"))
-	}
 	if (c.Global.TLS.CertFile != "" || c.Global.TLS.KeyFile != "") &&
 		(c.Global.TLS.CertFile == "" || c.Global.TLS.KeyFile == "") {
 		errs = multierror.Append(errs, fmt.Errorf("global.tls.cert_file and global.tls.key_file are both required if either are present"))
@@ -164,3 +253,34 @@ func (c *Config) Validate() error {
 	}
 	return errs
 }
+
+// ConfigMapCRD is a CRD for ConfigMap
+type ConfigMapCRD struct {
+	APIVersion string            `yaml:"apiVersion"`
+	Kind       string            `yaml:"kind"`
+	Metadata   Metadata          `yaml:"metadata"`
+	Data       map[string]string `yaml:"data"`
+}
+
+// SecretCRD is a CRD for Secret
+type SecretCRD struct {
+	APIVersion string            `yaml:"apiVersion"`
+	Kind       string            `yaml:"kind"`
+	Metadata   Metadata          `yaml:"metadata"`
+	Type       string            `yaml:"type,omitempty"`
+	Data       map[string]string `yaml:"data"`
+}
+
+// Metadata is for Kubernetes CRD generation
+type Metadata struct {
+	Name      string `yaml:"name"`
+	Namespace string `yaml:"namespace"`
+}
+
+// note: hybrid forces these specific file extensions! https://docs.apigee.com/hybrid/v1.2/k8s-secrets
+const (
+	SecretJKWSKey    = "remote-service.crt"        // hybrid treats .crt as blob
+	SecretPrivateKey = "remote-service.key"        // private key
+	SecretKIDKey     = "remote-service.properties" // java properties format: %s=%s
+	SecretKIDFormat  = "kid=%s"
+)

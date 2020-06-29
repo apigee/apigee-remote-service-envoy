@@ -27,8 +27,6 @@ func TestNewHandler(t *testing.T) {
 		RemoteServiceAPI:       "http://localhost/remote-service",
 		OrgName:                "org",
 		EnvName:                "env",
-		Key:                    "key",
-		Secret:                 "secret",
 		AllowUnverifiedSSLCert: true,
 	}
 	config.Auth = AuthConfig{
@@ -54,12 +52,6 @@ func TestNewHandler(t *testing.T) {
 	}
 	if h.Environment() != config.Tenant.EnvName {
 		t.Errorf("got: %s, want: %s", h.Environment(), config.Tenant.EnvName)
-	}
-	if h.Key() != config.Tenant.Key {
-		t.Errorf("got: %s, want: %s", h.Key(), config.Tenant.Key)
-	}
-	if h.Secret() != config.Tenant.Secret {
-		t.Errorf("got: %s, want: %s", h.Secret(), config.Tenant.Secret)
 	}
 
 	if h.productMan == nil {
