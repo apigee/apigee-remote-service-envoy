@@ -61,7 +61,7 @@ func DefaultConfig() *Config {
 			APIKeyCacheDuration: 30 * time.Minute,
 			APIKeyHeader:        "x-api-key",
 			TargetHeader:        ":authority",
-			RejectUnauthorized:  true,
+			RejectUnauthorized:  false,
 		},
 	}
 }
