@@ -96,20 +96,8 @@ func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLo
 			ClientIP:                     req.GetForwardedFor(),
 		}
 
-		// the following could replace: record.EnsureFields() in SendRecords() if we address the above
-		// record.GatewayFlowID = uuid.New().String()
-		record.DeveloperEmail = authContext.DeveloperEmail
-		record.DeveloperApp = authContext.Application
-		record.AccessToken = authContext.AccessToken
-		record.ClientID = authContext.ClientID
-		record.Organization = authContext.Organization()
-		record.Environment = authContext.Environment()
-		if len(authContext.APIProducts) > 0 {
-			record.APIProduct = authContext.APIProducts[0]
-		}
-
-		// TODO: not terribly efficient, but changing the impl requires a rewrite as
-		// it assumes the same authContext for all records and we shouldn't
+		// this may be more efficient to batch, but changing the golib impl would require
+		// a rewrite as it assumes the same authContext for all records
 		records := []analytics.Record{record}
 		err := a.handler.analyticsMan.SendRecords(authContext, records)
 		if err != nil {

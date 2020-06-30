@@ -16,7 +16,6 @@
 package server
 
 import (
-	"strings"
 	"testing"
 	"time"
 
@@ -108,19 +107,8 @@ func TestHandleHTTPAccessLogs(t *testing.T) {
 	}
 
 	rec := recs[0]
-	product := strings.Split(headers[headerAPIProducts], ",")[0]
-	if rec.APIProduct != product {
-		t.Errorf("got: %s, want: %s", rec.APIProduct, product)
-	}
 	if rec.APIProxy != headers[headerAPI] {
 		t.Errorf("got: %s, want: %s", rec.APIProxy, headers[headerAPI])
-	}
-	// rec.APIProxyRevision skipped
-	if rec.AccessToken != headers[headerAccessToken] {
-		t.Errorf("got: %s, want: %s", rec.AccessToken, headers[headerAccessToken])
-	}
-	if rec.ClientID != headers[headerClientID] {
-		t.Errorf("got: %s, want: %s", rec.ClientID, headers[headerClientID])
 	}
 	if rec.ClientIP != clientIP {
 		t.Errorf("got: %s, want: %s", rec.ClientIP, clientIP)
@@ -137,23 +125,39 @@ func TestHandleHTTPAccessLogs(t *testing.T) {
 	if rec.ClientSentStartTimestamp != thenUnix {
 		t.Errorf("got: %d, want: %d", rec.ClientSentStartTimestamp, thenUnix)
 	}
-	if rec.DeveloperApp != headers[headerApplication] {
-		t.Errorf("got: %s, want: %s", rec.DeveloperApp, headers[headerApplication])
-	}
-	if rec.DeveloperEmail != headers[headerDeveloperEmail] {
-		t.Errorf("got: %s, want: %s", rec.DeveloperEmail, headers[headerDeveloperEmail])
-	}
-	if rec.Environment != headers[headerEnvironment] {
-		t.Errorf("got: %s, want: %s", rec.Environment, headers[headerEnvironment])
-	}
+
+	// the following are handled in golib by record.ensureFields()
+	// so we're skipping validation of them...
+
+	// rec.RecordType skipped
+	// product := strings.Split(headers[headerAPIProducts], ",")[0]
+	// if rec.APIProduct != product {
+	// 	t.Errorf("got: %s, want: %s", rec.APIProduct, product)
+	// }
+	// rec.APIProxyRevision skipped
+	// if rec.AccessToken != headers[headerAccessToken] {
+	// 	t.Errorf("got: %s, want: %s", rec.AccessToken, headers[headerAccessToken])
+	// }
+	// if rec.ClientID != headers[headerClientID] {
+	// 	t.Errorf("got: %s, want: %s", rec.ClientID, headers[headerClientID])
+	// }
+	// if rec.DeveloperApp != headers[headerApplication] {
+	// 	t.Errorf("got: %s, want: %s", rec.DeveloperApp, headers[headerApplication])
+	// }
+	// if rec.DeveloperEmail != headers[headerDeveloperEmail] {
+	// 	t.Errorf("got: %s, want: %s", rec.DeveloperEmail, headers[headerDeveloperEmail])
+	// }
+	// if rec.Environment != headers[headerEnvironment] {
+	// 	t.Errorf("got: %s, want: %s", rec.Environment, headers[headerEnvironment])
+	// }
 	// if rec.GatewayFlowID != flowID {
 	// 	t.Errorf("got: %s, want: %s", rec.GatewayFlowID, flowID)
 	// }
 	// rec.GatewaySource skipped
-	if rec.Organization != headers[headerOrganization] {
-		t.Errorf("got: %s, want: %s", rec.Organization, headers[headerOrganization])
-	}
-	// rec.RecordType skipped
+	// if rec.Organization != headers[headerOrganization] {
+	// 	t.Errorf("got: %s, want: %s", rec.Organization, headers[headerOrganization])
+	// }
+
 	if rec.RequestPath != path {
 		t.Errorf("got: %s, want: %s", rec.RequestPath, path)
 	}
@@ -242,6 +246,7 @@ func (a *testAnalyticsMan) Start() error {
 }
 func (a *testAnalyticsMan) Close() {}
 func (a *testAnalyticsMan) SendRecords(ctx *auth.Context, records []analytics.Record) error {
+
 	a.records = append(a.records, records...)
 	return nil
 }
