@@ -36,7 +36,7 @@ func TestCheck(t *testing.T) {
 
 	jwtClaims := &pb.Struct{
 		Fields: map[string]*pb.Value{
-			"s": {
+			"apigee": {
 				Kind: &pb.Value_StringValue{StringValue: "x"},
 			},
 		},
@@ -95,6 +95,7 @@ func TestCheck(t *testing.T) {
 			authMan:            testAuthMan,
 			productMan:         testProductMan,
 			quotaMan:           testQuotaMan,
+			jwtProviderKey:     "apigee",
 		},
 	}
 

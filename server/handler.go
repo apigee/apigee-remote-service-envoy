@@ -43,6 +43,7 @@ type Handler struct {
 	apiKeyHeader       string
 	targetHeader       string
 	rejectUnauthorized bool
+	jwtProviderKey     string
 
 	productMan   product.Manager
 	authMan      auth.Manager
@@ -187,6 +188,7 @@ func NewHandler(config *Config) (*Handler, error) {
 		apiKeyHeader:       config.Auth.APIKeyHeader,
 		targetHeader:       config.Auth.TargetHeader,
 		rejectUnauthorized: config.Auth.RejectUnauthorized,
+		jwtProviderKey:     config.Auth.JWTProviderKey,
 	}
 
 	return h, nil

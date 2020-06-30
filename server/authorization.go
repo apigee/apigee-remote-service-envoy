@@ -66,10 +66,10 @@ func (a *AuthorizationServer) Check(ctx context.Context, req *auth.CheckRequest)
 	protoBufStruct := req.Attributes.GetMetadataContext().GetFilterMetadata()[jwtFilterMetadataKey]
 	fieldsMap := protoBufStruct.GetFields()
 	var claims map[string]interface{}
-	// TODO: just using the first for now, should configure and/or support multiple
-	for k, v := range fieldsMap {
-		log.Debugf("Using JWT at key: %s", k)
-		claims = DecodeToMap(v.GetStructValue())
+	claimsStruct, ok := fieldsMap[a.handler.jwtProviderKey]
+	if ok {
+		log.Debugf("Using JWT at provider key: %s", a.handler.jwtProviderKey)
+		claims = DecodeToMap(claimsStruct.GetStructValue())
 	}
 
 	splitPath := strings.SplitN(req.Attributes.Request.Http.Path, "?", 2)

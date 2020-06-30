@@ -62,6 +62,7 @@ func DefaultConfig() *Config {
 			APIKeyHeader:        "x-api-key",
 			TargetHeader:        ":authority",
 			RejectUnauthorized:  false,
+			JWTProviderKey:      "apigee",
 		},
 	}
 }
@@ -139,6 +140,7 @@ type AuthConfig struct {
 	APIKeyHeader        string        `yaml:"api_key_header,omitempty"`
 	TargetHeader        string        `yaml:"target_header,omitempty"`
 	RejectUnauthorized  bool          `yaml:"reject_unauthorized,omitempty"`
+	JWTProviderKey      string        `yaml:"-"`
 }
 
 // Load config
