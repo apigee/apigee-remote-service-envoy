@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Example ConfigMap for an apigee-remote-service-envoy configuration in Hybrid.
-# In general, use the generated config from the CLI.
+# You should generate your config using the CLI.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -28,8 +28,6 @@ data:
       remote_service_api: https://apigee-runtime-org-env:8443/remote-service
       org_name: org
       env_name: env
-      key: NotReal
-      secret: NotReal
       allow_unverified_ssl_cert: true # required for local cluster access to hybrid runtime
     products:
       refresh_rate: 2m
@@ -44,3 +42,14 @@ data:
     auth:
       api_key_cache_duration: 30m
       api_key_claim:
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: org-env-policy-secret
+  namespace: apigee
+type: Opaque
+data:
+  remote-service.crt: NotReal
+  remote-service.key: NotReal
+  remote-service.properties: NotReal

@@ -12,11 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Example ConfigMap for apigee-remote-service-envoy configuration in SaaS.
-# You must update the tenant values appropriately.
-# Note: Alternatively, you can use the generated config from the CLI directly.
-#       Direct the output to `config.yaml` and run the follow command on it:
-#       `kubectl -n apigee create configmap apigee-remote-service-envoy --from-file=config.yaml`
+# Example config for apigee-remote-service-envoy configuration in SaaS.
+# You should generate your config using the CLI.
 apiVersion: v1
 kind: ConfigMap
 metadata:

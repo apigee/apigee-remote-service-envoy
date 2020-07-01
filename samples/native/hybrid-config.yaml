@@ -14,30 +14,46 @@
 
 # Example configuration for hybrid.
 # You must update the values appropriately or use the CLI to create this file.
-global:
-  api_address: :5000
-  metrics_address: :5001
-  tls: # for api listener
-    ca_file: /opt/apigee/tls/ca.crt
-    cert_file: /opt/apigee/tls/tls.crt
-    key_file: /opt/apigee/tls/tls.key
-tenant:
-  remote_service_api: https://org.hybrid.e2e.apigeeks.net:8443/remote-service
-  org_name: org
-  env_name: env
-  key: NotReal
-  secret: NotReal
-  allow_unverified_ssl_cert: true # required for local cluster access to hybrid runtime
-products:
-  refresh_rate: 2m
-analytics:
-  file_limit: 1024
-  collection_interval: 10s
-  fluentd_endpoint: apigee-udca-org-env.apigee.svc.cluster.local:20001
-  tls: # for UDCA client
-    ca_file: /opt/apigee/tls/ca.crt
-    cert_file: /opt/apigee/tls/tls.crt
-    key_file: /opt/apigee/tls/tls.key
-auth:
-  api_key_cache_duration: 30m
-  api_key_claim:
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: apigee-remote-service-envoy
+  namespace: apigee
+data:
+  config.yaml: |
+    global:
+      api_address: :5000
+      metrics_address: :5001
+      tls: # for api listener
+        ca_file: /opt/apigee/tls/ca.crt
+        cert_file: /opt/apigee/tls/tls.crt
+        key_file: /opt/apigee/tls/tls.key
+    tenant:
+      remote_service_api: https://org.hybrid.e2e.apigeeks.net:8443/remote-service
+      org_name: org
+      env_name: env
+      allow_unverified_ssl_cert: true # required for local cluster access to hybrid runtime
+    products:
+      refresh_rate: 2m
+    analytics:
+      file_limit: 1024
+      collection_interval: 10s
+      fluentd_endpoint: https://org.hybrid.e2e.apigeeks.net:8443/udca-endpoint:20001
+      tls: # for UDCA client
+        ca_file: /opt/apigee/tls/ca.crt
+        cert_file: /opt/apigee/tls/tls.crt
+        key_file: /opt/apigee/tls/tls.key
+    auth:
+      api_key_cache_duration: 30m
+      api_key_claim:
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: org-env-policy-secret
+  namespace: apigee
+type: Opaque
+data:
+  remote-service.crt: NotReal
+  remote-service.key: NotReal
+  remote-service.properties: NotReal
