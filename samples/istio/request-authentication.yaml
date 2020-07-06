@@ -12,22 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Creates a RequestAuthentication for httpbin.
-# This causes Istio to evaluate JWT tokens passed to httpbin services.
-# The `originIsOptional: true` flag will allow requests with missing or invalid JWTs
+# Creates a RequestAuthentication and AuthorizationPolicy for JWTs.
+# This causes Istio to evaluate JWT tokens passed to workloads labeled as `managed-by: apigee`.
+# The `originIsOptional: true` flag allows requests with missing or invalid JWTs
 # to continue in case a valid x-api-key value can be evaluated by Apigee.
 # Replaces authentication Policy in Istio 1.5+.
 
-# You must update the issuer and jwks_uri for your environment.
+# You must update the issuer and jwksUri for your environment.
 apiVersion: security.istio.io/v1beta1
 kind: RequestAuthentication
 metadata:
- name: httpbin-jwt
+ name: apigee
  namespace: default
 spec:
   selector:
     matchLabels:
-      app: httpbin
+      managed-by: apigee
   jwtRules:
   - issuer: https://org-env.hybrid.e2e.apigeeks.net/remote-service/token
     jwksUri: https://org-env.hybrid.e2e.apigeeks.net/remote-service/certs
@@ -35,12 +35,12 @@ spec:
 apiVersion: security.istio.io/v1beta1
 kind: AuthorizationPolicy
 metadata:
- name: httpbin-jwt
+ name: apigee
  namespace: default
 spec:
  selector:
    matchLabels:
-     app: httpbin
+      managed-by: apigee
  rules:
  - from:
    - source:
