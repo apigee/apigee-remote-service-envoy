@@ -16,6 +16,8 @@
 package server
 
 import (
+	"bytes"
+	"reflect"
 	"testing"
 
 	"github.com/apigee/apigee-remote-service-envoy/testutil"
@@ -54,5 +56,28 @@ func TestDecodeToMap(t *testing.T) {
 	got := DecodeToMap(in)
 	if diff := testutil.Diff(got, want); diff != "" {
 		t.Error(diff)
+	}
+}
+
+func TestProperties(t *testing.T) {
+	want := map[string]string{
+		"testKey1": "testValue1",
+		"testKey2": "testValue2",
+	}
+
+	buffer := new(bytes.Buffer)
+
+	err := WriteProperties(buffer, want)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := ReadProperties(buffer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(want, got) {
+		t.Errorf("want: %v, got %v", want, got)
 	}
 }
