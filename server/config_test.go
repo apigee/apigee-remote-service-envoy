@@ -19,7 +19,6 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
@@ -164,7 +163,7 @@ func TestHybridSingleFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	equal(t, c.Tenant.PrivateKeyID, "kid")
+	equal(t, c.Tenant.PrivateKeyID, "my kid")
 }
 
 func TestMultifileConfig(t *testing.T) {
@@ -214,7 +213,7 @@ func TestMultifileConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	equal(t, c.Tenant.PrivateKeyID, "kid")
+	equal(t, c.Tenant.PrivateKeyID, "my kid")
 }
 
 func TestLoadLegacyConfig(t *testing.T) {
@@ -336,17 +335,23 @@ func TestValidateTLS(t *testing.T) {
 }
 
 func makeSecretCRD() (*SecretCRD, error) {
-	kid := "kid"
+	kid := "my kid"
 	privateKey, jwksBuf, err := testutil.GenerateKeyAndJWKs(kid)
 	if err != nil {
 		return nil, err
 	}
 	pkBytes := pem.EncodeToMemory(&pem.Block{Type: PEMKeyType, Bytes: x509.MarshalPKCS1PrivateKey(privateKey)})
 
+	props := map[string]string{SecretPropsKIDKey: kid}
+	propsBuf := new(bytes.Buffer)
+	if err := WriteProperties(propsBuf, props); err != nil {
+		return nil, err
+	}
+
 	data := map[string]string{
 		SecretJKWSKey:    base64.StdEncoding.EncodeToString(jwksBuf),
 		SecretPrivateKey: base64.StdEncoding.EncodeToString(pkBytes),
-		SecretKIDKey:     base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf(SecretKIDFormat, kid))),
+		SecretPropsKey:   base64.StdEncoding.EncodeToString(propsBuf.Bytes()),
 	}
 
 	return &SecretCRD{

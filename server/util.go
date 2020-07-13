@@ -15,6 +15,11 @@
 package server
 
 import (
+	"bufio"
+	"fmt"
+	"io"
+	"strings"
+
 	pb "github.com/golang/protobuf/ptypes/struct"
 )
 
@@ -52,4 +57,36 @@ func decodeValue(v *pb.Value) interface{} {
 	default:
 		panic("protostruct: unknown kind")
 	}
+}
+
+// ReadProperties reads Java-style %s=%s properties (no escaping)
+func ReadProperties(reader io.Reader) (map[string]string, error) {
+	properties := map[string]string{}
+
+	scanner := bufio.NewScanner(reader)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if equal := strings.Index(line, "="); equal >= 0 {
+			if key := strings.TrimSpace(line[:equal]); len(key) > 0 {
+				value := ""
+				if len(line) > equal {
+					value = strings.TrimSpace(line[equal+1:])
+				}
+				properties[key] = value
+			}
+		}
+	}
+
+	return properties, scanner.Err()
+}
+
+// WriteProperties writes Java-style %s=%s properties (no escaping)
+func WriteProperties(writer io.Writer, props map[string]string) error {
+	for k, v := range props {
+		if _, err := writer.Write([]byte(fmt.Sprintf("%s=%s\n", k, v))); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

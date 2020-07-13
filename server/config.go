@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path"
-	"strings"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -168,7 +167,7 @@ func (c *Config) Load(configFile, policySecretPath string) error {
 
 		if decoder.Decode(secret) == nil && secret.Kind == "Secret" {
 			key, _ = base64.StdEncoding.DecodeString(secret.Data[SecretPrivateKey])
-			kidProps, _ = base64.StdEncoding.DecodeString(secret.Data[SecretKIDKey])
+			kidProps, _ = base64.StdEncoding.DecodeString(secret.Data[SecretPropsKey])
 			jwksBytes, _ = base64.StdEncoding.DecodeString(secret.Data[SecretJKWSKey])
 
 			if key == nil || kidProps == nil || jwksBytes == nil { // all or nothing
@@ -195,7 +194,7 @@ func (c *Config) Load(configFile, policySecretPath string) error {
 
 		if policySecretPath != "" && key == nil {
 			if key, err = ioutil.ReadFile(path.Join(policySecretPath, SecretPrivateKey)); err == nil {
-				if kidProps, err = ioutil.ReadFile(path.Join(policySecretPath, SecretKIDKey)); err == nil {
+				if kidProps, err = ioutil.ReadFile(path.Join(policySecretPath, SecretPropsKey)); err == nil {
 					jwksBytes, err = ioutil.ReadFile(path.Join(policySecretPath, SecretJKWSKey))
 				}
 			}
@@ -204,7 +203,12 @@ func (c *Config) Load(configFile, policySecretPath string) error {
 			return err
 		}
 
-		c.Tenant.PrivateKeyID = strings.Split(string(kidProps), "=")[1] // assumes just single property
+		props, err := ReadProperties(bytes.NewReader(kidProps))
+		if err != nil {
+			return err
+		}
+
+		c.Tenant.PrivateKeyID = props[SecretPropsKIDKey]
 		jwks := &jwk.Set{}
 		if err = json.Unmarshal(jwksBytes, jwks); err == nil {
 			c.Tenant.JWKS = jwks
@@ -281,8 +285,8 @@ type Metadata struct {
 
 // note: hybrid forces these specific file extensions! https://docs.apigee.com/hybrid/v1.2/k8s-secrets
 const (
-	SecretJKWSKey    = "remote-service.crt"        // hybrid treats .crt as blob
-	SecretPrivateKey = "remote-service.key"        // private key
-	SecretKIDKey     = "remote-service.properties" // java properties format: %s=%s
-	SecretKIDFormat  = "kid=%s"
+	SecretJKWSKey     = "remote-service.crt"        // hybrid treats .crt as blob
+	SecretPrivateKey  = "remote-service.key"        // private key
+	SecretPropsKey    = "remote-service.properties" // java properties format: %s=%s
+	SecretPropsKIDKey = "kid"
 )
