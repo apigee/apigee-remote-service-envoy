@@ -15,6 +15,8 @@ jobs:
       - 
         name: Reviewdog Lint
         uses: reviewdog/action-golangci-lint@v1
+        with:
+          reporter: github-check
           
   test:
     name: Test and Cover
