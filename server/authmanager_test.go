@@ -54,6 +54,9 @@ func TestStaticAuthManager(t *testing.T) {
 func TestJWTAuthManager(t *testing.T) {
 	kid := "kid"
 	privateKey, jwksBuf, err := testutil.GenerateKeyAndJWKs(kid)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	config := &Config{
 		Tenant: TenantConfig{
@@ -90,13 +93,14 @@ func TestJWTAuthManager(t *testing.T) {
 	token := jam.getToken()
 	hdr := m.getAuthorizationHeader()
 	verifyHdr(hdr)
+	time.Sleep(5 * time.Millisecond)
 
 	token2 := jam.getToken()
 	hdr2 := m.getAuthorizationHeader()
 	verifyHdr(hdr2)
 
 	if token == token2 {
-		fmt.Errorf("should be new token")
+		t.Errorf("should be new token")
 	}
 
 	jam.stop()
