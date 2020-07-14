@@ -83,7 +83,9 @@ func main() {
 			zapConfig.Level = zap.NewAtomicLevelAt(zapLevel)
 
 			logger, _ := zapConfig.Build(zap.AddCallerSkip(2))
-			defer logger.Sync()
+			defer func() {
+				_ = logger.Sync()
+			}()
 			sugaredLogger := logger.Sugar()
 			log.Log = &log.LevelWrapper{
 				Logger:   sugaredLogger,

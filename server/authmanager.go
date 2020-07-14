@@ -22,7 +22,6 @@ const (
 	PEMKeyType  = "RSA PRIVATE KEY"
 	jwtIssuer   = "apigee-remote-service-envoy"
 	jwtAudience = "remote-service-client"
-	jwtMinExp   = 10 * time.Minute
 	authHeader  = "Authorization"
 )
 
@@ -145,7 +144,9 @@ func loadPrivateKey(privateKeyBytes []byte, rsaPrivateKeyPassword string) (*rsa.
 	}
 
 	if rsaPrivateKeyPassword != "" {
-		privPemBytes, err = x509.DecryptPEMBlock(privPem, []byte(rsaPrivateKeyPassword))
+		if privPemBytes, err = x509.DecryptPEMBlock(privPem, []byte(rsaPrivateKeyPassword)); err != nil {
+			return nil, err
+		}
 	} else {
 		privPemBytes = privPem.Bytes
 	}
