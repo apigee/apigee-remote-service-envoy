@@ -81,14 +81,14 @@ func TestNewHandler(t *testing.T) {
 	}
 
 	config.Tenant.InternalAPI = "not an url"
-	h, err = NewHandler(config)
+	_, err = NewHandler(config)
 	if err == nil {
 		t.Error("should get error")
 	}
 
 	config.Tenant.InternalAPI = config.Tenant.RemoteServiceAPI
 	config.Tenant.RemoteServiceAPI = "not an url"
-	h, err = NewHandler(config)
+	_, err = NewHandler(config)
 	if err == nil {
 		t.Error("should get error")
 	}

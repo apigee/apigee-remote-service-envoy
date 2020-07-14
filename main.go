@@ -83,7 +83,9 @@ func main() {
 			zapConfig.Level = zap.NewAtomicLevelAt(zapLevel)
 
 			logger, _ := zapConfig.Build(zap.AddCallerSkip(2))
-			defer logger.Sync()
+			defer func() {
+				_ = logger.Sync()
+			}()
 			sugaredLogger := logger.Sugar()
 			log.Log = &log.LevelWrapper{
 				Logger:   sugaredLogger,
@@ -110,7 +112,10 @@ func main() {
 	rootCmd.Flags().StringVarP(&policySecretPath, "policy-secret", "p", "/policy-secret", "Policy secret mount point")
 
 	rootCmd.SetArgs(os.Args[1:])
-	rootCmd.Execute()
+	if err := rootCmd.Execute(); err != nil {
+		log.Errorf("%v", err)
+		os.Exit(1)
+	}
 }
 
 func serve(config *server.Config) {
@@ -157,7 +162,11 @@ func serve(config *server.Config) {
 	}
 
 	log.Infof("listening: %s", config.Global.APIAddress)
-	go grpcServer.Serve(grpcListener)
+	go func() {
+		if err := grpcServer.Serve(grpcListener); err != nil {
+			log.Infof("%s", err)
+		}
+	}()
 
 	// prometheus listener
 	metricsListener, err := net.Listen("tcp", config.Global.MetricsAddress)
@@ -171,12 +180,16 @@ func serve(config *server.Config) {
 		in := &grpc_health_v1.HealthCheckRequest{}
 		response, err := health.Check(context.Background(), in)
 		if err != nil {
-			w.Write([]byte(err.Error()))
+			if _, err := w.Write([]byte(err.Error())); err != nil {
+				log.Infof("healthz unable to respond: %s", err)
+			}
 		} else {
 			if response.Status != grpc_health_v1.HealthCheckResponse_SERVING {
 				w.WriteHeader(500)
 			}
-			w.Write([]byte(response.Status.String()))
+			if _, err := w.Write([]byte(response.Status.String())); err != nil {
+				log.Infof("healthz unable to respond: %s", err)
+			}
 		}
 	})
 
@@ -197,5 +210,9 @@ func serve(config *server.Config) {
 	}
 
 	log.Infof("listening: %s", config.Global.MetricsAddress)
-	go httpServer.Serve(metricsListener)
+	go func() {
+		if err := httpServer.Serve(metricsListener); err != nil {
+			log.Infof("%s", err)
+		}
+	}()
 }

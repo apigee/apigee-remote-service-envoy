@@ -99,7 +99,9 @@ func TestHandleHTTPAccessLogs(t *testing.T) {
 			analyticsMan: testAnalyticsMan,
 		},
 	}
-	server.handleHTTPLogs(msg)
+	if err := server.handleHTTPLogs(msg); err != nil {
+		t.Fatal(err)
+	}
 
 	recs := testAnalyticsMan.records
 	if len(recs) != len(entries) {

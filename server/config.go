@@ -212,7 +212,9 @@ func (c *Config) Load(configFile, policySecretPath string) error {
 		jwks := &jwk.Set{}
 		if err = json.Unmarshal(jwksBytes, jwks); err == nil {
 			c.Tenant.JWKS = jwks
-			c.Tenant.PrivateKey, err = loadPrivateKey(key, "")
+			if c.Tenant.PrivateKey, err = loadPrivateKey(key, ""); err != nil {
+				return err
+			}
 		}
 	}
 

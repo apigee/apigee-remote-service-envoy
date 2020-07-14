@@ -1,0 +1,37 @@
+name: Docker
+
+on:
+  pull_request:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  docker:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    steps:
+      - 
+        name: Check out code
+        uses: actions/checkout@v1
+      -
+        name: Build and Push Docker image
+        uses: docker/build-push-action@v1
+        with:
+          repository: apigee-api-management-istio/apigee-remote-service-envoy
+          registry: gcr.io
+          tag_with_ref: true
+          add_git_labels: true
+          username: _json_key
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      -
+        name: Build and Push Docker image for debugging
+        uses: docker/build-push-action@v1
+        with:
+          repository: apigee-api-management-istio/apigee-remote-service-envoy-debug
+          dockerfile: Dockerfile_debug
+          registry: gcr.io
+          tag_with_ref: true
+          add_git_labels: true
+          username: _json_key
+          password: ${{ secrets.DOCKER_PASSWORD }}

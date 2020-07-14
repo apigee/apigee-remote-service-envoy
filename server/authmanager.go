@@ -19,12 +19,10 @@ import (
 
 const (
 	// PEMKeyType is the type of privateKey in the PEM file
-	PEMKeyType      = "RSA PRIVATE KEY"
-	jwtIssuer       = "apigee-remote-service-envoy"
-	jwtAudience     = "remote-service-client"
-	jwtMinExp       = 10 * time.Minute
-	jwtRefreshAfter = jwtMinExp - 5*time.Minute
-	authHeader      = "Authorization"
+	PEMKeyType  = "RSA PRIVATE KEY"
+	jwtIssuer   = "apigee-remote-service-envoy"
+	jwtAudience = "remote-service-client"
+	authHeader  = "Authorization"
 )
 
 // AuthManager maintains an authorization header value
@@ -99,10 +97,18 @@ func (a *JWTAuthManager) replaceJWT(privateKey *rsa.PrivateKey, kid string, jwtE
 	now := time.Now()
 
 	token := jwt.New()
-	token.Set(jwt.AudienceKey, jwtAudience)
-	token.Set(jwt.IssuerKey, jwtIssuer)
-	token.Set(jwt.IssuedAtKey, now.Unix())
-	token.Set(jwt.ExpirationKey, now.Add(jwtExpiration))
+	if err := token.Set(jwt.AudienceKey, jwtAudience); err != nil {
+		return err
+	}
+	if err := token.Set(jwt.IssuerKey, jwtIssuer); err != nil {
+		return err
+	}
+	if err := token.Set(jwt.IssuedAtKey, now.Unix()); err != nil {
+		return err
+	}
+	if err := token.Set(jwt.ExpirationKey, now.Add(jwtExpiration)); err != nil {
+		return err
+	}
 
 	payload, err := signJWT(token, jwa.RS256, privateKey, kid)
 	if err != nil {
@@ -138,7 +144,9 @@ func loadPrivateKey(privateKeyBytes []byte, rsaPrivateKeyPassword string) (*rsa.
 	}
 
 	if rsaPrivateKeyPassword != "" {
-		privPemBytes, err = x509.DecryptPEMBlock(privPem, []byte(rsaPrivateKeyPassword))
+		if privPemBytes, err = x509.DecryptPEMBlock(privPem, []byte(rsaPrivateKeyPassword)); err != nil {
+			return nil, err
+		}
 	} else {
 		privPemBytes = privPem.Bytes
 	}

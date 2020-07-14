@@ -35,8 +35,12 @@ func GenerateKeyAndJWKs(kid string) (privateKey *rsa.PrivateKey, jwksBuf []byte,
 	if err != nil {
 		return
 	}
-	key.Set(jwk.KeyIDKey, kid)
-	key.Set(jwk.AlgorithmKey, jwa.RS256)
+	if err = key.Set(jwk.KeyIDKey, kid); err != nil {
+		return
+	}
+	if err = key.Set(jwk.AlgorithmKey, jwa.RS256); err != nil {
+		return
+	}
 
 	jwksBuf, err = json.MarshalIndent(key, "", "")
 
