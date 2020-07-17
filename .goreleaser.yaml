@@ -13,15 +13,28 @@
 # limitations under the License.
 
 builds:
-  - main: main.go
+  - id: default
+    main: main.go
     goos:
+      - linux
       - windows
       - darwin
+    goarch:
+      - amd64
+    env:
+      - CGO_ENABLED=0
+  - id: goboring
+    main: main.go
+    goos:
       - linux
     goarch:
       - amd64
+    env:
+      # - CGO_ENABLED=1 # note: set in Dockerfile_releaser instead of here
+
 archives:
-  - format: tar.gz
+  - id: default
+    format: tar.gz
     replacements:
       darwin: macOS
       amd64: 64-bit
@@ -29,6 +42,19 @@ archives:
       - LICENSE
       - README.md
       - samples/**/*
+    builds:
+      - default
+  - id: goboring
+    format: tar.gz
+    replacements:
+      amd64: 64-bit_goboring
+    files:
+      - LICENSE
+      - README.md
+      - samples/**/*
+    builds:
+      - goboring
+
 release:
   draft: true
   prerelease: true

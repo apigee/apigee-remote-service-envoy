@@ -12,32 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Keep Dockerfile* files in sync!
+# Runs goreleaser to build linux version using Boring Crypto
+# Expects env: GITHUB_TOKEN
 
-# use following to build using Go with Boring Crypto:
-# env: CGO_ENABLED=1
-# --build-arg GO_CONTAINER=goboring/golang:1.14.4b4
+# use following to build without Boring Crypto:
+# --build-arg CGO_ENABLED=0
+# --build-arg GO_CONTAINER=golang:1.14
 
-# Build binary in golang container
-ARG GO_CONTAINER=golang:1.14
-FROM ${GO_CONTAINER} as builder
+ARG GO_CONTAINER=goboring/golang:1.14.4b4
+FROM ${GO_CONTAINER}
+
+ARG CGO_ENABLED=1
+
+RUN curl -sfL https://install.goreleaser.com/github.com/goreleaser/goreleaser.sh | sh
 
 WORKDIR /app
 ADD . .
 
-# Build service
+ENV CGO_ENABLED=$CGO_ENABLED
 RUN go mod download
-RUN go build -a -o apigee-remote-service-envoy .
-
-# Build runtime container
-FROM ubuntu:xenial
-
-# Add certs
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
-
-# Add service
-COPY --from=builder /app/apigee-remote-service-envoy .
-
-# Run
-ENTRYPOINT ["/apigee-remote-service-envoy"]
-EXPOSE 5000/tcp 5001/tcp
+RUN goreleaser release --rm-dist
+# RUN goreleaser release --snapshot --rm-dist

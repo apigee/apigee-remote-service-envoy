@@ -1,19 +1,35 @@
-# Keep in sync with Dockerfile_debug!
+# Copyright 2020 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-# Build binary in golang container #
+# Keep Dockerfile* files in sync!
 
-FROM golang:1.14 as builder
+# use following to build using Go with Boring Crypto:
+# env: CGO_ENABLED=1
+# --build-arg GO_CONTAINER=goboring/golang:1.14.4b4
 
-RUN mkdir /app
-ADD . /app/
+# Build binary in golang container
+ARG GO_CONTAINER=golang:1.14
+FROM ${GO_CONTAINER} as builder
+
 WORKDIR /app
+ADD . .
 
-# Build service
-# note: -ldflags '-s -w' strips debugger info
-RUN CGO_ENABLED=0 go build -a -ldflags '-s -w' -o apigee-remote-service-envoy .
+# Build service (-ldflags '-s -w' strips debugger info)
+RUN go mod download
+RUN go build -a -ldflags '-s -w' -o apigee-remote-service-envoy .
 
-# Build runtime container #
-
+# Build runtime container
 FROM scratch
 
 # Add certs
