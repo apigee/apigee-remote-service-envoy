@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Runs goreleaser to build linux version using Boring Crypto
-# Expects env: GITHUB_TOKEN
+# Expects --build-arg GITHUB_TOKEN=
 
 # use following to build without Boring Crypto:
 # --build-arg CGO_ENABLED=0
@@ -22,6 +22,7 @@
 ARG GO_CONTAINER=goboring/golang:1.14.4b4
 FROM ${GO_CONTAINER}
 
+ARG GITHUB_TOKEN
 ARG CGO_ENABLED=1
 
 RUN curl -sfL https://install.goreleaser.com/github.com/goreleaser/goreleaser.sh | sh
@@ -29,7 +30,6 @@ RUN curl -sfL https://install.goreleaser.com/github.com/goreleaser/goreleaser.sh
 WORKDIR /app
 ADD . .
 
-ENV CGO_ENABLED=$CGO_ENABLED
 RUN go mod download
-RUN goreleaser release --rm-dist
-# RUN goreleaser release --snapshot --rm-dist
+RUN GITHUB_TOKEN=$GITHUB_TOKEN CGO_ENABLED=$CGO_ENABLED goreleaser release --rm-dist
+# RUN CGO_ENABLED=$CGO_ENABLED goreleaser release --rm-dist --snapshot

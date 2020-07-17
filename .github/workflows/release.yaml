@@ -36,8 +36,7 @@ jobs:
           dockerfile: Dockerfile_releaser
           registry: gcr.io
           push: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          build_args: GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
           
       # local Goreleaser run would be per below
       # -
