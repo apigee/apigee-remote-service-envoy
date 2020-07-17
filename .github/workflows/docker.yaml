@@ -72,7 +72,7 @@ jobs:
         with:
           repository: apigee-api-management-istio/apigee-remote-service-envoy-goboring
           dockerfile: Dockerfile
-          build_args: BUILD_FROM=goboring/golang:1.14.4b4,CGO_ENABLED=1
+          build_args: GO_CONTAINER=goboring/golang:1.14.4b4,CGO_ENABLED=1
           registry: gcr.io
           tag_with_ref: true
           add_git_labels: true
@@ -92,7 +92,7 @@ jobs:
         with:
           repository: apigee-api-management-istio/apigee-remote-service-envoy-debug-goboring
           dockerfile: Dockerfile_debug
-          build_args: BUILD_FROM=goboring/golang:1.14.4b4,CGO_ENABLED=1
+          build_args: GO_CONTAINER=goboring/golang:1.14.4b4,CGO_ENABLED=1
           registry: gcr.io
           tag_with_ref: true
           add_git_labels: true
