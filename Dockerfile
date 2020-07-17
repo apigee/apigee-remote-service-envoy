@@ -15,19 +15,21 @@
 # Keep Dockerfile* files in sync!
 
 # use following to build using Go with Boring Crypto:
-# env: CGO_ENABLED=1
+# --build-arg CGO_ENABLED=1
 # --build-arg GO_CONTAINER=goboring/golang:1.14.4b4
 
 # Build binary in golang container
 ARG GO_CONTAINER=golang:1.14
 FROM ${GO_CONTAINER} as builder
 
+ARG CGO_ENABLED=0
+
 WORKDIR /app
 ADD . .
 
 # Build service (-ldflags '-s -w' strips debugger info)
 RUN go mod download
-RUN go build -a -ldflags '-s -w' -o apigee-remote-service-envoy .
+RUN CGO_ENABLED=$CGO_ENABLED go build -a -ldflags '-s -w' -o apigee-remote-service-envoy .
 
 # Build runtime container
 FROM scratch
