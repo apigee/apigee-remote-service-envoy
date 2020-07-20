@@ -60,7 +60,7 @@ spec:
           failureThreshold: 30
           periodSeconds: 10
         args:
-          - --log_level=debug
+          - --log-level=debug
           - --config=/config/config.yaml
         resources:
           limits:
