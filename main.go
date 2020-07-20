@@ -106,8 +106,8 @@ func main() {
 			select {} // infinite loop
 		},
 	}
-	rootCmd.Flags().StringVarP(&logLevel, "log_level", "l", "info", "Logging level")
-	rootCmd.Flags().BoolVarP(&logJSON, "json_log", "j", false, "Log as JSON")
+	rootCmd.Flags().StringVarP(&logLevel, "log-level", "l", "info", "Logging level")
+	rootCmd.Flags().BoolVarP(&logJSON, "json-log", "j", false, "Log as JSON")
 	rootCmd.Flags().StringVarP(&configFile, "config", "c", "config.yaml", "Config file")
 	rootCmd.Flags().StringVarP(&policySecretPath, "policy-secret", "p", "/policy-secret", "Policy secret mount point")
 
