@@ -1,3 +1,17 @@
+# Copyright 2020 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 name: Docker
 
 on:
@@ -19,17 +33,46 @@ jobs:
         uses: docker/build-push-action@v1
         with:
           repository: apigee-api-management-istio/apigee-remote-service-envoy
+          dockerfile: Dockerfile
           registry: gcr.io
           tag_with_ref: true
           add_git_labels: true
           username: _json_key
           password: ${{ secrets.DOCKER_PASSWORD }}
+
+  docker_debug:
+    name: Build Docker Image for Debugging
+    runs-on: ubuntu-latest
+    steps:
+      - 
+        name: Check out code
+        uses: actions/checkout@v1
       -
-        name: Build and Push Docker image for debugging
+        name: Build and Push Docker image
         uses: docker/build-push-action@v1
         with:
           repository: apigee-api-management-istio/apigee-remote-service-envoy-debug
           dockerfile: Dockerfile_debug
+          registry: gcr.io
+          tag_with_ref: true
+          add_git_labels: true
+          username: _json_key
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+  docker_boring:
+    name: Build Docker Image for Boring Crypto
+    runs-on: ubuntu-latest
+    steps:
+      - 
+        name: Check out code
+        uses: actions/checkout@v1
+      -
+        name: Build and Push Docker image
+        uses: docker/build-push-action@v1
+        with:
+          repository: apigee-api-management-istio/apigee-remote-service-envoy-goboring
+          dockerfile: Dockerfile_debug
+          build_args: GO_CONTAINER=goboring/golang:1.14.4b4,CGO_ENABLED=1
           registry: gcr.io
           tag_with_ref: true
           add_git_labels: true
