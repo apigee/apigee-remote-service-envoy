@@ -59,8 +59,8 @@ jobs:
           username: _json_key
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-  docker_goboring:
-    name: Build Docker Image
+  docker_boring:
+    name: Build Docker Image for Boring Crypto
     runs-on: ubuntu-latest
     steps:
       - 
@@ -71,26 +71,6 @@ jobs:
         uses: docker/build-push-action@v1
         with:
           repository: apigee-api-management-istio/apigee-remote-service-envoy-goboring
-          dockerfile: Dockerfile
-          build_args: GO_CONTAINER=goboring/golang:1.14.4b4,CGO_ENABLED=1
-          registry: gcr.io
-          tag_with_ref: true
-          add_git_labels: true
-          username: _json_key
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-  docker_debug_goboring:
-    name: Build Docker Image for Debugging
-    runs-on: ubuntu-latest
-    steps:
-      - 
-        name: Check out code
-        uses: actions/checkout@v1
-      -
-        name: Build and Push Docker image
-        uses: docker/build-push-action@v1
-        with:
-          repository: apigee-api-management-istio/apigee-remote-service-envoy-debug-goboring
           dockerfile: Dockerfile_debug
           build_args: GO_CONTAINER=goboring/golang:1.14.4b4,CGO_ENABLED=1
           registry: gcr.io
