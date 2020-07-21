@@ -39,6 +39,7 @@ jobs:
           add_git_labels: true
           username: _json_key
           password: ${{ secrets.DOCKER_PASSWORD }}
+          build_args: LDFLAGS="-s -w -X main.version=${GITHUB_REF##*/} -X main.commit=$GITHUB_SHA -X main.date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" 
 
   docker_debug:
     name: Build Docker Image for Debugging
@@ -52,12 +53,13 @@ jobs:
         uses: docker/build-push-action@v1
         with:
           repository: apigee-api-management-istio/apigee-remote-service-envoy-debug
-          dockerfile: Dockerfile_debug
+          dockerfile: Dockerfile
           registry: gcr.io
           tag_with_ref: true
           add_git_labels: true
           username: _json_key
           password: ${{ secrets.DOCKER_PASSWORD }}
+          build_args: RUN_CONTAINER:ubuntu:xenial,LDFLAGS="-X main.version=${GITHUB_REF##*/} -X main.commit=$GITHUB_SHA -X main.date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" 
 
   docker_boring:
     name: Build Docker Image for Boring Crypto
@@ -71,8 +73,8 @@ jobs:
         uses: docker/build-push-action@v1
         with:
           repository: apigee-api-management-istio/apigee-remote-service-envoy-goboring
-          dockerfile: Dockerfile_debug
-          build_args: GO_CONTAINER=goboring/golang:1.14.4b4,CGO_ENABLED=1
+          dockerfile: Dockerfile
+          build_args: RUN_CONTAINER:ubuntu:xenial,GO_CONTAINER=goboring/golang:1.14.4b4,CGO_ENABLED=1,LDFLAGS="-X main.version=${GITHUB_REF##*/} -X main.commit=$GITHUB_SHA -X main.date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" 
           registry: gcr.io
           tag_with_ref: true
           add_git_labels: true

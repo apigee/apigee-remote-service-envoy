@@ -12,34 +12,44 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Keep Dockerfile* files in sync!
+# Default build will be a standard Go binary in a scratch container.
+# Default LDFLAGS includes `-s -w` to strip symbols for a small binary.
 
-# use following to build using Go with Boring Crypto:
+# Include the following LDFLAGS for version information in the binary:
+# LDFLAGS="-X main.version=${BUILD_VERSION} -X main.commit=${BUILD_COMMIT} -X main.date=${BUILD_DATE}"
+
+# Use the following combination to build an image linked with Boring Crypto:
 # --build-arg CGO_ENABLED=1
-# --build-arg GO_CONTAINER=goboring/golang:1.14.4b4
+# --build-arg BUILD_CONTAINER=goboring/golang:1.14.4b4
+# --build-arg RUN_CONTAINER=ubuntu:xenial
 
-# Build binary in golang container
-ARG GO_CONTAINER=golang:1.14
-FROM ${GO_CONTAINER} as builder
+ARG BUILD_CONTAINER=golang:1.14
+ARG RUN_CONTAINER=scratch
+
+# Build binary in Go container
+FROM ${BUILD_CONTAINER} as builder
 
 ARG CGO_ENABLED=0
+ARG LDFLAGS="-s -w -X main.version=unknown -X main.commit=unknown -X main.date=unknown" 
 
 WORKDIR /app
 ADD . .
 
 # Build service (-ldflags '-s -w' strips debugger info)
 RUN go mod download
-RUN CGO_ENABLED=$CGO_ENABLED go build -a -ldflags '-s -w' -o apigee-remote-service-envoy .
+RUN CGO_ENABLED=$CGO_ENABLED go build -a \
+  -ldflags "${LDFLAGS}" \
+  -o apigee-remote-service-envoy .
 
 # Build runtime container
-FROM scratch
+FROM ${RUN_CONTAINER}
 
-# Add certs
+# Ensure certs
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 
-# Add service
+# Add binary
 COPY --from=builder /app/apigee-remote-service-envoy .
 
-# Run
+# Run entrypoint
 ENTRYPOINT ["/apigee-remote-service-envoy"]
 EXPOSE 5000/tcp 5001/tcp
