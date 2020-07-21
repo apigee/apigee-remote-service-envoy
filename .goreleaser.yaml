@@ -30,7 +30,7 @@ builds:
     goarch:
       - amd64
     env:
-      - CGO_ENABLED=1 # note: set in Dockerfile_releaser instead of here
+      - CGO_ENABLED=1
 
 archives:
   - id: default
