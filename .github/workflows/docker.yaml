@@ -74,7 +74,7 @@ jobs:
         with:
           repository: apigee-api-management-istio/apigee-remote-service-envoy-goboring
           dockerfile: Dockerfile
-          build_args: RUN_CONTAINER:ubuntu:xenial,GO_CONTAINER=goboring/golang:1.14.4b4,CGO_ENABLED=1,LDFLAGS="-X main.version=${GITHUB_REF##*/} -X main.commit=$GITHUB_SHA -X main.date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" 
+          build_args: RUN_CONTAINER:ubuntu:xenial,BUILD_CONTAINER=goboring/golang:1.14.4b4,CGO_ENABLED=1,LDFLAGS="-X main.version=${GITHUB_REF##*/} -X main.commit=$GITHUB_SHA -X main.date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" 
           registry: gcr.io
           tag_with_ref: true
           add_git_labels: true
