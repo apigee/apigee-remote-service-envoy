@@ -36,47 +36,30 @@ jobs:
         name: Check out code
         uses: actions/checkout@v1
       -
-        name: Build and Push Docker image
+        name: Scratch image
         uses: docker/build-push-action@v1
         with:
           repository: apigee-api-management-istio/apigee-remote-service-envoy
-          # tag: ${VERSION}
-          tag_with_ref: true
+          tag: ${VERSION}
           add_git_labels: true
           dockerfile: Dockerfile
           registry: gcr.io
           username: _json_key
           password: ${{ secrets.DOCKER_PASSWORD }}
           build_args: LDFLAGS=-s -w -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${DATE}
-
-  docker_debug:
-    name: Build Docker Image for Debugging
-    runs-on: ubuntu-latest
-    steps:
-      - 
-        name: Check out code
-        uses: actions/checkout@v1
       -
-        name: Build and Push Docker image
+        name: Ubutu image
         uses: docker/build-push-action@v1
         with:
           repository: apigee-api-management-istio/apigee-remote-service-envoy
-          tag: ${VERSION}-debug
+          tag: ${VERSION}-ubuntu
           dockerfile: Dockerfile
           registry: gcr.io
           username: _json_key
           password: ${{ secrets.DOCKER_PASSWORD }}
           build_args: RUN_CONTAINER:ubuntu:xenial,LDFLAGS=-X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${DATE}
-
-  docker_boring:
-    name: Build Docker Image for Boring Crypto
-    runs-on: ubuntu-latest
-    steps:
-      - 
-        name: Check out code
-        uses: actions/checkout@v1
       -
-        name: Build and Push Docker image
+        name: Boring Crypto Image
         uses: docker/build-push-action@v1
         with:
           repository: apigee-api-management-istio/apigee-remote-service-envoy
