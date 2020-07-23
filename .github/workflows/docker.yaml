@@ -39,10 +39,11 @@ jobs:
           dockerfile: Dockerfile
           registry: gcr.io
           tag_with_ref: true
-          add_git_labels: true
+          # add_git_labels: true
           username: _json_key
           password: ${{ secrets.DOCKER_PASSWORD }}
-          build_args: LDFLAGS="-s -w -X main.version=${VERSION} -X main.commit=${GITHUB_SHA} -X main.date=${DATE}" 
+          # build_args: LDFLAGS="-s -w -X main.version=${VERSION} -X main.commit=${GITHUB_SHA} -X main.date=${DATE}" 
+          build_args: LDFLAGS="-X main.commit=${GITHUB_SHA}" 
 
   # docker_debug:
   #   name: Build Docker Image for Debugging
