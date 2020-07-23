@@ -43,7 +43,7 @@ jobs:
           username: _json_key
           password: ${{ secrets.DOCKER_PASSWORD }}
           # build_args: LDFLAGS="-s -w -X main.version=${VERSION} -X main.commit=${GITHUB_SHA} -X main.date=${DATE}" 
-          build_args: LDFLAGS="-X main.commit=${GITHUB_SHA}" 
+          build_args: LDFLAGS="-s -w -X main.version=VERSION -X main.commit=COMMIT -X main.date=DATE" 
 
   # docker_debug:
   #   name: Build Docker Image for Debugging
