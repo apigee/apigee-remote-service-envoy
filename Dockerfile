@@ -35,12 +35,6 @@ ARG LDFLAGS="-s -w -X main.version=unknown -X main.commit=unknown -X main.date=u
 WORKDIR /app
 ADD . .
 
-RUN echo BUILD_CONTAINER: ${BUILD_CONTAINER}
-RUN echo CGO_ENABLED: ${CGO_ENABLED}
-RUN echo LDFLAGS: ${LDFLAGS}
-RUN echo RUN_CONTAINER: ${RUN_CONTAINER}
-
-# Build service (-ldflags '-s -w' strips debugger info)
 RUN go mod download
 RUN CGO_ENABLED=$CGO_ENABLED go build -a \
   -ldflags "${LDFLAGS}" \
