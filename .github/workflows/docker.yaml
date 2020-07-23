@@ -24,6 +24,13 @@ jobs:
   docker:
     name: Build Docker Image
     runs-on: ubuntu-latest
+    env:
+      # VERSION replaces all / with - and removes first two segments
+      # mostly matches https://github.com/marketplace/actions/build-and-push-docker-images#tag_with_ref 
+      # except 'refs/pull/2/merge' in example will be '2-merge' instead of 'pr-2-merge'
+      VERSION: $(echo ${GITHUB_REF//\//-} | cut -d'-' -f3-)
+      COMMIT: ${GITHUB_SHA}
+      DATE: $(date -u +'%Y-%m-%dT%H:%M:%SZ')
     steps:
       - 
         name: Check out code
@@ -31,56 +38,51 @@ jobs:
       -
         name: Build and Push Docker image
         uses: docker/build-push-action@v1
-        env:
-          VERSION: ${GITHUB_REF##*/}
-          DATE: $(date -u +'%Y-%m-%dT%H:%M:%SZ')
         with:
           repository: apigee-api-management-istio/apigee-remote-service-envoy
+          # tag: ${VERSION}
+          tag_with_ref: true
+          add_git_labels: true
           dockerfile: Dockerfile
           registry: gcr.io
-          tag_with_ref: true
-          # add_git_labels: true
           username: _json_key
           password: ${{ secrets.DOCKER_PASSWORD }}
-          # build_args: LDFLAGS="-s -w -X main.version=${VERSION} -X main.commit=${GITHUB_SHA} -X main.date=${DATE}" 
-          build_args: LDFLAGS=-s -w -X main.version=VERSION -X main.commit=COMMIT -X main.date=DATE
+          build_args: LDFLAGS=-s -w -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${DATE}
 
-  # docker_debug:
-  #   name: Build Docker Image for Debugging
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - 
-  #       name: Check out code
-  #       uses: actions/checkout@v1
-  #     -
-  #       name: Build and Push Docker image
-  #       uses: docker/build-push-action@v1
-  #       with:
-  #         repository: apigee-api-management-istio/apigee-remote-service-envoy-debug
-  #         dockerfile: Dockerfile
-  #         registry: gcr.io
-  #         tag_with_ref: true
-  #         add_git_labels: true
-  #         username: _json_key
-  #         password: ${{ secrets.DOCKER_PASSWORD }}
-  #         build_args: RUN_CONTAINER:ubuntu:xenial,LDFLAGS="-X main.version=${GITHUB_REF##*/} -X main.commit=${GITHUB_SHA} -X main.date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" 
+  docker_debug:
+    name: Build Docker Image for Debugging
+    runs-on: ubuntu-latest
+    steps:
+      - 
+        name: Check out code
+        uses: actions/checkout@v1
+      -
+        name: Build and Push Docker image
+        uses: docker/build-push-action@v1
+        with:
+          repository: apigee-api-management-istio/apigee-remote-service-envoy
+          tag: ${VERSION}-debug
+          dockerfile: Dockerfile
+          registry: gcr.io
+          username: _json_key
+          password: ${{ secrets.DOCKER_PASSWORD }}
+          build_args: RUN_CONTAINER:ubuntu:xenial,LDFLAGS=-X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${DATE}
 
-  # docker_boring:
-  #   name: Build Docker Image for Boring Crypto
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - 
-  #       name: Check out code
-  #       uses: actions/checkout@v1
-  #     -
-  #       name: Build and Push Docker image
-  #       uses: docker/build-push-action@v1
-  #       with:
-  #         repository: apigee-api-management-istio/apigee-remote-service-envoy-goboring
-  #         dockerfile: Dockerfile
-  #         build_args: RUN_CONTAINER:ubuntu:xenial,BUILD_CONTAINER=goboring/golang:1.14.4b4,CGO_ENABLED=1,LDFLAGS="-X main.version=${GITHUB_REF##*/} -X main.commit=${GITHUB_SHA} -X main.date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" 
-  #         registry: gcr.io
-  #         tag_with_ref: true
-  #         add_git_labels: true
-  #         username: _json_key
-  #         password: ${{ secrets.DOCKER_PASSWORD }}
+  docker_boring:
+    name: Build Docker Image for Boring Crypto
+    runs-on: ubuntu-latest
+    steps:
+      - 
+        name: Check out code
+        uses: actions/checkout@v1
+      -
+        name: Build and Push Docker image
+        uses: docker/build-push-action@v1
+        with:
+          repository: apigee-api-management-istio/apigee-remote-service-envoy
+          tag: ${VERSION}-boring
+          dockerfile: Dockerfile
+          build_args: RUN_CONTAINER:ubuntu:xenial,BUILD_CONTAINER=goboring/golang:1.14.4b4,CGO_ENABLED=1,LDFLAGS=-X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${DATE}
+          registry: gcr.io
+          username: _json_key
+          password: ${{ secrets.DOCKER_PASSWORD }}
