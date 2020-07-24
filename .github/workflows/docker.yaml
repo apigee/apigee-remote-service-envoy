@@ -20,18 +20,17 @@ on:
     tags:
       - '*'
 
-env:
-  # VERSION replaces all / with - and removes first two segments
-  # mostly matches https://github.com/marketplace/actions/build-and-push-docker-images#tag_with_ref 
-  # except 'refs/pull/2/merge' in example will be '2-merge' instead of 'pr-2-merge'
-  VERSION: $(echo ${GITHUB_REF//\//-} | cut -d'-' -f3-)
-  COMMIT: ${GITHUB_SHA}
-  DATE: $(date -u +'%Y-%m-%dT%H:%M:%SZ')
-
 jobs:
   default:
     name: Build Default Docker image
     runs-on: ubuntu-latest
+    env:
+      # VERSION replaces all / with - and removes first two segments
+      # mostly matches https://github.com/marketplace/actions/build-and-push-docker-images#tag_with_ref 
+      # except 'refs/pull/2/merge' in example will be '2-merge' instead of 'pr-2-merge'
+      VERSION: $(echo ${GITHUB_REF//\//-} | cut -d'-' -f3-)
+      COMMIT: ${GITHUB_SHA}
+      DATE: $(date -u +'%Y-%m-%dT%H:%M:%SZ')
     steps:
       - 
         name: Check out code
@@ -53,6 +52,7 @@ jobs:
     name: Build Ubuntu Docker image
     runs-on: ubuntu-latest
     steps:
+      - run: VERSION=$(echo ${GITHUB_REF//\//-} | cut -d'-' -f3-) ; COMMIT=${GITHUB_SHA} ; DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
       - 
         name: Check out code
         uses: actions/checkout@v1
@@ -68,21 +68,21 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
           build_args: RUN_CONTAINER:ubuntu:xenial,LDFLAGS=-X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${DATE}
 
-  boring:
-    name: Build Boring Crypto Docker image
-    runs-on: ubuntu-latest
-    steps:
-      - 
-        name: Check out code
-        uses: actions/checkout@v1
-      -
-        name: Boring Crypto Image
-        uses: docker/build-push-action@v1
-        with:
-          repository: apigee-api-management-istio/apigee-remote-service-envoy
-          tags: ${VERSION}-boring
-          dockerfile: Dockerfile
-          build_args: RUN_CONTAINER:ubuntu:xenial,BUILD_CONTAINER=goboring/golang:1.14.4b4,CGO_ENABLED=1,LDFLAGS=-X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${DATE}
-          registry: gcr.io
-          username: _json_key
-          password: ${{ secrets.DOCKER_PASSWORD }}
+  # boring:
+  #   name: Build Boring Crypto Docker image
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - 
+  #       name: Check out code
+  #       uses: actions/checkout@v1
+  #     -
+  #       name: Boring Crypto Image
+  #       uses: docker/build-push-action@v1
+  #       with:
+  #         repository: apigee-api-management-istio/apigee-remote-service-envoy
+  #         tags: ${VERSION}-boring
+  #         dockerfile: Dockerfile
+  #         build_args: RUN_CONTAINER:ubuntu:xenial,BUILD_CONTAINER=goboring/golang:1.14.4b4,CGO_ENABLED=1,LDFLAGS=-X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${DATE}
+  #         registry: gcr.io
+  #         username: _json_key
+  #         password: ${{ secrets.DOCKER_PASSWORD }}
