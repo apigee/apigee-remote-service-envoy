@@ -39,13 +39,13 @@ jobs:
         uses: docker/build-push-action@v1
         with:
           repository: apigee-api-management-istio/apigee-remote-service-envoy
-          tags: ${{VERSION}}
+          tags: ${{ env.VERSION }}
           add_git_labels: true
           dockerfile: Dockerfile
           registry: gcr.io
           username: _json_key
           password: ${{ secrets.DOCKER_PASSWORD }}
-          build_args: LDFLAGS=-s -w -X main.version=${{ VERSION }} -X main.commit=${{ GITHUB_SHA }} -X main.date=${{ DATE }}
+          build_args: LDFLAGS=-s -w -X main.version=${{ env.VERSION }} -X main.commit=${{ env.GITHUB_SHA }} -X main.date=${{ env.DATE }}
 
   ubuntu:
     name: Build Ubuntu Docker image
@@ -61,12 +61,12 @@ jobs:
         uses: docker/build-push-action@v1
         with:
           repository: apigee-api-management-istio/apigee-remote-service-envoy
-          tags: ${{VERSION}}-ubuntu
+          tags: ${{ env.VERSION }}-ubuntu
           dockerfile: Dockerfile
           registry: gcr.io
           username: _json_key
           password: ${{ secrets.DOCKER_PASSWORD }}
-          build_args: RUN_CONTAINER:ubuntu:xenial,LDFLAGS=-X main.version=${{VERSION}} -X main.commit=${{GITHUB_SHA}} -X main.date=${{DATE}}
+          build_args: RUN_CONTAINER:ubuntu:xenial,LDFLAGS=-X main.version=${{ env.VERSION }} -X main.commit=${{ env.GITHUB_SHA }} -X main.date=${{ env.DATE }}
 
   boring:
     name: Build Boring Crypto Docker image
@@ -82,9 +82,9 @@ jobs:
         uses: docker/build-push-action@v1
         with:
           repository: apigee-api-management-istio/apigee-remote-service-envoy
-          tags: ${{VERSION}}-boring
+          tags: ${{ env.VERSION }}-boring
           dockerfile: Dockerfile
-          build_args: RUN_CONTAINER:ubuntu:xenial,BUILD_CONTAINER=goboring/golang:1.14.4b4,CGO_ENABLED=1,LDFLAGS=-X main.version=${{VERSION}} -X main.commit=${{GITHUB_SHA}} -X main.date=${{DATE}}
+          build_args: RUN_CONTAINER:ubuntu:xenial,BUILD_CONTAINER=goboring/golang:1.14.4b4,CGO_ENABLED=1,LDFLAGS=-X main.version=${{ env.VERSION }} -X main.commit=${{ env.GITHUB_SHA }} -X main.date=${{ env.DATE }}
           registry: gcr.io
           username: _json_key
           password: ${{ secrets.DOCKER_PASSWORD }}
