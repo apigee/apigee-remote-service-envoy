@@ -57,7 +57,7 @@ jobs:
         name: Check out code
         uses: actions/checkout@v1
       -
-        name: Ubutu image
+        name: Ubuntu image
         uses: docker/build-push-action@v1
         with:
           repository: apigee-api-management-istio/apigee-remote-service-envoy
