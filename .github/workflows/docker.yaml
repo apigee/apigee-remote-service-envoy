@@ -38,7 +38,7 @@ jobs:
         name: Scratch image
         uses: docker/build-push-action@v1
         with:
-          repository: apigee-api-management-istio/apigee-remote-service-envoy
+          repository: google/apigee-envoy-adapter
           tags: ${{ env.VERSION }}
           add_git_labels: true
           dockerfile: Dockerfile
@@ -59,7 +59,7 @@ jobs:
         name: Ubuntu image
         uses: docker/build-push-action@v1
         with:
-          repository: apigee-api-management-istio/apigee-remote-service-envoy
+          repository: google/apigee-envoy-adapter
           tags: ${{ env.VERSION }}-ubuntu
           add_git_labels: true
           dockerfile: Dockerfile
@@ -80,7 +80,7 @@ jobs:
         name: Boring Crypto Image
         uses: docker/build-push-action@v1
         with:
-          repository: apigee-api-management-istio/apigee-remote-service-envoy
+          repository: google/apigee-envoy-adapter
           tags: ${{ env.VERSION }}-boring
           add_git_labels: true
           dockerfile: Dockerfile
