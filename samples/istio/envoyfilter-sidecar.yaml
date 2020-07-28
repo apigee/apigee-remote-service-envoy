@@ -16,6 +16,9 @@
 # It applies to all services in the namespace. If you wish, you
 # may tailor by specifying `workloadSelector` for specific targets.
 # Uses `apigee-remote-service-envoy.apigee:5000` as target.
+
+# This is known to work through Istio 1.6.
+
 apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
 metadata:
@@ -95,11 +98,6 @@ spec:
                   google_grpc:
                     target_uri: apigee-remote-service-envoy.apigee:5000
                     stat_prefix: apigee-remote-service
-                    # for custom tls. in general, use Istio mtls
-                    # ssl_credentials:
-                    #   root_certs:
-                    #   private_key:
-                    #   cert_chain:
               additional_request_headers_to_log:
               - :authority # default target header
               # context headers

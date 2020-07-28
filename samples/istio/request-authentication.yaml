@@ -13,12 +13,16 @@
 # limitations under the License.
 
 # Creates a RequestAuthentication and AuthorizationPolicy for JWTs.
-# This causes Istio to evaluate JWT tokens passed to workloads labeled as `managed-by: apigee`.
-# The `originIsOptional: true` flag allows requests with missing or invalid JWTs
-# to continue in case a valid x-api-key value can be evaluated by Apigee.
-# Replaces authentication Policy in Istio 1.5+.
+# This causes Istio to evaluate JWT tokens passed to workloads labeled 
+# as `managed-by: apigee` in the default namespace.
 
-# You must update the issuer and jwksUri for your environment.
+# Important: Replace ${RUNTIME} in the configuration below!
+
+# Note: An AuthorizationPolicy sample is shown below and commented out.
+# By not having an AuthorizationPolicy, either API Keys or JWTs can be
+# used by clients. If you enable the AuthorizationPolicy, JWT tokens will
+# be required and API Keys will not work by themselves.
+
 apiVersion: security.istio.io/v1beta1
 kind: RequestAuthentication
 metadata:
@@ -29,19 +33,19 @@ spec:
     matchLabels:
       managed-by: apigee
   jwtRules:
-  - issuer: https://org-env.hybrid.e2e.apigeeks.net/remote-service/token
-    jwksUri: https://org-env.hybrid.e2e.apigeeks.net/remote-service/certs
----
-apiVersion: security.istio.io/v1beta1
-kind: AuthorizationPolicy
-metadata:
- name: apigee
- namespace: default
-spec:
- selector:
-   matchLabels:
-      managed-by: apigee
- rules:
- - from:
-   - source:
-       requestPrincipals: ["*"]
+  - issuer: https://${RUNTIME}/remote-service/token
+    jwksUri: https://${RUNTIME}/remote-service/certs
+# ---
+# apiVersion: security.istio.io/v1beta1
+# kind: AuthorizationPolicy
+# metadata:
+#  name: apigee
+#  namespace: default
+# spec:
+#  selector:
+#    matchLabels:
+#       managed-by: apigee
+#  rules:
+#  - from:
+#    - source:
+#        requestPrincipals: ["*"]

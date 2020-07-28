@@ -12,15 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This example forwards to httpbin.org.
-# The Apigee API Product must be bound to `httpbin.org`.
-# You may use either JWT or API Key to authenticate.
-# Before use, you must edit and change:
-# 1. all references to `org.apigee.net` to your Apigee runtime.
-# 2. the apigee-remote-service-envoy cluster's `socket_address` to service location.
+# This is a sample Envoy config that acts as a proxy to httpbin.org.
+# The related Apigee API Product must be bound to the target: `httpbin.org`
+# and should be assigned a path of /httpbin.
+# Both JWT and API Key is supported in this configuration.
+
+# Before use you must, at a minimum, change:
+# 1. all references to ${RUNTIME} to your Apigee runtime.
+# 2. `apigee-remote-service-envoy` cluster's `socket_address` (if not localhost)
 
 admin:
-  access_log_path: /tmp/admin_access.log
+  access_log_path: /tmp/envoy_admin.log
   address:
     socket_address:
       address: 127.0.0.1
@@ -28,52 +30,50 @@ admin:
 
 static_resources:
   listeners:
-  - name: listener_0
-    address:
+  - address:
       socket_address: { address: 0.0.0.0, port_value: 8080 }
 
     filter_chains:
     - filters:
-      - name: envoy.http_connection_manager
+      - name: envoy.filters.network.http_connection_manager
         typed_config:  
-          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           stat_prefix: ingress_http
-          codec_type: AUTO
           route_config:
-            name: local_route
             virtual_hosts:
-            - name: local_service
-              domains: ["*"]
+            - name: default
+              domains: "*"
               routes:
-              - match:
-                  prefix: /httpbin
+              - match: { prefix: /httpbin }
                 route:
-                  prefix_rewrite: /
+                  prefix_rewrite: / # removes /httpbin prefix
                   cluster: httpbin
-                per_filter_config:
-                  envoy.filters.http.dynamic_forward_proxy: # rewrite :authority for Apigee product check
-                    host_rewrite: httpbin.org
+                typed_per_filter_config:
+                  envoy.filters.http.dynamic_forward_proxy:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.PerRouteConfig
+                    host_rewrite_literal: httpbin.org  # rewrites :authority for Apigee product check
 
           http_filters:
 
-          # rewrite :authority for Apigee product check
           - name: envoy.filters.http.dynamic_forward_proxy
-            config:
-              dns_cache_config: 
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.filter.http.dynamic_forward_proxy.v2alpha.FilterConfig
+              dns_cache_config:
                 name: dynamic_forward_proxy_cache_config
-                dns_lookup_family: "V4_ONLY"
+                dns_lookup_family: V4_ONLY
 
           # evaluate JWT tokens, allow_missing allows API Key also
           - name: envoy.filters.http.jwt_authn
-            config:
+            typed_config: 
+              "@type": type.googleapis.com/envoy.config.filter.http.jwt_authn.v2alpha.JwtAuthentication
               providers:
                 apigee:
-                  issuer: https://org.apigee.net/remote-service/token
+                  issuer: https://${RUNTIME}/remote-service/token
                   audiences:
                   - remote-service-client
                   remote_jwks:
                     http_uri:
-                      uri: https://org.apigee.net/remote-service/certs
+                      uri: https://${RUNTIME}/remote-service/certs
                       cluster: apigee-auth-service
                       timeout: 5s
                     cache_duration:
@@ -89,8 +89,9 @@ static_resources:
                     - allow_missing: {}
 
           # evaluate Apigee rules
-          - name: envoy.ext_authz
-            config:
+          - name: envoy.filters.http.ext_authz
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.filter.http.ext_authz.v2.ExtAuthz
               grpc_service:
                 envoy_grpc:
                   cluster_name: apigee-remote-service-envoy
@@ -100,7 +101,8 @@ static_resources:
 
           # evaluate RBAC (necessary for Apigee config: reject_unauthorized == false)
           - name: envoy.filters.http.rbac
-            config:
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.filter.http.rbac.v2.RBAC
               rules:
                 action: ALLOW
                 policies:
@@ -111,12 +113,15 @@ static_resources:
                     - header: { "name": "X-Apigee-Authorized" }
 
           - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 
           access_log: 
 
           # collect Apigee analytics
-          - name: envoy.http_grpc_access_log 
-            config:
+          - name: envoy.access_loggers.http_grpc
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.accesslog.v2.HttpGrpcAccessLogConfig
               common_config:
                 grpc_service:
                   envoy_grpc:
@@ -152,7 +157,7 @@ static_resources:
     transport_socket:
       name: envoy.transport_sockets.tls
       typed_config:
-        "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
         sni: httpbin.org
 
   # define cluster for Apigee remote service
@@ -184,7 +189,7 @@ static_resources:
     # transport_socket: 
     #   name: envoy.transport_sockets.tls
     #   typed_config:
-    #     "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+    #     "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
     #     common_tls_context:
     #       tls_certificates: 
     #       - certificate_chain: { filename: "/tls.crt" }
@@ -203,10 +208,10 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: org.apigee.net
+                address: ${RUNTIME}
                 port_value: 443
     transport_socket:
       name: envoy.transport_sockets.tls
       typed_config:
-        "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
-        sni: org.apigee.net
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        sni: ${RUNTIME}
