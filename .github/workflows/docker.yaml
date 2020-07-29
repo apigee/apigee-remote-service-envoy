@@ -38,12 +38,11 @@ jobs:
         name: Scratch image
         uses: docker/build-push-action@v1
         with:
-          repository: apigee-api-management-istio/apigee-remote-service-envoy
+          repository: google/apigee-envoy-adapter
           tags: ${{ env.VERSION }}
           add_git_labels: true
           dockerfile: Dockerfile
-          registry: gcr.io
-          username: _json_key
+          username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
           build_args: LDFLAGS=-s -w -X main.version=${{ env.VERSION }} -X main.commit=${{ github.SHA }} -X main.date=${{ env.DATE }}
 
@@ -60,11 +59,11 @@ jobs:
         name: Ubuntu image
         uses: docker/build-push-action@v1
         with:
-          repository: apigee-api-management-istio/apigee-remote-service-envoy
+          repository: google/apigee-envoy-adapter
           tags: ${{ env.VERSION }}-ubuntu
+          add_git_labels: true
           dockerfile: Dockerfile
-          registry: gcr.io
-          username: _json_key
+          username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
           build_args: RUN_CONTAINER=ubuntu:xenial,LDFLAGS=-X main.version=${{ env.VERSION }} -X main.commit=${{ github.SHA }} -X main.date=${{ env.DATE }}
 
@@ -81,10 +80,10 @@ jobs:
         name: Boring Crypto Image
         uses: docker/build-push-action@v1
         with:
-          repository: apigee-api-management-istio/apigee-remote-service-envoy
+          repository: google/apigee-envoy-adapter
           tags: ${{ env.VERSION }}-boring
+          add_git_labels: true
           dockerfile: Dockerfile
           build_args: RUN_CONTAINER=ubuntu:xenial,BUILD_CONTAINER=goboring/golang:1.14.4b4,CGO_ENABLED=1,LDFLAGS=-X main.version=${{ env.VERSION }} -X main.commit=${{ github.SHA }} -X main.date=${{ env.DATE }}
-          registry: gcr.io
-          username: _json_key
+          username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
