@@ -19,7 +19,6 @@
 name: Docker
 
 on:
-  pull_request:
   push:
     tags:
       - '*'
