@@ -34,7 +34,6 @@ jobs:
         with:
           repository: build/goboring
           dockerfile: Dockerfile_releaser
-          registry: gcr.io
           push: false
           build_args: GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
           

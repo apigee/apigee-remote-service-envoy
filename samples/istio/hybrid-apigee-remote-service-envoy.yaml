@@ -47,7 +47,7 @@ spec:
     spec:
       containers:
       - name: apigee-remote-service-envoy
-        image: "gcr.io/apigee-api-management-istio/apigee-remote-service-envoy:1.0.0"
+        image: "google/apigee-envoy-adapter:1.0.0"
         imagePullPolicy: IfNotPresent
         env:
         - name: GODEBUG # value must be 0, as apigee does not support http 2
