@@ -94,23 +94,13 @@ func (a *JWTAuthManager) stop() {
 
 func (a *JWTAuthManager) replaceJWT(privateKey *rsa.PrivateKey, kid string, jwtExpiration time.Duration) error {
 	log.Debugf("setting internal JWT")
-	now := time.Now()
 
-	token := jwt.New()
-	if err := token.Set(jwt.AudienceKey, jwtAudience); err != nil {
-		return err
-	}
-	if err := token.Set(jwt.IssuerKey, jwtIssuer); err != nil {
-		return err
-	}
-	if err := token.Set(jwt.IssuedAtKey, now.Unix()); err != nil {
-		return err
-	}
-	if err := token.Set(jwt.ExpirationKey, now.Add(jwtExpiration)); err != nil {
+	token, err := NewToken(jwtExpiration)
+	if err != nil {
 		return err
 	}
 
-	payload, err := signJWT(token, jwa.RS256, privateKey, kid)
+	payload, err := SignJWT(token, jwa.RS256, privateKey, kid)
 	if err != nil {
 		return err
 	}
@@ -168,7 +158,8 @@ func loadPrivateKey(privateKeyBytes []byte, rsaPrivateKeyPassword string) (*rsa.
 	return privateKey, nil
 }
 
-func signJWT(t jwt.Token, method jwa.SignatureAlgorithm, key interface{}, kid string) ([]byte, error) {
+// SignJWT signs an token with specified algorithm and keys
+func SignJWT(t jwt.Token, method jwa.SignatureAlgorithm, key interface{}, kid string) ([]byte, error) {
 	buf, err := json.Marshal(t)
 	if err != nil {
 		return nil, err
@@ -190,6 +181,26 @@ func signJWT(t jwt.Token, method jwa.SignatureAlgorithm, key interface{}, kid st
 	}
 
 	return signed, nil
+}
+
+// NewToken generates a new jwt.Token with the necessary claims
+func NewToken(jwtExpiration time.Duration) (jwt.Token, error) {
+	now := time.Now()
+
+	token := jwt.New()
+	if err := token.Set(jwt.AudienceKey, jwtAudience); err != nil {
+		return nil, err
+	}
+	if err := token.Set(jwt.IssuerKey, jwtIssuer); err != nil {
+		return nil, err
+	}
+	if err := token.Set(jwt.IssuedAtKey, now.Unix()); err != nil {
+		return nil, err
+	}
+	if err := token.Set(jwt.ExpirationKey, now.Add(jwtExpiration)); err != nil {
+		return nil, err
+	}
+	return token, nil
 }
 
 // RoundTripperFunc is a RoundTripper
