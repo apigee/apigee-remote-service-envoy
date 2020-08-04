@@ -1,6 +1,6 @@
 module github.com/apigee/apigee-remote-service-envoy
 
-go 1.13
+go 1.14
 
 // replace github.com/apigee/apigee-remote-service-golib => ../apigee-remote-service-golib
 
