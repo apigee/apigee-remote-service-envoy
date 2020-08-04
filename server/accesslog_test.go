@@ -242,9 +242,8 @@ type testAnalyticsMan struct {
 	records []analytics.Record
 }
 
-func (a *testAnalyticsMan) Start() error {
+func (a *testAnalyticsMan) Start() {
 	a.records = []analytics.Record{}
-	return nil
 }
 func (a *testAnalyticsMan) Close() {}
 func (a *testAnalyticsMan) SendRecords(ctx *auth.Context, records []analytics.Record) error {
