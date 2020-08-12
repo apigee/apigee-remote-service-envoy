@@ -16,8 +16,11 @@ coverage.txt
 # Distribution
 dist/
 temp/
+__pycache__/
 
 # Misc
 apigee-remote-service-envoy
+apigee-remote-service-cli
 /config.yaml
 /configmap.yaml
+tests/*.yaml
