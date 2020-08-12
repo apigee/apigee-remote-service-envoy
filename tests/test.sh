@@ -11,12 +11,12 @@ echo "Testing Legacy SaaS..."
 # set up necessary environment variables read by the python script
 USER=$USER
 PASSWORD=$PASSWORD
-ORG=lwge-eval
-ENV=test
+ORG=$ORG
+ENV=$ENV
 APIGEE_TAG=v1.0.0
 ENVOY_TAG=v1.14.4
-APIGEE_CONFIG=$PWD/config.yaml # Bring your own yaml
-ENVOY_CONFIG=$PWD/envoy-httpbin.yaml # Bring your own yaml
+APIGEE_CONFIG=$PWD/config.yaml # this will be generated
+ENVOY_CONFIG=$PWD/envoy-httpbin.yaml # bring your own yaml
 
 python3 test_legacy_saas.py
 
