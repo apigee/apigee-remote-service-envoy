@@ -166,7 +166,7 @@ if __name__ == '__main__':
 
   start_containers(logger)
 
-  logger.debug("waiting for adapter to fetch the latest product info. . this takes about two minutes...")
+  logger.debug("waiting for adapter to fetch the latest product info. this takes about two minutes...")
   time.sleep(120)
 
   start_test(logger, apigee_client)
