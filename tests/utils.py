@@ -125,8 +125,34 @@ def start_local_test(logger, apigee_client):
   except Exception as e:
     logger.error(e)
 
-def cleanup(logger, apigee_client):
+def start_hybrid_test(logger, apigee_client):
+  client = test_client.HybridTestClient(apigee_client, logger)
 
+  try:
+    logger.debug("testing calls to target service with API key")
+    client.test_apikey(logger)
+  except Exception as e:
+    logger.error(e)
+
+  try:
+    logger.debug("testing calls to target service with JWT")
+    client.test_jwt(os.getenv("CLI_DIR", "."), logger)
+  except Exception as e:
+    logger.error(e)
+
+  try:
+    logger.debug("testing API product quota")
+    client.test_quota(5, logger)
+  except Exception as e:
+    logger.error(e)
+
+  try:
+    logger.debug("testing local API product quota")
+    client.test_local_quota(5, logger)
+  except Exception as e:
+    logger.error(e)
+
+def cleanup(logger, apigee_client):
   logger.debug("deleting App developer...")
   response = apigee_client.delete_developer()
   if response.ok == False:

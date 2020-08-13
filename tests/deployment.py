@@ -57,4 +57,22 @@ class LegacyManager():
       return process.stdout.decode()
     raise Exception("stopping Envoy container" + process.stderr.decode())
 
+class KubeManager():
+  @staticmethod
+  def apply(file, logger):
+    cmd = ["kubectl", "apply", "-f", file]
+    logger.debug("executing " + " ".join(cmd))
+    process = subprocess.run(cmd, capture_output=True)
+    logger.debug(process.stdout.decode())
+    if process.stderr != b'':
+      logger.error("applying kubectl command: " + process.stderr.decode())
+
+  @staticmethod
+  def delete(name, namespace, logger, type="deployment"):
+    cmd = ["kubectl", "delete", type, name, "-n", namespace]
+    logger.debug("executing " + " ".join(cmd))
+    process = subprocess.run(cmd, capture_output=True)
+    logger.debug(process.stdout.decode())
+    if process.stderr != b'':
+      logger.error("applying kubectl command: " + process.stderr.decode())
   

@@ -19,6 +19,7 @@ set -e
 echo "Fetching the cli binary..."
 wget https://github.com/apigee/apigee-remote-service-cli/releases/download/v1.0.0/apigee-remote-service-cli_1.0.0_linux_64-bit.tar.gz
 tar -zxvf apigee-remote-service-cli_1.0.0_linux_64-bit.tar.gz apigee-remote-service-cli
+rm apigee-remote-service-cli_1.0.0_linux_64-bit.tar.gz
 
 export APIGEE_TAG=v1.0.0
 export ENVOY_TAG=v1.14.4
@@ -36,7 +37,12 @@ python3 test_legacy_saas.py
 
 echo "Testing Hybrid..."
 
-echo "Not implemented yet"
+export ORG=$ORG
+export ENV=$ENV
+export RUNTIME=$RUNTIME
+export TOKEN=$(gcloud auth print-access-token)
+
+python3 test_hybrid.py
 
 echo "Testing OPDK..."
 
@@ -50,8 +56,5 @@ export ENVOY_CONFIG=$PWD/envoy-opdk.yaml # bring your own yaml
 
 python3 test_opdk.py
 
-echo "Not implemented yet"
-
 echo "Cleaning up files..."
-rm apigee-remote-service-cli_1.0.0_linux_64-bit.tar.gz
 rm config.yaml

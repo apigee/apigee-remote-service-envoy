@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import deployment
 import os
 import requests
 import subprocess
@@ -90,3 +91,83 @@ class LocalTestClient():
       logger.error("turning the remote-service proxies back on")
       logger.error(response.content.decode())
 
+class HybridTestClient():
+  """
+  HybridTestClient assumes the Envoy proxy listenning locally on localhost:8080
+  It needs a valid ApigeeClient to fetch the necessary credentials
+  """
+  def __init__(self, apigee_client, logger):
+    self.apigee_client = apigee_client
+    self.key, self.secret = apigee_client.fetch_credentials()
+
+  def curl(self, header, logger):
+    cmd = "kubectl exec curl -c curl -- curl -iv httpbin.default.svc.cluster.local/headers -H"
+    process = subprocess.run(cmd.split(" ") + [header], capture_output=True)
+    try:
+      status = int(process.stdout.decode().splitlines()[0].split(" ")[1])
+      return status
+    except:
+      logger.error(process.stderr.decode())
+      logger.error(process.stdout.decode())
+      return 500
+
+  def test_apikey(self, logger, expect=200):
+    apikey_header = f"x-api-key: {self.key}"
+    status = self.curl(apikey_header, logger)
+    if expect == None:
+      logger.debug(f"call using API key got response code {status}")
+      return
+    if status != expect:
+      logger.error(f"failed to test target service using API key, expected {expect} got {status}")
+    else:    
+      logger.debug(f"call using API key got response code {status} as expected")
+
+  def test_jwt(self, cli_dir, logger, expect=200):
+    token = self.apigee_client.fetch_jwt(self.key, self.secret, logger)
+    auth_header = f"Authorization: Bearer {token}"
+    status = self.curl(auth_header, logger)
+    if expect == None:
+      logger.debug(f"call using JWT got response code {status}")
+      return
+    if status != expect:
+      logger.error(f"failed to test target service using JWT, expected {expect} got {status}")
+    else:
+      logger.debug(f"call using JWT got response code {status} as expected")
+
+  def test_quota(self, quota, logger):
+    for _ in range(quota):
+      self.test_apikey(logger, None)
+
+    time.sleep(1)
+
+    logger.debug("expecting this call to fail for quota depletion...")
+    self.test_apikey(logger, 403)
+
+    logger.debug("waiting for quota to be restored. this takes about a minute...")
+    time.sleep(62)
+
+    logger.debug("expecting this call to succeed with restored quota...")
+    self.test_apikey(logger, 200)
+
+  def test_local_quota(self, quota, logger):
+    # turn the remote-service proxies offline
+    logger.debug("turning the remote-service proxies offline...")
+    try:
+      response = self.apigee_client.undeploy_proxy()
+      if response.ok == False:
+        logger.error("turning the remote-service proxies offline")
+        logger.error(response.content.decode())
+    except Exception as e:
+      logger.error(e)
+
+    time.sleep(30)
+
+    logger.debug("performing local quota test...")
+    self.test_quota(quota, logger)
+
+    # turn the remote-service proxies back on
+    logger.debug("turning the remote-service proxies back on...")
+    response = self.apigee_client.deploy_proxy()
+    if response.ok == False:
+      logger.error("turning the remote-service proxies back on")
+      logger.error(response.content.decode())

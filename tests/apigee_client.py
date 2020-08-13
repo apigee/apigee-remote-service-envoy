@@ -52,7 +52,7 @@ class ApigeeClient():
     cmd = [f"{self.cli_dir}/apigee-remote-service-cli", "provision", "-f",
         "-o", self.org, "-e", self.env]
     if self.platform == None:
-      cmd += [self.token, "-r", self.runtime_url]
+      cmd += ["-t", self.token, "-r", self.runtime_url, "-n", "apigee"]
     elif self.platform == "--legacy":
       cmd += [self.platform, "-u", self.username, "-p", self.password]
     elif self.platform == "--opdk":
@@ -62,7 +62,6 @@ class ApigeeClient():
     process = subprocess.run(cmd, capture_output=True)
     if process.stderr != b'':
       logger.error(process.stderr.decode())
-      return
     f = open("config.yaml", "wb")
     f.write(process.stdout)
     f.close()
@@ -102,7 +101,7 @@ class ApigeeClient():
         },
         {
           "name": "apigee-remote-service-targets",
-          "value": "httpbin.org",
+          "value": "httpbin.org,httpbin.default.svc.cluster.local",
         },
       ],
       "description": "httpbin product for test purpose",
@@ -166,7 +165,10 @@ class ApigeeClient():
     if response.status_code != 200:
       raise Exception("unable to get deployments of remote-service proxies")
     body = json.loads(response.content)
-    self.revision = body['revision'][0]['name']
+    if self.platform != None:
+      self.revision = body['revision'][0]['name']
+    else:
+      self.revision = body['deployments'][0]['revision']
     path = f"/v1/organizations/{self.org}/environments/{self.env}" + \
       f"/apis/remote-service/revisions/{self.revision}/deployments"
     return self.delete(path)
