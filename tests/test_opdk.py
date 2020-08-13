@@ -21,10 +21,11 @@ import test_client
 import time
 
 def main():
-  logger = utils.get_logger("Legacy SaaS Test")
+  logger = utils.get_logger("OPDK Test")
 
   apigee_client = apigee.ApigeeClient(org=os.getenv("ORG"), env=os.getenv("ENV"),
     username=os.getenv("USER"), password=os.getenv("PASSWORD"),
+    mgmt_url=os.getenv("MGMT"), runtime_url=os.getenv("RUNTIME"),
     cli_dir=os.getenv("CLI_DIR", "."))
 
   utils.provision(logger, apigee_client)

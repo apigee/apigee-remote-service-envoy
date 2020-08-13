@@ -17,7 +17,11 @@ import requests
 import subprocess
 import time
 
-class LegacyTestClient():
+class LocalTestClient():
+  """
+  LocalTestClient assumes the Envoy proxy listenning locally on localhost:8080
+  It needs a valid ApigeeClient to fetch the necessary credentials
+  """
   def __init__(self, apigee_client):
     self.apigee_client = apigee_client
     self.key, self.secret = apigee_client.fetch_credentials()
@@ -36,16 +40,7 @@ class LegacyTestClient():
       logger.debug(f"call using API key got response code {status} as expected")
 
   def test_jwt(self, cli_dir, logger, expect=200):
-    org = os.getenv("ORG")
-    env = os.getenv("ENV")
-    logger.debug(f"fetching JWT from organization {org} and environment {env}")
-    cmd = [f"{cli_dir}/apigee-remote-service-cli", "token", "create",
-        "--legacy", "-o", org, "-e", env,
-        "-i", self.key, "-s", self.secret]
-    process = subprocess.run(cmd, capture_output=True)
-    if process.stderr != b'':
-      raise Exception("failed in fetching JWT" + process.stderr.decode())
-    token = process.stdout[:-1].decode() # remove the line breaking
+    token = self.apigee_client.fetch_jwt(self.key, self.secret, logger)
     auth_header = {"Authorization": f"Bearer {token}"}
     response = requests.get(url=self.url, headers=auth_header)
     status = response.status_code
@@ -53,7 +48,7 @@ class LegacyTestClient():
       logger.debug(f"call using JWT got response code {status}")
       return
     if status != expect:
-      logger.eror(f"failed to test target service using JWT, expected {expect} got {status}")
+      logger.erorr(f"failed to test target service using JWT, expected {expect} got {status}")
     else:
       logger.debug(f"call using JWT got response code {status} as expected")
 

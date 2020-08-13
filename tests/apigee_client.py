@@ -19,27 +19,46 @@ import subprocess
 from urllib.parse import quote
 
 class ApigeeClient():
-  def __init__(self, org, env, username="", password="", token=""):
+  def __init__(self, org, env,
+       username="",
+       password="",
+       token="",
+       mgmt_url="",
+       runtime_url="",
+       cli_dir=""):
     self.org = org
     self.env = env
     self.username = username
     self.password = password
     self.token = token
     self.developer_email = "foo@bar.com"
-    self.developer_id = ""
     self.product_name = "httpbin-product"
     self.app_name = "httpbin-app"
-    if username == "":
-      self.mgmt_url = "https://apigee.googleapis.com"
-    else:
-      self.mgmt_url = "https://api.enterprise.apigee.com"
+    self.platform = None
+    self.runtime_url = runtime_url
     self.revision = "1"
+    if mgmt_url != "":
+      self.mgmt_url = mgmt_url
+      self.platform = "--opdk"
+    else:
+      if username == "":
+        self.mgmt_url = "https://apigee.googleapis.com"
+      else:
+        self.mgmt_url = "https://api.enterprise.apigee.com"
+        self.platform = "--legacy"
+    self.cli_dir = cli_dir
 
-  def provision(self, cli_dir, logger):
-    cmd = [f"{cli_dir}/apigee-remote-service-cli", "provision", "--legacy", "-f",
-        "-o", self.org, "-e", self.env,
-        "-u", self.username, "-p", self.password,
-    ]
+  def provision(self, logger):
+    cmd = [f"{self.cli_dir}/apigee-remote-service-cli", "provision", "-f",
+        "-o", self.org, "-e", self.env]
+    if self.platform == None:
+      cmd += [self.token, "-r", self.runtime_url]
+    elif self.platform == "--legacy":
+      cmd += [self.platform, "-u", self.username, "-p", self.password]
+    elif self.platform == "--opdk":
+      cmd += [self.platform, "-r", self.runtime_url, "-m", self.mgmt_url,
+          "-u", self.username, "-p", self.password,
+          "--virtual-hosts", "default"]
     process = subprocess.run(cmd, capture_output=True)
     if process.stderr != b'':
       logger.error(process.stderr.decode())
@@ -47,6 +66,29 @@ class ApigeeClient():
     f = open("config.yaml", "wb")
     f.write(process.stdout)
     f.close()
+
+  def fetch_jwt(self, key, secret, logger):
+    if self.platform == "--legacy":
+      logger.debug(f"fetching JWT from organization {self.org} and environment {self.env}")
+      cmd = [f"{self.cli_dir}/apigee-remote-service-cli", "token", "create",
+          "--legacy", "-o", self.org, "-e", self.env,
+          "-i", key, "-s", secret]
+      process = subprocess.run(cmd, capture_output=True)
+      if process.stderr != b'':
+        logger.error("failed in fetching JWT" + process.stderr.decode())
+        return ""
+      return process.stdout[:-1].decode() # remove the line breaking
+    url = self.runtime_url + "/remote-service/token"
+    payload = {
+      "client_id": key,
+      "client_secret": secret,
+      "grant_type": "client_credentials",
+    }
+    response = requests.post(url=url, json=payload)
+    if response.ok == False:
+      logger.error("failed in fetching JWT" + response.content.decode())
+      return ""
+    return json.loads(response.content)["token"]
 
   def create_apiproduct(self, quota=5):
     product_payload = {
@@ -61,11 +103,12 @@ class ApigeeClient():
         {
           "name": "apigee-remote-service-targets",
           "value": "httpbin.org",
-        }
+        },
       ],
       "description": "httpbin product for test purpose",
       "apiResources": [
         "/httpbin/headers",
+        "/headers",
       ],
       "environments": [
         "test",
