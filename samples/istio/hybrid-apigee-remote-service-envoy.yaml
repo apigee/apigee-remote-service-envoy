@@ -49,9 +49,6 @@ spec:
       - name: apigee-remote-service-envoy
         image: "google/apigee-envoy-adapter:v1.0.0"
         imagePullPolicy: IfNotPresent
-        env:
-        - name: GODEBUG # value must be 0, as apigee does not support http 2
-          value: http2client=0
         ports:
         - containerPort: 5000
         livenessProbe:
