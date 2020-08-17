@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Default build will be a standard Go binary in a scratch container.
+# Default build will be a standard Go binary in a distroless container.
 # Default LDFLAGS includes `-s -w` to strip symbols for a small binary.
 
 # Include the following LDFLAGS for version information in the binary:
@@ -20,34 +20,38 @@
 
 # Use the following combination to build an image linked with Boring Crypto:
 # --build-arg CGO_ENABLED=1
-# --build-arg BUILD_CONTAINER=goboring/golang:1.14.4b4
+# --build-arg BUILD_CONTAINER=goboring/golang:1.14.6b4
 # --build-arg RUN_CONTAINER=ubuntu:xenial
 
-ARG BUILD_CONTAINER=golang:1.14
-ARG RUN_CONTAINER=scratch
+ARG BUILD_CONTAINER=golang:1.15
+ARG RUN_CONTAINER=gcr.io/distroless/base
 
-# Build binary in Go container
+#--- Build binary in Go container ---#
 FROM ${BUILD_CONTAINER} as builder
 
 ARG CGO_ENABLED=0
 ARG LDFLAGS="-s -w -X main.version=unknown -X main.commit=unknown -X main.date=unknown" 
 
+# Build app
 WORKDIR /app
 ADD . .
-
 RUN go mod download
 RUN CGO_ENABLED=$CGO_ENABLED go build -a \
   -ldflags "${LDFLAGS}" \
   -o apigee-remote-service-envoy .
 
-# Build runtime container
+# add apigee:apigee user
+RUN groupadd -g 999 apigee && \
+    useradd -r -u 999 -g apigee apigee
+
+#--- Build runtime container ---#
 FROM ${RUN_CONTAINER}
 
-# Ensure certs
+# Copy certs, app, and user
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
-
-# Add binary
 COPY --from=builder /app/apigee-remote-service-envoy .
+COPY --from=builder /etc/passwd /etc/group /etc/shadow /etc/
+USER apigee
 
 # Run entrypoint
 ENTRYPOINT ["/apigee-remote-service-envoy"]
