@@ -23,30 +23,29 @@
 # used by clients. If you enable the AuthorizationPolicy, JWT tokens will
 # be required and API Keys will not work by themselves.
 
-# apiVersion: security.istio.io/v1beta1
-# kind: RequestAuthentication
-# metadata:
-#  name: apigee
-#  namespace: default
-# spec:
-#   selector:
-#     matchLabels:
-#       managed-by: apigee
-#   jwtRules:
-#   - issuer: https://${RUNTIME}/remote-service/token
-#     jwksUri: https://${RUNTIME}/remote-service/certs
-# ---
 apiVersion: security.istio.io/v1beta1
-kind: AuthorizationPolicy
+kind: RequestAuthentication
 metadata:
  name: apigee
  namespace: default
 spec:
- selector:
-   matchLabels:
+  selector:
+    matchLabels:
       managed-by: apigee
- rules:
- - from:
-   - source:
-       requestPrincipals: ["*"]
-       headers: { "name": "X-Apigee-Authorized" }
+  jwtRules:
+  - issuer: https://${RUNTIME}/remote-service/token
+    jwksUri: https://${RUNTIME}/remote-service/certs
+# ---
+# apiVersion: security.istio.io/v1beta1
+# kind: AuthorizationPolicy
+# metadata:
+#  name: apigee
+#  namespace: default
+# spec:
+#  selector:
+#    matchLabels:
+#       managed-by: apigee
+#  rules:
+#  - from:
+#    - source:
+#        requestPrincipals: ["*"]
