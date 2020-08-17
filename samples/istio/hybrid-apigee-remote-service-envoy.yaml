@@ -45,6 +45,10 @@ spec:
         app: apigee-remote-service-envoy
         version: v1
     spec:
+      securityContext:  
+        runAsUser: 999
+        runAsGroup: 999
+        runAsNonRoot: true
       containers:
       - name: apigee-remote-service-envoy
         image: "google/apigee-envoy-adapter:v1.0.0"
