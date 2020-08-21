@@ -24,3 +24,4 @@ apigee-remote-service-cli
 /config.yaml
 /configmap.yaml
 tests/*.yaml
+tests/*/*.yaml

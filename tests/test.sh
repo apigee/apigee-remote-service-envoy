@@ -41,6 +41,8 @@ export ORG=$ORG
 export ENV=$ENV
 export RUNTIME=$RUNTIME
 export TOKEN=$(gcloud auth print-access-token)
+export HYBRID_DEPLOYMENTS=hybrid-deployments # a folder with deployment related configs
+export HYBRID_CONFIGS=hybrid-configs # a folder with policy related configs
 
 python3 test_hybrid.py
 

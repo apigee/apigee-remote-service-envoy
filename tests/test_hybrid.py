@@ -21,13 +21,14 @@ import test_client
 import time
 
 def deploy(logger):
-  deployment.KubeManager.apply("request-authentication.yaml", logger)
-  deployment.KubeManager.apply("envoyfilter-sidecar.yaml", logger)
   deployment.KubeManager.apply("config.yaml", logger)
+
+  hybrid_configs = os.getenv("HYBRID_CONFIGS", "hybrid-configs")
+  deployment.KubeManager.apply(hybrid_configs, logger)
   time.sleep(20)
-  deployment.KubeManager.apply("../samples/istio/httpbin.yaml", logger)
-  deployment.KubeManager.apply("hybrid-apigee-remote-service-envoy.yaml", logger)
-  deployment.KubeManager.apply("curl.yaml", logger)
+
+  hybrid_deployments = os.getenv("HYBRID_DEPLOYMENTS", "hybrid-deployments")
+  deployment.KubeManager.apply(hybrid_deployments, logger)
 
 def main():
   logger = utils.get_logger("Hybrid Test")

@@ -49,7 +49,7 @@ class LocalTestClient():
       logger.debug(f"call using JWT got response code {status}")
       return
     if status != expect:
-      logger.erorr(f"failed to test target service using JWT, expected {expect} got {status}")
+      logger.error(f"failed to test target service using JWT, expected {expect} got {status}")
     else:
       logger.debug(f"call using JWT got response code {status} as expected")
 
@@ -63,7 +63,7 @@ class LocalTestClient():
     self.test_apikey(logger, 403)
 
     logger.debug("waiting for quota to be restored. this takes about a minute...")
-    time.sleep(62)
+    time.sleep(65)
 
     logger.debug("expecting this call to succeed with restored quota...")
     self.test_apikey(logger, 200)
@@ -144,7 +144,7 @@ class HybridTestClient():
     self.test_apikey(logger, 403)
 
     logger.debug("waiting for quota to be restored. this takes about a minute...")
-    time.sleep(62)
+    time.sleep(65)
 
     logger.debug("expecting this call to succeed with restored quota...")
     self.test_apikey(logger, 200)
