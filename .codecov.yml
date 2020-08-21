@@ -4,4 +4,3 @@ coverage:
   range: 60..99
   ignore:
     - "bin/"
-    - "samples/"
