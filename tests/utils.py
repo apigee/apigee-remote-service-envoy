@@ -141,9 +141,9 @@ def start_local_test(logger, apigee_client):
 def start_istio_test(logger, apigee_client):
   client = test_client.IstioTestClient(apigee_client, logger)
 
-  logger.debug("waiting for pods to be ready. this takes about two minutes...")
-  for _ in range(6):
-    if client.test_apikey(logger, None) == 200:
+  logger.debug("waiting for pods to be ready. this takes a while...")
+  for _ in range(20):
+    if client.test_jwt(os.getenv("CLI_DIR", "."), logger, None) == 200:
       logger.debug("the pods are ready for testing")
       break
     time.sleep(60)
