@@ -22,7 +22,7 @@ The default python logging library is used. In addition to the default setting, 
 
 Have your Apigee organization (as well as runtime cluster for hybrid) ready. If you do not intend to test all platforms, simply comment out the the other python script executions. For any Istio environment, please enable Istio sidecar injection for the `default` namespace.
 
-Assign proper values to the environment variables in `test.sh`. While most of the variables are straightforward to understand, it is worth noting that, because the deployment of the Envoy adapter depends on a valid `config.yaml` in the ConfigMap, the order of `kubectl apply` matters. As a result, two folders need to be provided, `$HYBRID_DEPLOYMENTS` stores the deployment related configs while `$HYBRID_CONFIGS` stores the rest.
+Assign proper values to the environment variables in `test.sh`. While all variables are straightforward to understand, the `$K8S_CONTEXT` should be the full name of the context that one can run `kubetcl config use-context ...` with. It is the Kubernetes cluster with Istio (and Hybrid runtime if applicable) installed for each platform.
 
 Run `./test.sh` and watch the output!
 
