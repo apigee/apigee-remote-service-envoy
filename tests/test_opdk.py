@@ -59,8 +59,7 @@ def main():
 
   utils.start_containers(logger)
 
-  logger.debug("waiting for adapter to fetch the latest product info. this takes about two minutes...")
-  time.sleep(120)
+  time.sleep(3)
 
   utils.start_local_test(logger, apigee_client)
 

@@ -60,6 +60,8 @@ def main():
 
   utils.start_containers(logger)
 
+  time.sleep(3)
+
   utils.start_local_test(logger, apigee_client)
 
   utils.stop_containers(logger)
