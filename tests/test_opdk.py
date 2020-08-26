@@ -85,8 +85,10 @@ def main():
     utils.start_istio_test(logger, apigee_client)
 
     deployment.KubeManager.delete("apigee-remote-service-envoy", "apigee", logger)
+    deployment.KubeManager.delete("apigee-remote-service-envoy", "apigee", logger, "services")
     deployment.KubeManager.delete("curl", "default", logger, "pods")
     deployment.KubeManager.delete("httpbin", "default", logger)
+    deployment.KubeManager.delete("httpbin", "default", logger, "services")
     deployment.KubeManager.delete("apigee", "default", logger, "requestauthentications.security.istio.io")
     deployment.KubeManager.delete("apigee-remote-httpbin", "default", logger, "envoyfilters.networking.istio.io")
 

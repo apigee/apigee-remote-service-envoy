@@ -102,11 +102,11 @@ def start_local_test(logger, apigee_client):
   client = test_client.LocalTestClient(apigee_client)
 
   logger.debug("waiting for the adapter to be ready. this takes about two minutes...")
-  for _ in range(5):
+  for _ in range(6):
     if client.test_apikey(logger, None) == 200:
       logger.debug("the adapter is ready for testing")
       break
-    time.sleep(30)
+    time.sleep(60)
 
   try:
     logger.debug("testing calls to target service with API key in headers")
@@ -142,11 +142,11 @@ def start_istio_test(logger, apigee_client):
   client = test_client.IstioTestClient(apigee_client, logger)
 
   logger.debug("waiting for pods to be ready. this takes about two minutes...")
-  for _ in range(5):
+  for _ in range(6):
     if client.test_apikey(logger, None) == 200:
       logger.debug("the pods are ready for testing")
       break
-    time.sleep(30)
+    time.sleep(60)
 
   try:
     logger.debug("testing calls to target service with API key")
