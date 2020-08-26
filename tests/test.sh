@@ -22,7 +22,7 @@ export ENVOY_TAG=v1.15.0
 export ISTIO_VERSION=istio-1.6
 
 echo "Fetching the cli binary..."
-wget https://github.com/apigee/apigee-remote-service-cli/releases/download/${APIGEE_TAG}/apigee-remote-service-cli_1.1.0-rc.1_linux_64-bit.tar.gz
+wget https://github.com/apigee/apigee-remote-service-cli/releases/download/${APIGEE_TAG}/apigee-remote-service-cli_${APIGEE_VERSION}_linux_64-bit.tar.gz
 tar -zxvf apigee-remote-service-cli_${APIGEE_VERSION}_linux_64-bit.tar.gz apigee-remote-service-cli
 rm apigee-remote-service-cli_${APIGEE_VERSION}_linux_64-bit.tar.gz
 
