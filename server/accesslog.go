@@ -75,6 +75,11 @@ func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLo
 			continue
 		}
 
+		var responseCode int
+		if v.Response.ResponseCode != nil {
+			responseCode = int(v.Response.ResponseCode.Value)
+		}
+
 		cp := v.CommonProperties
 		requestPath := strings.SplitN(req.Path, "?", 2)[0] // Apigee doesn't want query params in requestPath
 		record := analytics.Record{
@@ -91,7 +96,7 @@ func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLo
 			RequestPath:                  requestPath,
 			RequestVerb:                  req.RequestMethod.String(),
 			UserAgent:                    req.UserAgent,
-			ResponseStatusCode:           int(v.Response.ResponseCode.Value),
+			ResponseStatusCode:           responseCode,
 			GatewaySource:                gatewaySource,
 			ClientIP:                     req.GetForwardedFor(),
 		}

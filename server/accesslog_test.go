@@ -188,6 +188,17 @@ func TestHandleHTTPAccessLogs(t *testing.T) {
 	if rec.UserAgent != userAgent {
 		t.Errorf("got: %s, want: %s", rec.UserAgent, userAgent)
 	}
+
+	// missing response code can happen when client kills request
+	msg.HttpLogs.LogEntry[0].Response.ResponseCode = nil
+	if err := server.handleHTTPLogs(msg); err != nil {
+		t.Fatal(err)
+	}
+
+	rec = testAnalyticsMan.records[len(testAnalyticsMan.records)-1]
+	if rec.ResponseStatusCode != 0 {
+		t.Errorf("got: %d, want: %d", rec.ResponseStatusCode, 0)
+	}
 }
 
 func TestTimeToUnix(t *testing.T) {
