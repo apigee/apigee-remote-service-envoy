@@ -16,19 +16,25 @@ import apigee_client as apigee
 import deployment
 import os
 import json
-import utils
+import subprocess
 import test_client
 import time
+import utils
 
 def deploy(logger):
+  istio_version = os.getenv("ISTIO_VERSION", "istio-1.6")
+  cmd = [os.getenv("CLI_DIR", ".")+"/apigee-remote-service-cli", "samples", "create",
+          "-c", "config.yaml", "--out", "hybrid-configs", "-t", istio_version, "-f"]
+  process = subprocess.run(cmd, capture_output=True)
+  if process.stderr != b'':
+    logger.error(process.stderr.decode())
+
   deployment.KubeManager.apply("config.yaml", logger)
+  deployment.KubeManager.apply("curl.yml", logger)
 
-  hybrid_configs = os.getenv("HYBRID_CONFIGS", "hybrid-configs")
-  deployment.KubeManager.apply(hybrid_configs, logger)
-  time.sleep(20)
+  time.sleep(10)
 
-  hybrid_deployments = os.getenv("HYBRID_DEPLOYMENTS", "hybrid-deployments")
-  deployment.KubeManager.apply(hybrid_deployments, logger)
+  deployment.KubeManager.apply("hybrid-configs", logger)
 
 def main():
   logger = utils.get_logger("Hybrid Test")
@@ -39,18 +45,24 @@ def main():
 
   utils.provision(logger, apigee_client)
 
+  cmd = ["kubectl", "config", "use-context", os.getenv("K8S_CONTEXT")]
+  process = subprocess.run(cmd, capture_output=True)
+  if process.stderr != b'':
+    logger.error(process.stderr.decode())
+  logger.debug(process.stdout.decode())
+
   deploy(logger)
 
-  logger.debug("waiting for pods to get ready. this takes about four minutes...")
-  time.sleep(240)
-
-  utils.start_hybrid_test(logger, apigee_client)
+  utils.start_istio_test(logger, apigee_client)
 
   utils.cleanup(logger, apigee_client)
 
   deployment.KubeManager.delete("apigee-remote-service-envoy", "apigee", logger)
   deployment.KubeManager.delete("curl", "default", logger, "pods")
   deployment.KubeManager.delete("httpbin", "default", logger)
+  deployment.KubeManager.delete("apigee", "default", logger, "requestauthentications.security.istio.io")
+  deployment.KubeManager.delete("apigee-remote-httpbin", "default", logger, "envoyfilters.networking.istio.io")
+
 
 if __name__ == "__main__":
   main()

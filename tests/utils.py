@@ -63,10 +63,10 @@ def start_containers(logger):
   adapter_config = os.getenv("APIGEE_CONFIG", f"{pwd}/config.yaml")
   logger.debug("Apigee Adapter config file: " + adapter_config)
 
-  envoy_tag = os.getenv("ENVOY_TAG", "v1.14.4")
+  envoy_tag = os.getenv("ENVOY_TAG", "v1.15.0")
   logger.debug("Envoy version tag: " + envoy_tag)
 
-  envoy_config = os.getenv("ENVOY_CONFIG", f"{pwd}/envoy-httpbin.yaml")
+  envoy_config = os.getenv("ENVOY_CONFIG", f"{pwd}/envoy-config.yaml")
   logger.debug("Envoy config file: " + envoy_config)
 
   logger.debug("starting Apigee adapter docker container")
@@ -101,9 +101,22 @@ def stop_containers(logger):
 def start_local_test(logger, apigee_client):
   client = test_client.LocalTestClient(apigee_client)
 
+  logger.debug("waiting for the adapter to be ready. this takes about two minutes...")
+  for _ in range(5):
+    if client.test_apikey(logger, None) == 200:
+      logger.debug("the adapter is ready for testing")
+      break
+    time.sleep(30)
+
   try:
-    logger.debug("testing calls to target service with API key")
+    logger.debug("testing calls to target service with API key in headers")
     client.test_apikey(logger)
+  except Exception as e:
+    logger.error(e)
+
+  try:
+    logger.debug("testing calls to target service with API key in params")
+    client.test_apikey_params(logger)
   except Exception as e:
     logger.error(e)
 
@@ -125,8 +138,15 @@ def start_local_test(logger, apigee_client):
   except Exception as e:
     logger.error(e)
 
-def start_hybrid_test(logger, apigee_client):
-  client = test_client.HybridTestClient(apigee_client, logger)
+def start_istio_test(logger, apigee_client):
+  client = test_client.IstioTestClient(apigee_client, logger)
+
+  logger.debug("waiting for pods to be ready. this takes about two minutes...")
+  for _ in range(5):
+    if client.test_apikey(logger, None) == 200:
+      logger.debug("the pods are ready for testing")
+      break
+    time.sleep(30)
 
   try:
     logger.debug("testing calls to target service with API key")
@@ -142,13 +162,13 @@ def start_hybrid_test(logger, apigee_client):
 
   try:
     logger.debug("testing API product quota")
-    client.test_quota(5, logger)
+    client.test_quota(5, logger, os.getenv("CLI_DIR", "."))
   except Exception as e:
     logger.error(e)
 
   try:
     logger.debug("testing local API product quota")
-    client.test_local_quota(5, logger)
+    client.test_local_quota(5, logger, os.getenv("CLI_DIR", "."))
   except Exception as e:
     logger.error(e)
 

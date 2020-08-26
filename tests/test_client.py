@@ -26,7 +26,7 @@ class LocalTestClient():
   def __init__(self, apigee_client):
     self.apigee_client = apigee_client
     self.key, self.secret = apigee_client.fetch_credentials()
-    self.url = "http://localhost:8080/httpbin/headers"
+    self.url = "http://localhost:8080/headers"
 
   def test_apikey(self, logger, expect=200):
     apikey_header = {"x-api-key": self.key}
@@ -34,11 +34,25 @@ class LocalTestClient():
     status = response.status_code
     if expect == None:
       logger.debug(f"call using API key got response code {status}")
-      return
+      return status
     if status != expect:
-      logger.error(f"failed to test target service using API key, expected {expect} got {status}")
+      logger.error(f"failed to test target service using API key in headers, expected {expect} got {status}")
     else:
       logger.debug(f"call using API key got response code {status} as expected")
+    return status
+
+  def test_apikey_params(self, logger, expect=200):
+    url = f"{self.url}?x-api-key={self.key}"
+    response = requests.get(url=url)
+    status = response.status_code
+    if expect == None:
+      logger.debug(f"call using API key got response code {status}")
+      return status
+    if status != expect:
+      logger.error(f"failed to test target service using API key in params, expected {expect} got {status}")
+    else:
+      logger.debug(f"call using API key got response code {status} as expected")
+    return status
 
   def test_jwt(self, cli_dir, logger, expect=200):
     token = self.apigee_client.fetch_jwt(self.key, self.secret, logger)
@@ -47,15 +61,18 @@ class LocalTestClient():
     status = response.status_code
     if expect == None:
       logger.debug(f"call using JWT got response code {status}")
-      return
+      return status
     if status != expect:
       logger.error(f"failed to test target service using JWT, expected {expect} got {status}")
     else:
       logger.debug(f"call using JWT got response code {status} as expected")
+    return status
 
   def test_quota(self, quota, logger):
-    for _ in range(quota):
-      self.test_apikey(logger, None)
+    for _ in range(quota + 10):
+      if self.test_apikey(logger, None) != 200:
+        logger.debug("quota depleted")
+        break
 
     time.sleep(1)
 
@@ -91,9 +108,9 @@ class LocalTestClient():
       logger.error("turning the remote-service proxies back on")
       logger.error(response.content.decode())
 
-class HybridTestClient():
+class IstioTestClient():
   """
-  HybridTestClient assumes the Envoy proxy listenning locally on localhost:8080
+  IstioTestClient assumes the Envoy proxy listenning locally on localhost:8080
   It needs a valid ApigeeClient to fetch the necessary credentials
   """
   def __init__(self, apigee_client, logger):
@@ -116,11 +133,12 @@ class HybridTestClient():
     status = self.curl(apikey_header, logger)
     if expect == None:
       logger.debug(f"call using API key got response code {status}")
-      return
+      return status
     if status != expect:
       logger.error(f"failed to test target service using API key, expected {expect} got {status}")
     else:    
       logger.debug(f"call using API key got response code {status} as expected")
+    return status
 
   def test_jwt(self, cli_dir, logger, expect=200):
     token = self.apigee_client.fetch_jwt(self.key, self.secret, logger)
@@ -128,15 +146,18 @@ class HybridTestClient():
     status = self.curl(auth_header, logger)
     if expect == None:
       logger.debug(f"call using JWT got response code {status}")
-      return
+      return status
     if status != expect:
       logger.error(f"failed to test target service using JWT, expected {expect} got {status}")
     else:
       logger.debug(f"call using JWT got response code {status} as expected")
+    return status
 
-  def test_quota(self, quota, logger):
-    for _ in range(quota):
-      self.test_apikey(logger, None)
+  def test_quota(self, quota, logger, cli_dir="."):
+    for _ in range(quota + 10):
+      if self.test_apikey(logger, None) != 200:
+        logger.debug("quota depleted")
+        break
 
     time.sleep(1)
 
@@ -149,7 +170,7 @@ class HybridTestClient():
     logger.debug("expecting this call to succeed with restored quota...")
     self.test_apikey(logger, 200)
 
-  def test_local_quota(self, quota, logger):
+  def test_local_quota(self, quota, logger, cli_dir="."):
     # turn the remote-service proxies offline
     logger.debug("turning the remote-service proxies offline...")
     try:
@@ -163,7 +184,7 @@ class HybridTestClient():
     time.sleep(30)
 
     logger.debug("performing local quota test...")
-    self.test_quota(quota, logger)
+    self.test_quota(quota, logger, cli_dir)
 
     # turn the remote-service proxies back on
     logger.debug("turning the remote-service proxies back on...")

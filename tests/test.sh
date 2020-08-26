@@ -16,13 +16,16 @@
 
 set -e
 
-echo "Fetching the cli binary..."
-wget https://github.com/apigee/apigee-remote-service-cli/releases/download/v1.0.0/apigee-remote-service-cli_1.0.0_linux_64-bit.tar.gz
-tar -zxvf apigee-remote-service-cli_1.0.0_linux_64-bit.tar.gz apigee-remote-service-cli
-rm apigee-remote-service-cli_1.0.0_linux_64-bit.tar.gz
+export APIGEE_VERSION=1.1.0-rc.1
+export APIGEE_TAG=v${APIGEE_VERSION}
+export ENVOY_TAG=v1.15.0
+export ISTIO_VERSION=istio-1.6
 
-export APIGEE_TAG=v1.0.0
-export ENVOY_TAG=v1.14.4
+echo "Fetching the cli binary..."
+wget https://github.com/apigee/apigee-remote-service-cli/releases/download/${APIGEE_TAG}/apigee-remote-service-cli_1.1.0-rc.1_linux_64-bit.tar.gz
+tar -zxvf apigee-remote-service-cli_${APIGEE_VERSION}_linux_64-bit.tar.gz apigee-remote-service-cli
+rm apigee-remote-service-cli_${APIGEE_VERSION}_linux_64-bit.tar.gz
+
 export APIGEE_CONFIG=$PWD/config.yaml # this will be generated
 
 echo "Testing Legacy SaaS..."
@@ -31,9 +34,12 @@ export USER=$USER
 export PASSWORD=$PASSWORD
 export ORG=$ORG
 export ENV=$ENV
-export ENVOY_CONFIG=$PWD/envoy-saas.yaml # bring your own yaml
+export K8S_CONTEXT=$K8S_CONTEXT
 
 python3 test_legacy_saas.py
+
+echo "Cleaning up files..."
+rm config.yaml
 
 echo "Testing Hybrid..."
 
@@ -41,10 +47,12 @@ export ORG=$ORG
 export ENV=$ENV
 export RUNTIME=$RUNTIME
 export TOKEN=$(gcloud auth print-access-token)
-export HYBRID_DEPLOYMENTS=hybrid-deployments # a folder with deployment related configs
-export HYBRID_CONFIGS=hybrid-configs # a folder with policy related configs
+export K8S_CONTEXT=$K8S_CONTEXT
 
 python3 test_hybrid.py
+
+echo "Cleaning up files..."
+rm config.yaml
 
 echo "Testing OPDK..."
 
@@ -54,7 +62,7 @@ export ORG=$ORG
 export ENV=$ENV
 export RUNTIME=$RUNTIME
 export MGMT=$MGMT
-export ENVOY_CONFIG=$PWD/envoy-opdk.yaml # bring your own yaml
+export K8S_CONTEXT=$K8S_CONTEXT
 
 python3 test_opdk.py
 

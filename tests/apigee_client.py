@@ -65,6 +65,9 @@ class ApigeeClient():
     f = open("config.yaml", "wb")
     f.write(process.stdout)
     f.close()
+    process = subprocess.run(["chmod", "644", "config.yaml"], capture_output=True)
+    if process.stderr != b'':
+      logger.error(process.stderr.decode())
 
   def fetch_jwt(self, key, secret, logger):
     if self.platform == "--legacy":

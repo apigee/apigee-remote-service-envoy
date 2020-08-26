@@ -14,7 +14,7 @@ The three main test scripts are `test_legacy_saas.py`, `test_hybrid.py` and `tes
 
 The script will not attempt to override any exisiting resources if conflict ever occurs. Likewise, existing dependencies might prevent from the aforementioned resources being deleted.
 
-As of now, calls using API keys, JWT and (local) quota deletion and restoration are being tested on all three platforms. As an API product for the target service, a quota (5 calls per minute by default) is set for `httpbin product`.
+As of now, calls using API keys (either in http headers or query parameters), JWT and (local) quota deletion and restoration are being tested on all three platforms. As an API product for the target service, a quota (5 calls per minute by default) is set for `httpbin product`.
 
 The default python logging library is used. In addition to the default setting, the logger is configured to stream the ouput to stderr for the convenience of local testing purpose.
 
@@ -27,12 +27,6 @@ Assign proper values to the environment variables in `test.sh`. While most of th
 Run `./test.sh` and watch the output!
 
 ## To-do
-
-- Currently the script sleeps for several minutes between provisioning and actual tests to make sure all deployments are ready. Although this works most of the time, waiting for an arbitrary amount of time is not ideal and will be particularly error-prone when automated.
-
-- Generating sample configs utilizing the latest cli to eliminate the need of preparing too many configurations beforehand.
-
-- Testing with Legacy SaaS in Istio such that different Istio versions can be verified.
 
 - Testing more cli commands, in particular those interacting with the `remote-service` proxies or Apigee management plane such as `bindings ...` and `token rotate-cert ...`. 
 
