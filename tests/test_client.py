@@ -41,6 +41,16 @@ class LocalTestClient():
       logger.debug(f"call using API key got response code {status} as expected")
     return status
 
+  def test_invalid_apikey(self, logger, expect=403):
+    apikey_header = {"x-api-key": "key"}
+    response = requests.get(url=self.url, headers=apikey_header)
+    status = response.status_code
+    if status != expect:
+      logger.error(f"failed to test target service using invalid API key in headers, expected {expect} got {status}")
+    else:
+      logger.debug(f"call using invalid API key got response code {status} as expected")
+    return status
+
   def test_apikey_params(self, logger, expect=200):
     url = f"{self.url}?x-api-key={self.key}"
     response = requests.get(url=url)
@@ -66,6 +76,16 @@ class LocalTestClient():
       logger.error(f"failed to test target service using JWT, expected {expect} got {status}")
     else:
       logger.debug(f"call using JWT got response code {status} as expected")
+    return status
+
+  def test_invalid_jwt(self, logger, expect=401):
+    auth_header = {"Authorization": "Bearer token"}
+    response = requests.get(url=self.url, headers=auth_header)
+    status = response.status_code
+    if status != expect:
+      logger.error(f"failed to test target service using invalid JWT, expected {expect} got {status}")
+    else:
+      logger.debug(f"call using invalid JWT got response code {status} as expected")
     return status
 
   def test_quota(self, quota, logger):
@@ -140,6 +160,15 @@ class IstioTestClient():
       logger.debug(f"call using API key got response code {status} as expected")
     return status
 
+  def test_invalid_apikey(self, logger, expect=403):
+    apikey_header = "x-api-key: key"
+    status = self.curl(apikey_header, logger)
+    if status != expect:
+      logger.error(f"failed to test target service using invalid API key in headers, expected {expect} got {status}")
+    else:
+      logger.debug(f"call using invalid API key got response code {status} as expected")
+    return status
+
   def test_jwt(self, cli_dir, logger, expect=200):
     token = self.apigee_client.fetch_jwt(self.key, self.secret, logger)
     auth_header = f"Authorization: Bearer {token}"
@@ -151,6 +180,15 @@ class IstioTestClient():
       logger.error(f"failed to test target service using JWT, expected {expect} got {status}")
     else:
       logger.debug(f"call using JWT got response code {status} as expected")
+    return status
+
+  def test_invalid_jwt(self, logger, expect=401):
+    auth_header = "Authorization: Bearer token"
+    status = self.curl(auth_header, logger)
+    if status != expect:
+      logger.error(f"failed to test target service using invalid JWT, expected {expect} got {status}")
+    else:
+      logger.debug(f"call using invalid JWT got response code {status} as expected")
     return status
 
   def test_quota(self, quota, logger, cli_dir="."):

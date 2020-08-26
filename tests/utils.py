@@ -121,8 +121,20 @@ def start_local_test(logger, apigee_client):
     logger.error(e)
 
   try:
+    logger.debug("testing calls to target service with invalid API key in headers")
+    client.test_invalid_apikey(logger)
+  except Exception as e:
+    logger.error(e)
+
+  try:
     logger.debug("testing calls to target service with JWT")
     client.test_jwt(os.getenv("CLI_DIR", "."), logger)
+  except Exception as e:
+    logger.error(e)
+
+  try:
+    logger.debug("testing calls to target service with invalid JWT")
+    client.test_invalid_jwt(logger)
   except Exception as e:
     logger.error(e)
 
@@ -155,8 +167,20 @@ def start_istio_test(logger, apigee_client):
     logger.error(e)
 
   try:
+    logger.debug("testing calls to target service with invalid API key")
+    client.test_invalid_apikey(logger)
+  except Exception as e:
+    logger.error(e)
+
+  try:
     logger.debug("testing calls to target service with JWT")
     client.test_jwt(os.getenv("CLI_DIR", "."), logger)
+  except Exception as e:
+    logger.error(e)
+
+  try:
+    logger.debug("testing calls to target service with invalid JWT")
+    client.test_invalid_jwt(logger)
   except Exception as e:
     logger.error(e)
 
