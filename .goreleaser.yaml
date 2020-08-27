@@ -41,7 +41,6 @@ archives:
     files:
       - LICENSE
       - README.md
-      - samples/**/*
     builds:
       - default
   - id: goboring
@@ -51,7 +50,6 @@ archives:
     files:
       - LICENSE
       - README.md
-      - samples/**/*
     builds:
       - goboring
 
