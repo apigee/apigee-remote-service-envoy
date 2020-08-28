@@ -15,6 +15,7 @@
 package server
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net"
@@ -31,6 +32,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 )
 
 // A Handler is the main entry
@@ -157,12 +160,24 @@ func NewHandler(config *Config) (*Handler, error) {
 		return nil, err
 	}
 
+	var analyticsClient *http.Client
+	// It tries to get a credentials authorized client if the credentials json is not empty.
+	// Otherwise it uses the same setting as the other managers do.
+	if config.Analytics.CredentialsJSON != nil {
+		analyticsClient, err = clientAuthorizedByCredentials(config, "analytics", config.Analytics.CredentialsJSON)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		analyticsClient = instrumentedClientFor(config, "analytics", tr)
+	}
+
 	analyticsMan, err := analytics.NewManager(analytics.Options{
 		LegacyEndpoint:     config.Analytics.LegacyEndpoint,
 		BufferPath:         analyticsDir,
 		StagingFileLimit:   config.Analytics.FileLimit,
 		BaseURL:            internalAPI,
-		Client:             instrumentedClientFor(config, "analytics", tr),
+		Client:             analyticsClient,
 		SendChannelSize:    config.Analytics.SendChannelSize,
 		CollectionInterval: time.Minute,
 		FluentdEndpoint:    config.Analytics.FluentdEndpoint,
@@ -194,14 +209,36 @@ func NewHandler(config *Config) (*Handler, error) {
 	return h, nil
 }
 
+// instrumentedClientFor returns a http.Client with a given RoundTripper
 func instrumentedClientFor(config *Config, api string, rt http.RoundTripper) *http.Client {
-	promLabels := prometheus.Labels{"org": config.Tenant.OrgName, "env": config.Tenant.EnvName, "api": api}
-	observer := prometheusApigeeRequests.MustCurryWith(promLabels)
-	rt = promhttp.InstrumentRoundTripperDuration(observer, rt)
+	rt = roundTripperWithPrometheus(config, api, rt)
 	return &http.Client{
 		Timeout:   config.Tenant.ClientTimeout,
 		Transport: rt,
 	}
+}
+
+// roundTripperWithPrometheus returns a http.RoundTripper with prometheus labels configured
+func roundTripperWithPrometheus(config *Config, api string, rt http.RoundTripper) http.RoundTripper {
+	promLabels := prometheus.Labels{"org": config.Tenant.OrgName, "env": config.Tenant.EnvName, "api": api}
+	observer := prometheusApigeeRequests.MustCurryWith(promLabels)
+	return promhttp.InstrumentRoundTripperDuration(observer, rt)
+}
+
+// clientAuthorizedByServiceAccount returns a http client authorized with the
+// service account credentials provided as json data
+func clientAuthorizedByCredentials(config *Config, api string, jsonData []byte) (*http.Client, error) {
+	const scope = "https://www.googleapis.com/auth/cloud-platform" // scope Apigee API needs
+	ctx := context.Background()
+	cred, err := google.CredentialsFromJSON(ctx, jsonData, scope)
+	if err != nil {
+		return nil, err
+	}
+	client := oauth2.NewClient(ctx, cred.TokenSource)
+	rt := client.Transport
+	client.Transport = roundTripperWithPrometheus(config, api, rt)
+	client.Timeout = config.Tenant.ClientTimeout
+	return client, nil
 }
 
 var (

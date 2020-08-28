@@ -19,6 +19,7 @@ require (
 	github.com/spf13/cobra v1.0.0
 	go.uber.org/zap v1.15.0
 	golang.org/x/net v0.0.0-20200813134508-3edf25e44fcc // indirect
+	golang.org/x/oauth2 v0.0.0-20190226205417-e64efc72b421
 	google.golang.org/genproto v0.0.0-20200815001618-f69a88009b70
 	google.golang.org/grpc v1.31.0
 	google.golang.org/protobuf v1.25.0

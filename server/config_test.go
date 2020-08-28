@@ -142,11 +142,15 @@ func TestHybridSingleFile(t *testing.T) {
     analytics:
       fluentd_endpoint: apigee-udca-myorg-test.apigee.svc.cluster.local:20001`
 	configCRD := makeConfigCRD(config)
-	secretCRD, err := makeSecretCRD()
+	policySecretCRD, err := makePolicySecretCRD()
 	if err != nil {
 		t.Fatal(err)
 	}
-	configMapYAML, err := makeYAML(configCRD, secretCRD)
+	analyticsSecretCRD, err := makeAnalyaticsSecretCRD()
+	if err != nil {
+		t.Fatal(err)
+	}
+	configMapYAML, err := makeYAML(configCRD, policySecretCRD, analyticsSecretCRD)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,7 +163,7 @@ func TestHybridSingleFile(t *testing.T) {
 	}
 
 	c := DefaultConfig()
-	if err := c.Load(tf.Name(), "xxx"); err != nil {
+	if err := c.Load(tf.Name(), "xxx", "xxx"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -194,7 +198,7 @@ func TestMultifileConfig(t *testing.T) {
 	}
 	defer os.RemoveAll(secretDir)
 
-	secretCRD, err := makeSecretCRD()
+	secretCRD, err := makePolicySecretCRD()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,7 +213,7 @@ func TestMultifileConfig(t *testing.T) {
 	}
 
 	c := DefaultConfig()
-	if err := c.Load(tf.Name(), secretDir); err != nil {
+	if err := c.Load(tf.Name(), secretDir, ""); err != nil {
 		t.Fatal(err)
 	}
 
@@ -224,7 +228,7 @@ func TestLoadLegacyConfig(t *testing.T) {
 	defer os.Remove(tf.Name())
 
 	configCRD := makeConfigCRD(allConfigOptions)
-	secretCRD, err := makeSecretCRD()
+	secretCRD, err := makePolicySecretCRD()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -241,7 +245,7 @@ func TestLoadLegacyConfig(t *testing.T) {
 	}
 
 	c := &Config{}
-	if err := c.Load(tf.Name(), "xxx"); err != nil {
+	if err := c.Load(tf.Name(), "xxx", ""); err != nil {
 		t.Fatal(err)
 	}
 
@@ -271,7 +275,7 @@ func TestValidate(t *testing.T) {
 
 	wantErrs := []string{
 		"tenant.remote_service_api is required",
-		"tenant.internal_api or tenant.analytics.fluentd_endpoint is required",
+		"tenant.internal_api or tenant.analytics.fluentd_endpoint is required if no service account",
 		"tenant.org_name is required",
 		"tenant.env_name is required",
 	}
@@ -334,7 +338,7 @@ func TestValidateTLS(t *testing.T) {
 	}
 }
 
-func makeSecretCRD() (*SecretCRD, error) {
+func makePolicySecretCRD() (*SecretCRD, error) {
 	kid := "my kid"
 	privateKey, jwksBuf, err := testutil.GenerateKeyAndJWKs(kid)
 	if err != nil {
@@ -360,6 +364,23 @@ func makeSecretCRD() (*SecretCRD, error) {
 		Type:       "Opaque",
 		Metadata: Metadata{
 			Name:      "org-env-policy-secret",
+			Namespace: "apigee",
+		},
+		Data: data,
+	}, nil
+}
+
+func makeAnalyaticsSecretCRD() (*SecretCRD, error) {
+	data := map[string]string{
+		ServiceAccount: base64.StdEncoding.EncodeToString([]byte(`{"type": "service_account"}`)),
+	}
+
+	return &SecretCRD{
+		APIVersion: "v1",
+		Kind:       "Secret",
+		Type:       "Opaque",
+		Metadata: Metadata{
+			Name:      "org-env-analytics-secret",
 			Namespace: "apigee",
 		},
 		Data: data,

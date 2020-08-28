@@ -31,8 +31,13 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// LegacySaaSInternalBase is the internal API used for auth and analytics
-const LegacySaaSInternalBase = "https://istioservices.apigee.net/edgemicro"
+const (
+	// LegacySaaSInternalBase is the internal API used for auth and analytics
+	LegacySaaSInternalBase = "https://istioservices.apigee.net/edgemicro"
+
+	// ServiceAccount is the json file with application credentials
+	ServiceAccount = "client_secret.json"
+)
 
 // DefaultConfig returns a config with defaults set
 func DefaultConfig() *Config {
@@ -129,6 +134,7 @@ type AnalyticsConfig struct {
 	CollectionInterval time.Duration   `yaml:"collection_interval,omitempty"`
 	FluentdEndpoint    string          `yaml:"fluentd_endpoint,omitempty"`
 	TLS                TLSClientConfig `yaml:"tls,omitempty"`
+	CredentialsJSON    []byte          `yaml:"-"`
 }
 
 // AuthConfig is auth-related config
@@ -143,7 +149,7 @@ type AuthConfig struct {
 }
 
 // Load config
-func (c *Config) Load(configFile, policySecretPath string) error {
+func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string) error {
 	log.Debugf("reading config from: %s", configFile)
 	yamlFile, err := ioutil.ReadFile(configFile)
 	if err != nil {
@@ -170,11 +176,17 @@ func (c *Config) Load(configFile, policySecretPath string) error {
 			kidProps, _ = base64.StdEncoding.DecodeString(secret.Data[SecretPropsKey])
 			jwksBytes, _ = base64.StdEncoding.DecodeString(secret.Data[SecretJKWSKey])
 
+			// TODO: DecodeString() never returns nil even on error
+			// the above check is not effective
 			if key == nil || kidProps == nil || jwksBytes == nil { // all or nothing
 				key = nil
 				kidProps = nil
 				jwksBytes = nil
 			}
+		}
+
+		if decoder.Decode(secret) == nil && secret.Kind == "Secret" {
+			c.Analytics.CredentialsJSON, _ = base64.StdEncoding.DecodeString(secret.Data[ServiceAccount])
 		}
 	}
 
@@ -216,6 +228,12 @@ func (c *Config) Load(configFile, policySecretPath string) error {
 				return err
 			}
 		}
+
+		if analyticsSecretPath != "" && c.Analytics.CredentialsJSON == nil {
+			if c.Analytics.CredentialsJSON, err = ioutil.ReadFile(path.Join(analyticsSecretPath, ServiceAccount)); err != nil {
+				return err
+			}
+		}
 	}
 
 	return c.Validate()
@@ -242,8 +260,8 @@ func (c *Config) Validate() error {
 	if c.Tenant.RemoteServiceAPI == "" {
 		errs = multierror.Append(errs, fmt.Errorf("tenant.remote_service_api is required"))
 	}
-	if c.Tenant.InternalAPI == "" && c.Analytics.FluentdEndpoint == "" {
-		errs = multierror.Append(errs, fmt.Errorf("tenant.internal_api or tenant.analytics.fluentd_endpoint is required"))
+	if c.Tenant.InternalAPI == "" && c.Analytics.FluentdEndpoint == "" && c.Analytics.CredentialsJSON == nil {
+		errs = multierror.Append(errs, fmt.Errorf("tenant.internal_api or tenant.analytics.fluentd_endpoint is required if no service account"))
 	}
 	if c.Tenant.OrgName == "" {
 		errs = multierror.Append(errs, fmt.Errorf("tenant.org_name is required"))
