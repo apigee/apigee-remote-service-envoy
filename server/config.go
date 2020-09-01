@@ -35,6 +35,9 @@ const (
 	// LegacySaaSInternalBase is the internal API used for auth and analytics
 	LegacySaaSInternalBase = "https://istioservices.apigee.net/edgemicro"
 
+	// GCPExperienceBase is the default management API URL for GCP Experience
+	GCPExperienceBase = "https://apigee.googleapis.com"
+
 	// ServiceAccount is the json file with application credentials
 	ServiceAccount = "client_secret.json"
 )

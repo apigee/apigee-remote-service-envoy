@@ -168,6 +168,9 @@ func NewHandler(config *Config) (*Handler, error) {
 		if err != nil {
 			return nil, err
 		}
+		// overwrites internalAPI to the GCP managed base
+		// no need to check error since it's a well-defined const
+		internalAPI, _ = url.Parse(GCPExperienceBase)
 	} else {
 		analyticsClient = instrumentedClientFor(config, "analytics", tr)
 	}
