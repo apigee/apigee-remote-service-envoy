@@ -111,7 +111,7 @@ func main() {
 	rootCmd.Flags().BoolVarP(&logJSON, "json-log", "j", false, "Log as JSON")
 	rootCmd.Flags().StringVarP(&configFile, "config", "c", "config.yaml", "Config file")
 	rootCmd.Flags().StringVarP(&policySecretPath, "policy-secret", "p", "/policy-secret", "Policy secret mount point")
-	rootCmd.Flags().StringVarP(&analyticsSecretPath, "analytics-secret", "p", "/analytics-secret", "Analytics secret mount point")
+	rootCmd.Flags().StringVarP(&analyticsSecretPath, "analytics-secret", "a", "/analytics-secret", "Analytics secret mount point")
 
 	rootCmd.SetArgs(os.Args[1:])
 	if err := rootCmd.Execute(); err != nil {

@@ -180,7 +180,7 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string) 
 			jwksBytes, _ = base64.StdEncoding.DecodeString(secret.Data[SecretJKWSKey])
 
 			// TODO: DecodeString() never returns nil even on error
-			// the above check is not effective
+			// the following check is not effective
 			if key == nil || kidProps == nil || jwksBytes == nil { // all or nothing
 				key = nil
 				kidProps = nil
@@ -232,9 +232,12 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string) 
 			}
 		}
 
+		// attempts to load the service account credentials if the credentials are not set yet
 		if analyticsSecretPath != "" && c.Analytics.CredentialsJSON == nil {
-			if c.Analytics.CredentialsJSON, err = ioutil.ReadFile(path.Join(analyticsSecretPath, ServiceAccount)); err != nil {
-				return err
+			c.Analytics.CredentialsJSON, err = ioutil.ReadFile(path.Join(analyticsSecretPath, ServiceAccount))
+			if err != nil { // not returning the error since it may fall back to using fluentd endpoint
+				c.Analytics.CredentialsJSON = nil
+				log.Warnf("reading analytics service account credentials: %v", err)
 			}
 		}
 	}
