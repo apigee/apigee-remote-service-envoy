@@ -92,4 +92,36 @@ func TestNewHandler(t *testing.T) {
 	if err == nil {
 		t.Error("should get error")
 	}
+
+	config.Tenant.RemoteServiceAPI = config.Tenant.InternalAPI
+	config.Analytics.CredentialsJSON = fakeServiceAccount()
+	h, err = NewHandler(config)
+	if err != nil {
+		t.Error(err)
+	}
+	if h.internalAPI.Host != "apigee.googleapis.com" {
+		t.Errorf("intervalAPI error: want %s got %s", "apigee.googleapis.com", h.internalAPI.Host)
+	}
+
+	config.Analytics.CredentialsJSON = []byte("invalid sa")
+	_, err = NewHandler(config)
+	if err == nil {
+		t.Error("should get error")
+	}
+}
+
+func fakeServiceAccount() []byte {
+	sa := []byte(`{
+	"type": "service_account",
+	"project_id": "hi",
+	"private_key_id": "5a0ef8b44fe312a005ac6e6fe59e2e559b40bff3",
+	"private_key": "-----BEGIN PRIVATE KEY-----\n-----END PRIVATE KEY-----\n",
+	"client_email": "client@hi.iam.gserviceaccount.com",
+	"client_id": "111111111111111111",
+	"auth_uri": "https://mock.com/o/oauth2/auth",
+	"token_uri": "https://mock.com/token",
+	"auth_provider_x509_cert_url": "https://mock.com/oauth2/v1/certs",
+	"client_x509_cert_url": "https://mock.com/robot/v1/metadata/x509/client%40hi.iam.gserviceaccount.com"
+}`)
+	return sa
 }

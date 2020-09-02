@@ -2,10 +2,8 @@ module github.com/apigee/apigee-remote-service-envoy
 
 go 1.15
 
-// replace github.com/apigee/apigee-remote-service-golib => ../apigee-remote-service-golib
-
 require (
-	github.com/apigee/apigee-remote-service-golib v1.1.0
+	github.com/apigee/apigee-remote-service-golib v1.1.1-0.20200902192348-9e26efe438ba
 	github.com/envoyproxy/go-control-plane v0.9.6
 	github.com/gogo/googleapis v1.4.0
 	github.com/golang/protobuf v1.4.2
@@ -19,6 +17,7 @@ require (
 	github.com/spf13/cobra v1.0.0
 	go.uber.org/zap v1.15.0
 	golang.org/x/net v0.0.0-20200813134508-3edf25e44fcc // indirect
+	golang.org/x/oauth2 v0.0.0-20190226205417-e64efc72b421
 	google.golang.org/genproto v0.0.0-20200815001618-f69a88009b70
 	google.golang.org/grpc v1.31.0
 	google.golang.org/protobuf v1.25.0

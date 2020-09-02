@@ -48,10 +48,11 @@ var (
 )
 
 var (
-	logLevel         string
-	logJSON          bool
-	configFile       string
-	policySecretPath string
+	logLevel            string
+	logJSON             bool
+	configFile          string
+	policySecretPath    string
+	analyticsSecretPath string
 )
 
 func main() {
@@ -95,7 +96,7 @@ func main() {
 			fmt.Printf("apigee-remote-service-envoy version %s %s [%s]\n", version, date, commit)
 
 			config := server.DefaultConfig()
-			if err := config.Load(configFile, policySecretPath); err != nil {
+			if err := config.Load(configFile, policySecretPath, analyticsSecretPath); err != nil {
 				log.Errorf("Unable to load config: %s:\n%v", configFile, err)
 				os.Exit(1)
 			}
@@ -110,6 +111,7 @@ func main() {
 	rootCmd.Flags().BoolVarP(&logJSON, "json-log", "j", false, "Log as JSON")
 	rootCmd.Flags().StringVarP(&configFile, "config", "c", "config.yaml", "Config file")
 	rootCmd.Flags().StringVarP(&policySecretPath, "policy-secret", "p", "/policy-secret", "Policy secret mount point")
+	rootCmd.Flags().StringVarP(&analyticsSecretPath, "analytics-secret", "a", "/analytics-secret", "Analytics secret mount point")
 
 	rootCmd.SetArgs(os.Args[1:])
 	if err := rootCmd.Execute(); err != nil {
