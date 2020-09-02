@@ -177,11 +177,10 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string) 
 		if decoder.Decode(secret) == nil && secret.Kind == "Secret" {
 			key, _ = base64.StdEncoding.DecodeString(secret.Data[SecretPrivateKey])
 			kidProps, _ = base64.StdEncoding.DecodeString(secret.Data[SecretPropsKey])
-			jwksBytes, _ = base64.StdEncoding.DecodeString(secret.Data[SecretJKWSKey])
+			jwksBytes, _ = base64.StdEncoding.DecodeString(secret.Data[SecretJWKSKey])
 
-			// TODO: DecodeString() never returns nil even on error
-			// the following check is not effective
-			if key == nil || kidProps == nil || jwksBytes == nil { // all or nothing
+			// check the lengths as DecodeString() only returns empty bytes
+			if len(key) == 0 || len(kidProps) == 0 || len(jwksBytes) == 0 { // all or nothing
 				key = nil
 				kidProps = nil
 				jwksBytes = nil
@@ -210,7 +209,7 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string) 
 		if policySecretPath != "" && key == nil {
 			if key, err = ioutil.ReadFile(path.Join(policySecretPath, SecretPrivateKey)); err == nil {
 				if kidProps, err = ioutil.ReadFile(path.Join(policySecretPath, SecretPropsKey)); err == nil {
-					jwksBytes, err = ioutil.ReadFile(path.Join(policySecretPath, SecretJKWSKey))
+					jwksBytes, err = ioutil.ReadFile(path.Join(policySecretPath, SecretJWKSKey))
 				}
 			}
 		}
@@ -311,7 +310,7 @@ type Metadata struct {
 
 // note: hybrid forces these specific file extensions! https://docs.apigee.com/hybrid/v1.2/k8s-secrets
 const (
-	SecretJKWSKey     = "remote-service.crt"        // hybrid treats .crt as blob
+	SecretJWKSKey     = "remote-service.crt"        // hybrid treats .crt as blob
 	SecretPrivateKey  = "remote-service.key"        // private key
 	SecretPropsKey    = "remote-service.properties" // java properties format: %s=%s
 	SecretPropsKIDKey = "kid"

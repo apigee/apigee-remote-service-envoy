@@ -220,6 +220,48 @@ func TestMultifileConfig(t *testing.T) {
 	equal(t, c.Tenant.PrivateKeyID, "my kid")
 }
 
+func TestIncompletePolicySecret(t *testing.T) {
+	tf, err := ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tf.Name())
+
+	const config = `
+    tenant:
+      remote_service_api: https://org-test.apigee.net/remote-service
+      org_name: org
+      env_name: env
+    analytics:
+      fluentd_endpoint: apigee-udca-myorg-test.apigee.svc.cluster.local:20001`
+	configCRD := makeConfigCRD(config)
+	policySecretCRD, err := makePolicySecretCRD()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// remove the JWKS
+	delete(policySecretCRD.Data, SecretJWKSKey)
+
+	configMapYAML, err := makeYAML(configCRD, policySecretCRD)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := tf.WriteString(configMapYAML); err != nil {
+		t.Fatal(err)
+	}
+	if err := tf.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	c := DefaultConfig()
+	if err := c.Load(tf.Name(), "", ""); err != nil {
+		t.Fatal(err)
+	}
+
+	equal(t, c.Tenant.PrivateKeyID, "")
+}
+
 func TestLoadLegacyConfig(t *testing.T) {
 	tf, err := ioutil.TempFile("", "")
 	if err != nil {
@@ -353,7 +395,7 @@ func makePolicySecretCRD() (*SecretCRD, error) {
 	}
 
 	data := map[string]string{
-		SecretJKWSKey:    base64.StdEncoding.EncodeToString(jwksBuf),
+		SecretJWKSKey:    base64.StdEncoding.EncodeToString(jwksBuf),
 		SecretPrivateKey: base64.StdEncoding.EncodeToString(pkBytes),
 		SecretPropsKey:   base64.StdEncoding.EncodeToString(propsBuf.Bytes()),
 	}

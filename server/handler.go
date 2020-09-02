@@ -239,6 +239,12 @@ func clientAuthorizedByCredentials(config *Config, api string, jsonData []byte) 
 	}
 	client := oauth2.NewClient(ctx, cred.TokenSource)
 	rt := client.Transport
+	// modify base roundtripper to strip auth header on PUT requests
+	if rt, ok := rt.(*oauth2.Transport); ok {
+		rt.Base = NoAuthPUTRoundTripper()
+	} else {
+		return nil, fmt.Errorf("unable to modify oauth2 client base transport")
+	}
 	client.Transport = roundTripperWithPrometheus(config, api, rt)
 	client.Timeout = config.Tenant.ClientTimeout
 	return client, nil

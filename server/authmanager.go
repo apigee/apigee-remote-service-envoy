@@ -227,3 +227,13 @@ func AuthorizationRoundTripper(config *Config, next http.RoundTripper) (http.Rou
 		return next.RoundTrip(r)
 	}), nil
 }
+
+// NoAuthPUTRoundTripper strips the authorization header for any PUT request
+func NoAuthPUTRoundTripper() http.RoundTripper {
+	return roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+		if r.Method == http.MethodPut {
+			r.Header.Del(authHeader)
+		}
+		return http.DefaultTransport.RoundTrip(r)
+	})
+}
