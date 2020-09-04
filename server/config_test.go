@@ -177,14 +177,10 @@ func TestMultifileConfig(t *testing.T) {
 	}
 	defer os.Remove(tf.Name())
 
-	const config = `
-    tenant:
-      remote_service_api: https://org-test.apigee.net/remote-service
-      org_name: org
-      env_name: env
-    analytics:
-      fluentd_endpoint: apigee-udca-myorg-test.apigee.svc.cluster.local:20001`
-	configCRD := makeConfigCRD(config)
+	configCRD, secretCRD, _, err := makeCRDs()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, err := tf.WriteString(configCRD.Data[configMapConfigKey]); err != nil {
 		t.Fatal(err)
 	}
@@ -198,10 +194,6 @@ func TestMultifileConfig(t *testing.T) {
 	}
 	defer os.RemoveAll(secretDir)
 
-	secretCRD, err := makePolicySecretCRD()
-	if err != nil {
-		t.Fatal(err)
-	}
 	for k, v := range secretCRD.Data {
 		data, err := base64.StdEncoding.DecodeString(v)
 		if err != nil {
@@ -227,18 +219,11 @@ func TestIncompletePolicySecret(t *testing.T) {
 	}
 	defer os.Remove(tf.Name())
 
-	const config = `
-    tenant:
-      remote_service_api: https://org-test.apigee.net/remote-service
-      org_name: org
-      env_name: env
-    analytics:
-      fluentd_endpoint: apigee-udca-myorg-test.apigee.svc.cluster.local:20001`
-	configCRD := makeConfigCRD(config)
-	policySecretCRD, err := makePolicySecretCRD()
+	configCRD, policySecretCRD, _, err := makeCRDs()
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	// remove the JWKS
 	delete(policySecretCRD.Data, SecretJWKSKey)
 
@@ -260,6 +245,70 @@ func TestIncompletePolicySecret(t *testing.T) {
 	}
 
 	equal(t, c.Tenant.PrivateKeyID, "")
+}
+
+func TestLoadOrders(t *testing.T) {
+	configCRD, policySecretCRD, analyticsSecretCRD, err := makeCRDs()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tf, err := ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tf.Name())
+
+	// put ConfigMap in the end
+	configMapYAML, err := makeYAML(policySecretCRD, analyticsSecretCRD, configCRD)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := tf.WriteString(configMapYAML); err != nil {
+		t.Fatal(err)
+	}
+	if err := tf.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	c := DefaultConfig()
+	if err := c.Load(tf.Name(), "", ""); err != nil {
+		t.Fatal(err)
+	}
+
+	equal(t, c.Tenant.PrivateKeyID, "my kid")
+
+	tf, err = ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tf.Name())
+
+	// put ConfigMap in the middle
+	configMapYAML, err = makeYAML(policySecretCRD, configCRD, analyticsSecretCRD)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = tf.Truncate(0) // re-create the yaml file
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := tf.WriteString(configMapYAML); err != nil {
+		t.Fatal(err)
+	}
+	if err := tf.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	c = DefaultConfig()
+	if err := c.Load(tf.Name(), "", ""); err != nil {
+		t.Fatal(err)
+	}
+
+	equal(t, c.Tenant.PrivateKeyID, "my kid")
 }
 
 func TestLoadLegacyConfig(t *testing.T) {
@@ -293,6 +342,51 @@ func TestLoadLegacyConfig(t *testing.T) {
 
 	equal(t, c.Global.Namespace, "apigee")
 	equal(t, c.Global.TempDir, "/tmp/apigee-istio")
+}
+
+func TestInvalidConfig(t *testing.T) {
+	tf, err := ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tf.Name())
+
+	// a bad simple config
+	if _, err := tf.WriteString("not a good yaml"); err != nil {
+		t.Fatal(err)
+	}
+	if err := tf.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	c := &Config{}
+	if err := c.Load(tf.Name(), "", ""); err == nil {
+		t.Error("should have gotten error")
+	}
+
+	tf, err = ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tf.Name())
+
+	configCRD := makeConfigCRD("not a good yaml")
+	configMapYAML, err := makeYAML(configCRD)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := tf.WriteString(configMapYAML); err != nil {
+		t.Fatal(err)
+	}
+	if err := tf.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	c = &Config{}
+	if err := c.Load(tf.Name(), "", ""); err == nil {
+		t.Error("should have gotten error")
+	}
 }
 
 func makeConfigCRD(config string) *ConfigMapCRD {
@@ -427,6 +521,26 @@ func makeAnalyaticsSecretCRD() (*SecretCRD, error) {
 		},
 		Data: data,
 	}, nil
+}
+
+func makeCRDs() (configCRD *ConfigMapCRD, policySecretCRD, analyticsSecretCRD *SecretCRD, err error) {
+	const config = `
+tenant:
+  remote_service_api: https://org-test.apigee.net/remote-service
+  org_name: org
+  env_name: env
+analytics:
+  fluentd_endpoint: apigee-udca-myorg-test.apigee.svc.cluster.local:20001`
+	configCRD = makeConfigCRD(config)
+	policySecretCRD, err = makePolicySecretCRD()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	analyticsSecretCRD, err = makeAnalyaticsSecretCRD()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return configCRD, policySecretCRD, analyticsSecretCRD, nil
 }
 
 func makeYAML(crds ...interface{}) (string, error) {

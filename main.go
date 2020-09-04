@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -101,7 +102,8 @@ func main() {
 				os.Exit(1)
 			}
 
-			log.Debugf("Config: %#v", config)
+			b, _ := json.Marshal(config)
+			log.Debugf("Config: \n%v", string(b))
 
 			serve(config)
 			select {} // infinite loop

@@ -20,8 +20,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -76,79 +78,79 @@ func DefaultConfig() *Config {
 
 // Config is all config
 type Config struct {
-	Global    GlobalConfig    `yaml:"global,omitempty"`
-	Tenant    TenantConfig    `yaml:"tenant,omitempty"`
-	Products  ProductsConfig  `yaml:"products,omitempty"`
-	Analytics AnalyticsConfig `yaml:"analytics,omitempty"`
-	Auth      AuthConfig      `yaml:"auth,omitempty"`
+	Global    GlobalConfig    `yaml:"global,omitempty" json:"global,omitempty"`
+	Tenant    TenantConfig    `yaml:"tenant,omitempty" json:"tenant,omitempty"`
+	Products  ProductsConfig  `yaml:"products,omitempty" json:"products,omitempty"`
+	Analytics AnalyticsConfig `yaml:"analytics,omitempty" json:"analytics,omitempty"`
+	Auth      AuthConfig      `yaml:"auth,omitempty" json:"auth,omitempty"`
 }
 
 // GlobalConfig is global configuration for the server
 type GlobalConfig struct {
-	APIAddress                string            `yaml:"api_address,omitempty"`
-	MetricsAddress            string            `yaml:"metrics_address,omitempty"`
-	TempDir                   string            `yaml:"temp_dir,omitempty"`
-	KeepAliveMaxConnectionAge time.Duration     `yaml:"keep_alive_max_connection_age,omitempty"`
-	TLS                       TLSListenerConfig `yaml:"tls,omitempty"`
-	Namespace                 string            `yaml:"-"`
+	APIAddress                string            `yaml:"api_address,omitempty" json:"api_address,omitempty"`
+	MetricsAddress            string            `yaml:"metrics_address,omitempty" json:"metrics_address,omitempty"`
+	TempDir                   string            `yaml:"temp_dir,omitempty" json:"temp_dir,omitempty"`
+	KeepAliveMaxConnectionAge time.Duration     `yaml:"keep_alive_max_connection_age,omitempty" json:"keep_alive_max_connection_age,omitempty"`
+	TLS                       TLSListenerConfig `yaml:"tls,omitempty" json:"tls,omitempty"`
+	Namespace                 string            `yaml:"-" json:"-"`
 }
 
 // TLSListenerConfig is tls configuration
 type TLSListenerConfig struct {
-	KeyFile  string `yaml:"key_file,omitempty"`
-	CertFile string `yaml:"cert_file,omitempty"`
+	KeyFile  string `yaml:"key_file,omitempty" json:"key_file,omitempty"`
+	CertFile string `yaml:"cert_file,omitempty" json:"cert_file,omitempty"`
 }
 
 // TLSClientConfig is mtls configuration
 type TLSClientConfig struct {
-	CAFile                 string `yaml:"ca_file,omitempty"`
-	KeyFile                string `yaml:"key_file,omitempty"`
-	CertFile               string `yaml:"cert_file,omitempty"`
-	AllowUnverifiedSSLCert bool   `yaml:"allow_unverified_ssl_cert,omitempty"`
+	CAFile                 string `yaml:"ca_file,omitempty" json:"ca_file,omitempty"`
+	KeyFile                string `yaml:"key_file,omitempty" json:"key_file,omitempty"`
+	CertFile               string `yaml:"cert_file,omitempty" json:"cert_file,omitempty"`
+	AllowUnverifiedSSLCert bool   `yaml:"allow_unverified_ssl_cert,omitempty" json:"allow_unverified_ssl_cert,omitempty"`
 }
 
 // TenantConfig is config relating to an Apigee tentant
 type TenantConfig struct {
-	InternalAPI            string          `yaml:"internal_api,omitempty"`
-	RemoteServiceAPI       string          `yaml:"remote_service_api"`
-	OrgName                string          `yaml:"org_name"`
-	EnvName                string          `yaml:"env_name"`
-	Key                    string          `yaml:"key,omitempty"`
-	Secret                 string          `yaml:"secret,omitempty"`
-	ClientTimeout          time.Duration   `yaml:"client_timeout,omitempty"`
-	AllowUnverifiedSSLCert bool            `yaml:"allow_unverified_ssl_cert,omitempty"`
-	PrivateKey             *rsa.PrivateKey `yaml:"-"`
-	PrivateKeyID           string          `yaml:"-"`
-	JWKS                   *jwk.Set        `yaml:"-"`
-	InternalJWTDuration    time.Duration   `yaml:"-"`
-	InternalJWTRefresh     time.Duration   `yaml:"-"`
+	InternalAPI            string          `yaml:"internal_api,omitempty" json:"internal_api,omitempty"`
+	RemoteServiceAPI       string          `yaml:"remote_service_api" json:"remote_service_api"`
+	OrgName                string          `yaml:"org_name" json:"org_name"`
+	EnvName                string          `yaml:"env_name" json:"env_name"`
+	Key                    string          `yaml:"key,omitempty" json:"key,omitempty"`
+	Secret                 string          `yaml:"secret,omitempty" json:"secret,omitempty"`
+	ClientTimeout          time.Duration   `yaml:"client_timeout,omitempty" json:"client_timeout,omitempty"`
+	AllowUnverifiedSSLCert bool            `yaml:"allow_unverified_ssl_cert,omitempty" json:"allow_unverified_ssl_cert,omitempty"`
+	PrivateKey             *rsa.PrivateKey `yaml:"-" json:"-"`
+	PrivateKeyID           string          `yaml:"-" json:"-"`
+	JWKS                   *jwk.Set        `yaml:"-" json:"-"`
+	InternalJWTDuration    time.Duration   `yaml:"-" json:"-"`
+	InternalJWTRefresh     time.Duration   `yaml:"-" json:"-"`
 }
 
 // ProductsConfig is products-related config
 type ProductsConfig struct {
-	RefreshRate time.Duration `yaml:"refresh_rate,omitempty"`
+	RefreshRate time.Duration `yaml:"refresh_rate,omitempty" json:"refresh_rate,omitempty"`
 }
 
 // AnalyticsConfig is analytics-related config
 type AnalyticsConfig struct {
-	LegacyEndpoint     bool            `yaml:"legacy_endpoint,omitempty"`
-	FileLimit          int             `yaml:"file_limit,omitempty"`
-	SendChannelSize    int             `yaml:"send_channel_size,omitempty"`
-	CollectionInterval time.Duration   `yaml:"collection_interval,omitempty"`
-	FluentdEndpoint    string          `yaml:"fluentd_endpoint,omitempty"`
-	TLS                TLSClientConfig `yaml:"tls,omitempty"`
-	CredentialsJSON    []byte          `yaml:"-"`
+	LegacyEndpoint     bool            `yaml:"legacy_endpoint,omitempty" json:"legacy_endpoint,omitempty"`
+	FileLimit          int             `yaml:"file_limit,omitempty" json:"file_limit,omitempty"`
+	SendChannelSize    int             `yaml:"send_channel_size,omitempty" json:"send_channel_size,omitempty"`
+	CollectionInterval time.Duration   `yaml:"collection_interval,omitempty" json:"collection_interval,omitempty"`
+	FluentdEndpoint    string          `yaml:"fluentd_endpoint,omitempty" json:"fluentd_endpoint,omitempty"`
+	TLS                TLSClientConfig `yaml:"tls,omitempty" json:"tls,omitempty"`
+	CredentialsJSON    []byte          `yaml:"-" json:"-"`
 }
 
 // AuthConfig is auth-related config
 type AuthConfig struct {
-	APIKeyClaim         string        `yaml:"api_key_claim,omitempty"`
-	APIKeyCacheDuration time.Duration `yaml:"api_key_cache_duration,omitempty"`
-	JWKSPollInterval    time.Duration `yaml:"jwks_poll_interval,omitempty"`
-	APIKeyHeader        string        `yaml:"api_key_header,omitempty"`
-	TargetHeader        string        `yaml:"target_header,omitempty"`
-	RejectUnauthorized  bool          `yaml:"reject_unauthorized,omitempty"`
-	JWTProviderKey      string        `yaml:"-"`
+	APIKeyClaim         string        `yaml:"api_key_claim,omitempty" json:"api_key_claim,omitempty"`
+	APIKeyCacheDuration time.Duration `yaml:"api_key_cache_duration,omitempty" json:"api_key_cache_duration,omitempty"`
+	JWKSPollInterval    time.Duration `yaml:"jwks_poll_interval,omitempty" json:"jwks_poll_interval,omitempty"`
+	APIKeyHeader        string        `yaml:"api_key_header,omitempty" json:"api_key_header,omitempty"`
+	TargetHeader        string        `yaml:"target_header,omitempty" json:"target_header,omitempty"`
+	RejectUnauthorized  bool          `yaml:"reject_unauthorized,omitempty" json:"reject_unauthorized,omitempty"`
+	JWTProviderKey      string        `yaml:"-" json:"-"`
 }
 
 // Load config
@@ -161,34 +163,37 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string) 
 
 	// attempt load from CRD
 	var key, kidProps, jwksBytes []byte
-	configMap := &ConfigMapCRD{}
-	secret := &SecretCRD{}
 	var configBytes []byte
 	decoder := yaml.NewDecoder(bytes.NewReader(yamlFile))
-	if decoder.Decode(configMap) == nil && configMap.Kind == "ConfigMap" {
-		configBytes = []byte(configMap.Data["config.yaml"])
-		if configBytes != nil {
-			if err = yaml.Unmarshal(configBytes, c); err != nil {
-				return errors.Wrap(err, "bad config file format")
+
+	crd := &ConfigMapCRD{}
+	ctr := 3 // at most 3 CRDs to read
+	for decoder.Decode(crd) != io.EOF && ctr > 0 {
+		ctr -= 1 // decrement the counter
+		if crd.Kind == "ConfigMap" {
+			configBytes = []byte(crd.Data["config.yaml"])
+			if configBytes != nil {
+				fmt.Println(string(configBytes))
+				if err = yaml.Unmarshal(configBytes, c); err != nil {
+					return errors.Wrap(err, "bad config file format")
+				}
+				c.Global.Namespace = crd.Metadata.Namespace
 			}
-			c.Global.Namespace = configMap.Metadata.Namespace
-		}
+		} else if crd.Kind == "Secret" {
+			if strings.Contains(crd.Metadata.Name, "policy") {
+				key, _ = base64.StdEncoding.DecodeString(crd.Data[SecretPrivateKey])
+				kidProps, _ = base64.StdEncoding.DecodeString(crd.Data[SecretPropsKey])
+				jwksBytes, _ = base64.StdEncoding.DecodeString(crd.Data[SecretJWKSKey])
 
-		if decoder.Decode(secret) == nil && secret.Kind == "Secret" {
-			key, _ = base64.StdEncoding.DecodeString(secret.Data[SecretPrivateKey])
-			kidProps, _ = base64.StdEncoding.DecodeString(secret.Data[SecretPropsKey])
-			jwksBytes, _ = base64.StdEncoding.DecodeString(secret.Data[SecretJWKSKey])
-
-			// check the lengths as DecodeString() only returns empty bytes
-			if len(key) == 0 || len(kidProps) == 0 || len(jwksBytes) == 0 { // all or nothing
-				key = nil
-				kidProps = nil
-				jwksBytes = nil
+				// check the lengths as DecodeString() only returns empty bytes
+				if len(key) == 0 || len(kidProps) == 0 || len(jwksBytes) == 0 { // all or nothing
+					key = nil
+					kidProps = nil
+					jwksBytes = nil
+				}
+			} else if strings.Contains(crd.Metadata.Name, "analytics") {
+				c.Analytics.CredentialsJSON, _ = base64.StdEncoding.DecodeString(crd.Data[ServiceAccount])
 			}
-		}
-
-		if decoder.Decode(secret) == nil && secret.Kind == "Secret" {
-			c.Analytics.CredentialsJSON, _ = base64.StdEncoding.DecodeString(secret.Data[ServiceAccount])
 		}
 	}
 
