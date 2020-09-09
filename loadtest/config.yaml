@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    name: test-apigee-remote-service-envoy
+    namespace: apigee
+data:
+    config.yaml: |
+        tenant:
+            internal_api: http://127.0.0.1:6000
+            remote_service_api: http://127.0.0.1:6000
+            org_name: org
+            env_name: test
+            key: key
+            secret: secret
