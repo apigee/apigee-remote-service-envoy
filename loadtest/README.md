@@ -16,7 +16,7 @@ Assumes running from this directory.
 
 ### Remote Service (5000,5001)
 
-    go run ../main.go -c k8s-configs/config.yaml
+    go run ../main.go -c config.yaml
 
 ### Envoy (8080)
 
