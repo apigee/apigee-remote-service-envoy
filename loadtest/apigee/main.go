@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/apigee/apigee-remote-service-envoy/server"
@@ -30,7 +31,6 @@ const (
 	DEFAULT_NUM_PRODUCTS = 100
 	RESPONSE_DELAY       = time.Millisecond
 
-	// for product config: quotas are not counted
 	QUOTA_LIMIT     = "1000000" // 1m
 	QUOTA_INTERVAL  = "1"
 	QUOTA_TIME_UNIT = "minute"
@@ -84,6 +84,8 @@ type (
 	TestServer struct {
 		srv         *http.Server
 		numProducts int
+		quotas      map[string]*quota.Result
+		quotaLock   sync.Mutex
 	}
 
 	JWKS struct {
@@ -119,7 +121,6 @@ func (ts *TestServer) Handler() http.Handler {
 		products = append(products, v)
 	}
 	productsResponse := product.APIResponse{APIProducts: products}
-	quotaResponse := createQuotaResponse()
 
 	m := http.NewServeMux()
 
@@ -155,10 +156,37 @@ func (ts *TestServer) Handler() http.Handler {
 		}
 	})
 
+	ts.quotas = map[string]*quota.Result{}
 	m.HandleFunc("/quotas", func(w http.ResponseWriter, r *http.Request) {
-		consumeBody(r)
 		time.Sleep(RESPONSE_DELAY)
-		resp := quotaResponse
+
+		var req quota.Request
+		err := json.NewDecoder(r.Body).Decode(&req)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer r.Body.Close()
+		ts.quotaLock.Lock()
+		resp, ok := ts.quotas[req.Identifier]
+		if !ok {
+			resp = &quota.Result{}
+			ts.quotas[req.Identifier] = resp
+		}
+		now := time.Now()
+		resp.Allowed = req.Allow
+		resp.Timestamp = now.UnixNano() / 1000
+		if resp.Timestamp >= resp.ExpiryTime {
+			resp.Used = 0
+			resp.Exceeded = 0
+			resp.ExpiryTime = now.Add(time.Minute).UnixNano() / 1000
+		}
+		resp.Used += req.Weight
+		if resp.Used > resp.Allowed {
+			resp.Exceeded = resp.Used - resp.Allowed
+			resp.Used = resp.Allowed
+		}
+		ts.quotaLock.Unlock()
+
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
 			log.Fatal(err)
@@ -274,17 +302,6 @@ func createProducts(num int) map[string]product.APIProduct {
 	}
 
 	return products
-}
-
-func createQuotaResponse() quota.Result {
-	now := time.Now()
-	return quota.Result{
-		Allowed:    3,
-		Used:       2,
-		Exceeded:   0,
-		ExpiryTime: now.Unix(),
-		Timestamp:  now.Unix(),
-	}
 }
 
 func createVerifyAPIKeyResponse(product product.APIProduct, privateKey *rsa.PrivateKey) (auth.APIKeyResponse, error) {
