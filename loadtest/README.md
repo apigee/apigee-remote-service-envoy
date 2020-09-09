@@ -16,7 +16,7 @@ Assumes running from this directory.
 
 ### Remote Service (5000,5001)
 
-    go run ../main.go -c config.yaml
+    go run ../main.go -c k8s-configs/config.yaml
 
 ### Envoy (8080)
 
@@ -40,3 +40,60 @@ For auth, host much match x-api-key and be product-n where n in range.
 
     cd locust
     locust --config master.conf
+
+# Distributed load testing on GKE
+
+Define necessary environment variables in the terminal session for convenience.
+```
+$ PROJECT=$(gcloud config get-value project)
+$ REGION=us-east1 # change to what fits your situation
+$ ZONE=${REGION}-b
+$ CLUSTER=gke-load-test
+$ TARGET=${PROJECT}.appspot.com
+$ gcloud config set compute/region $REGION 
+$ gcloud config set compute/zone $ZONE
+```
+
+Make sure the following APIs are enabled by running:
+```
+$ gcloud services enable \
+    cloudbuild.googleapis.com \
+    compute.googleapis.com \
+    container.googleapis.com \
+    containeranalysis.googleapis.com \
+    containerregistry.googleapis.com 
+```
+
+Build and upload the docker images of the mock apigee and target servers to the project's container registry.
+```
+$ gcloud builds submit --tag gcr.io/$PROJECT/apigee-mock:latest ../apigee/.
+$ gcloud builds submit --tag gcr.io/$PROJECT/target-mock:latest ../target/.
+```
+
+The configurations for the envoy proxy, apigee adapter as well as the `locustfile.py` are embedded in ConfigMap yaml files. They are already good to start the basic tests. But one can edit them to fit the actual needs.
+
+Apply the ConfigMaps first to the GKE cluster:
+```
+kubectl apply -f k8s-files/envoy-config.yaml
+kubectl apply -f k8s-files/adapter-config.yaml
+kubectl apply -f k8s-files/locustfile-config.yaml
+```
+
+Replace the project ID in the following k8s configuration files. One can also customize other details as needed.
+```
+sed -i -e "s/\[PROJECT_ID\]/$PROJECT/g" k8s-files/target-server.yaml
+sed -i -e "s/\[PROJECT_ID\]/$PROJECT/g" k8s-files/apigee-mock-server.yaml
+```
+
+Apply the rest to the GKE cluster:
+```
+kubectl apply -f k8s-files/apigee-mock-server.yaml
+kubectl apply -f k8s-files/target-server.yaml
+kubectl apply -f k8s-files/apigee-envoy-adapter.yaml
+kubectl apply -f k8s-files/locust-manager.yaml
+kubectl apply -f k8s-files/locust-worker.yaml
+```
+
+By default, the number of locust workers is 20.
+
+Along with the locust manager deployment, a load balancer is configured to expose the manager ports. Once everything is ready, one can open `http://$LB_IP:8089` in a web browser to start the load tests.

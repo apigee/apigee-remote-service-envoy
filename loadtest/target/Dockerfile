@@ -12,17 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: test-apigee-remote-service-envoy
-  namespace: apigee
-data:
-  config.yaml: |
-    tenant:
-      internal_api: http://127.0.0.1:6000
-      remote_service_api: http://127.0.0.1:6000
-      org_name: org
-      env_name: test
-      key: key
-      secret: secret
+FROM golang:1.15.1-alpine AS build
+
+WORKDIR /src/
+COPY main.go go.* /src/
+RUN CGO_ENABLED=0 go build -o /target
+
+FROM scratch
+COPY --from=build /target /target
+ENTRYPOINT ["/target"]

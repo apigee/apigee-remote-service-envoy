@@ -20,8 +20,8 @@ metadata:
 data:
   config.yaml: |
     tenant:
-      internal_api: http://127.0.0.1:6000
-      remote_service_api: http://127.0.0.1:6000
+      internal_api: http://mock-apigee.apigee.svc.cluster.local
+      remote_service_api: http://mock-apigee.apigee.svc.cluster.local
       org_name: org
       env_name: test
       key: key
