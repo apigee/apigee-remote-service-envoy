@@ -65,7 +65,7 @@ auth:
   api_key_claim: claim
   api_key_cache_duration: 30m
   api_key_header: x-api-key
-  api_target_header: :authority
+  target_header: :authority
   reject_unauthorized: true
   jwks_poll_interval: 0s`
 
