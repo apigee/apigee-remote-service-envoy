@@ -29,15 +29,21 @@ spec:
         app: mock-apigee
         version: v1
     spec:
+      tolerations:
+      - key: "mock-apigee"
+        operator: "Exists"
+        effect: "NoSchedule"
       containers:
       - image: gcr.io/[PROJECT_ID]/apigee-mock:test
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         name: mock-apigee
         args:
           - -addr
           - :6000
           - -num-products
           - "1000"
+          - -host
+          - mock-apigee.apigee.svc.cluster.local
 ---
 apiVersion: v1
 kind: Service
@@ -49,7 +55,7 @@ metadata:
 spec:
   ports:
   - name: http
-    port: 80
+    port: 6000
     targetPort: 6000
   selector:
     app: mock-apigee

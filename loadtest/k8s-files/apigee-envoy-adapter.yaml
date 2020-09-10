@@ -35,6 +35,10 @@ spec:
         app: apigee-remote-service-envoy
         version: v1
     spec:
+      tolerations:
+        - key: "adapter"
+          operator: "Exists"
+          effect: "NoSchedule"
       securityContext:  
         runAsUser: 999
         runAsGroup: 999
@@ -42,7 +46,7 @@ spec:
       containers:
       - name: apigee-remote-service-envoy
         image: "google/apigee-envoy-adapter:v1.1.0"
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         ports:
         - containerPort: 5000
         livenessProbe:
@@ -58,11 +62,11 @@ spec:
           failureThreshold: 30
           periodSeconds: 10
         args:
-          - --log-level=debug
+          #- --log-level=debug
           - --config=/config/config.yaml
         resources:
           limits:
-            cpu: 100m
+            cpu: 1000m
             memory: 100Mi
           requests:
             cpu: 10m

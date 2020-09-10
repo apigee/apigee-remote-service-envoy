@@ -48,7 +48,7 @@ data:
                     typed_per_filter_config:
                       envoy.filters.http.dynamic_forward_proxy:
                         "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.PerRouteConfig
-      
+
               http_filters:
       
               - name: envoy.filters.http.dynamic_forward_proxy
@@ -69,7 +69,7 @@ data:
                       - remote-service-client
                       remote_jwks:
                         http_uri:
-                          uri: http://mock-apigee.apigee.svc.cluster.local/certs
+                          uri: http://mock-apigee.apigee.svc.cluster.local:6000/certs
                           cluster: apigee-remote-service-envoy
                           timeout: 5s
                         cache_duration:
@@ -91,7 +91,7 @@ data:
                   grpc_service:
                     envoy_grpc:
                       cluster_name: apigee-remote-service-envoy
-                    timeout: 1s                
+                    timeout: 5s                
                   metadata_context_namespaces:
                   - envoy.filters.http.jwt_authn
       
@@ -151,15 +151,15 @@ data:
         common_lb_config:
           healthy_panic_threshold:
             value: 50.0
-        health_checks:
-          - timeout: 1s
-            interval: 5s
-            interval_jitter: 1s
-            no_traffic_interval: 5s
-            unhealthy_threshold: 1
-            healthy_threshold: 3
-            grpc_health_check: {}
-        connect_timeout: 0.25s
+        # health_checks:
+        #   - timeout: 1s
+        #     interval: 10s
+        #     interval_jitter: 1s
+        #     no_traffic_interval: 5s
+        #     unhealthy_threshold: 1
+        #     healthy_threshold: 3
+        #     grpc_health_check: {}
+        connect_timeout: 2s
     
         # define cluster for target
       - name: target

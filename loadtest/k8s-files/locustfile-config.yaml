@@ -33,7 +33,6 @@ data:
         def good_request(self):
           product_id = "product-" + str(random.randint(1, 1000))
           headers = {
-              'host': product_id,
               'x-api-key': product_id,
           }
           self.client.get("/target", headers=headers)

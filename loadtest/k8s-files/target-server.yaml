@@ -29,6 +29,10 @@ spec:
         app: target
         version: v1
     spec:
+      tolerations:
+      - key: "mock-target"
+        operator: "Exists"
+        effect: "NoSchedule"
       containers:
       - image: gcr.io/[PROJECT_ID]/target-mock:test
         imagePullPolicy: IfNotPresent
@@ -43,8 +47,8 @@ spec:
         args:
           - -c
           - /config/config.yaml
-          - -l
-          - debug
+          # - -l
+          # - debug
         volumeMounts:
           - mountPath: /config
             name: test-envoy-config

@@ -54,6 +54,10 @@ spec:
       labels:
         app: locust-manager
     spec:
+      tolerations:
+      - key: "locust"
+        operator: "Exists"
+        effect: "NoSchedule"
       containers:
       - name: locust-manager
         image: docker.io/locustio/locust

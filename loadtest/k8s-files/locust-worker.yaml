@@ -29,6 +29,10 @@ spec:
       labels:
         app: locust-worker
     spec:
+      tolerations:
+      - key: "locust"
+        operator: "Exists"
+        effect: "NoSchedule"
       containers:
       - name: locust-worker
         image: docker.io/locustio/locust

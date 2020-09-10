@@ -51,8 +51,10 @@ const (
 
 func main() {
 	var addr string
+	var host string
 	var numProducts int
 	flag.StringVar(&addr, "addr", "", "address, default is random free port")
+	flag.StringVar(&host, "host", "", "host for signed url")
 	flag.IntVar(&numProducts, "num-products", DEFAULT_NUM_PRODUCTS, "num products")
 	flag.Parse()
 
@@ -66,6 +68,7 @@ func main() {
 
 	ts := &TestServer{
 		numProducts: numProducts,
+		host:        host,
 	}
 	defer ts.Close()
 	ts.srv = &http.Server{
@@ -99,6 +102,7 @@ type (
 		numProducts int
 		quotas      map[string]*quota.Result
 		quotaLock   sync.Mutex
+		host        string
 	}
 
 	JWKS struct {
@@ -273,6 +277,9 @@ func (ts *TestServer) URL() string {
 	}
 	if host == "" {
 		host = "127.0.0.1"
+	}
+	if ts.host != "" {
+		host = ts.host
 	}
 	return fmt.Sprintf("http://%s:%s", host, port)
 }
