@@ -20,7 +20,7 @@ metadata:
   labels:
     name: locust-worker
 spec:
-  replicas: 20
+  replicas: 40
   selector:
     matchLabels:
       app: locust-worker
@@ -44,6 +44,13 @@ spec:
           - --master-host
           - locust-manager.apigee.svc.cluster.local
           - --worker
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 200Mi
+          requests:
+            cpu: 200m
+            memory: 100Mi
         volumeMounts:
           - mountPath: /config
             name: locust-config

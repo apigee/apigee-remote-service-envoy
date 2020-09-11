@@ -44,25 +44,30 @@ spec:
         runAsGroup: 999
         runAsNonRoot: true
       containers:
-      - name: apigee-remote-service-envoy
+      - env: 
+        - name: GODEBUG
+          value: x509ignoreCN=0
+        name: apigee-remote-service-envoy
         image: "google/apigee-envoy-adapter:v1.1.0"
         imagePullPolicy: Always
         ports:
         - containerPort: 5000
         livenessProbe:
           httpGet:
+            scheme: HTTPS
             path: /healthz
             port: 5001
           failureThreshold: 1
           periodSeconds: 10
         readinessProbe:
           httpGet:
+            scheme: HTTPS
             path: /healthz
             port: 5001
           failureThreshold: 30
           periodSeconds: 10
         args:
-          #- --log-level=debug
+          # - --log-level=debug
           - --config=/config/config.yaml
         resources:
           limits:
@@ -75,9 +80,9 @@ spec:
         - mountPath: /config
           name: apigee-remote-service-envoy
           readOnly: true
-        # - mountPath: /opt/apigee/tls
-        #   name: tls-volume
-        #   readOnly: true
+        - mountPath: /tls
+          name: tls-volume
+          readOnly: true
         # - mountPath: /policy-secret
         #   name: policy-secret
         #   readOnly: true
@@ -85,10 +90,10 @@ spec:
       - name: apigee-remote-service-envoy
         configMap:
           name: test-apigee-remote-service-envoy
-      # - name: tls-volume
-      #   secret:
-      #     defaultMode: 420
-      #     secretName: apigee-udca-lwge-apigee-test-2c2149e-tls
+      - name: tls-volume
+        secret:
+          defaultMode: 420
+          secretName: test-apigee-server-tls
       # - name: policy-secret
       #   secret:
       #     defaultMode: 420

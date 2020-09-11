@@ -67,6 +67,13 @@ spec:
           - -H
           - http://target.apigee.svc.cluster.local
           - --master
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1000Mi
+          requests:
+            cpu: 500m
+            memory: 100Mi
         ports:
           - name: loc-manager-web
             containerPort: 8089

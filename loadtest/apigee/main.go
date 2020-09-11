@@ -24,6 +24,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path"
 	"strings"
 	"sync"
 	"time"
@@ -53,8 +54,10 @@ func main() {
 	var addr string
 	var host string
 	var numProducts int
+	var tlsDir string
 	flag.StringVar(&addr, "addr", "", "address, default is random free port")
 	flag.StringVar(&host, "host", "", "host for signed url")
+	flag.StringVar(&tlsDir, "tls", "", "directory for tls files")
 	flag.IntVar(&numProducts, "num-products", DEFAULT_NUM_PRODUCTS, "num products")
 	flag.Parse()
 
@@ -92,7 +95,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	_ = ts.srv.ListenAndServe()
+	if tlsDir == "" {
+		_ = ts.srv.ListenAndServe()
+	} else {
+		crt := path.Join(tlsDir, "tls.crt")
+		key := path.Join(tlsDir, "tls.key")
+		_ = ts.srv.ListenAndServeTLS(crt, key)
+	}
 	select {} // forever
 }
 

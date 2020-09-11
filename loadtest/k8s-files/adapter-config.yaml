@@ -19,6 +19,10 @@ metadata:
   namespace: apigee
 data:
   config.yaml: |
+    global:
+      tls:
+        cert_file: /tls/tls.crt
+        key_file: /tls/tls.key
     tenant:
       internal_api: http://mock-apigee.apigee.svc.cluster.local:6000
       remote_service_api: http://mock-apigee.apigee.svc.cluster.local:6000
@@ -28,3 +32,13 @@ data:
       secret: secret
     auth:
       target_header: x-api-key
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test-apigee-server-tls
+  namespace: apigee
+type: Opaque
+data:
+  tls.crt: {{base64 encoded crt}}
+  tls.key: {{base64 encoded key}}

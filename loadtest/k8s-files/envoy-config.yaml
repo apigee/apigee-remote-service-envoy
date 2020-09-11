@@ -160,6 +160,11 @@ data:
         #     healthy_threshold: 3
         #     grpc_health_check: {}
         connect_timeout: 2s
+        transport_socket:
+          name: envoy.transport_sockets.tls
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+            sni: apigee-remote-service-envoy.apigee.svc.cluster.local
     
         # define cluster for target
       - name: target

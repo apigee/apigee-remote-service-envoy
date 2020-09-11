@@ -44,6 +44,17 @@ spec:
           - "1000"
           - -host
           - mock-apigee.apigee.svc.cluster.local
+      #     - -tls
+      #     - /tls
+      #   volumeMounts:
+      #   - mountPath: /tls
+      #     name: tls-volume
+      #     readOnly: true
+      # volumes:
+      # - name: tls-volume
+      #   secret:
+      #     defaultMode: 420
+      #     secretName: test-apigee-mock-tls
 ---
 apiVersion: v1
 kind: Service
