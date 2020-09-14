@@ -22,6 +22,9 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/apigee/apigee-remote-service-envoy/server"
 	"github.com/apigee/apigee-remote-service-golib/log"
@@ -218,5 +221,29 @@ func serve(config *server.Config) {
 		if err := httpServer.Serve(metricsListener); err != nil {
 			log.Infof("%s", err)
 		}
+	}()
+
+	// watch for termination signals
+	go func() {
+		sigint := make(chan os.Signal, 1)
+		signal.Notify(sigint, os.Interrupt)    // terminal
+		signal.Notify(sigint, syscall.SIGTERM) // kubernetes
+		sig := <-sigint
+		log.Infof("shutdown signal: %s", sig)
+		signal.Stop(sigint)
+
+		grpcServer.GracefulStop()
+
+		timeout, cancel := context.WithTimeout(context.Background(), time.Second)
+		if err := httpServer.Shutdown(timeout); err != nil {
+			log.Errorf("http shutdown: %v", err)
+			os.Exit(1)
+		}
+		cancel()
+
+		rsHandler.Close()
+
+		log.Infof("shutdown complete")
+		os.Exit(0)
 	}()
 }
