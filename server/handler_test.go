@@ -108,6 +108,8 @@ func TestNewHandler(t *testing.T) {
 	if err == nil {
 		t.Error("should get error")
 	}
+
+	h.Close()
 }
 
 func fakeServiceAccount() []byte {

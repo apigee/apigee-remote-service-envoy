@@ -21,6 +21,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/apigee/apigee-remote-service-golib/analytics"
@@ -50,6 +51,24 @@ type Handler struct {
 	authMan      auth.Manager
 	analyticsMan analytics.Manager
 	quotaMan     quota.Manager
+}
+
+// Close waits for all managers to close
+func (h *Handler) Close() {
+	wg := sync.WaitGroup{}
+	wg.Add(4)
+	type Closable interface {
+		Close()
+	}
+	close := func(c Closable) {
+		c.Close()
+		wg.Done()
+	}
+	go close(h.productMan)
+	go close(h.authMan)
+	go close(h.analyticsMan)
+	go close(h.quotaMan)
+	wg.Wait()
 }
 
 // InternalAPI is the internal api base (legacy)
