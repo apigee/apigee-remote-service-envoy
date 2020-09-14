@@ -237,7 +237,6 @@ func serve(config *server.Config) {
 		timeout, cancel := context.WithTimeout(context.Background(), time.Second)
 		if err := httpServer.Shutdown(timeout); err != nil {
 			log.Errorf("http shutdown: %v", err)
-			os.Exit(1)
 		}
 		cancel()
 
