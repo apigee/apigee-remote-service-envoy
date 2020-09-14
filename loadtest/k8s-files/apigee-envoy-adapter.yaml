@@ -17,8 +17,6 @@ kind: Deployment
 metadata:
   name: apigee-remote-service-envoy
   namespace: apigee
-  annotations:
-    sidecar.istio.io/rewriteAppHTTPProbers: "true"
 spec:
   replicas: 1
   selector:
@@ -30,6 +28,7 @@ spec:
         app: apigee-remote-service-envoy
         version: v1
       annotations:
+        sidecar.istio.io/rewriteAppHTTPProbers: "true"
         prometheus.io/path: /metrics
         prometheus.io/port: "5001"
         prometheus.io/scheme: https
