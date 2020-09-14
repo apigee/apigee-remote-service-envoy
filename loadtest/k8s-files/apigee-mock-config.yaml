@@ -13,31 +13,9 @@
 # limitations under the License.
 
 apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: apigee-remote-service-envoy
-  namespace: apigee
-data:
-  config.yaml: |
-    global:
-      tls:
-        cert_file: /tls/tls.crt
-        key_file: /tls/tls.key
-    tenant:
-      internal_api: https://mock-apigee.apigee.svc.cluster.local:6000
-      remote_service_api: https://mock-apigee.apigee.svc.cluster.local:6000
-      org_name: org
-      env_name: test
-      key: key
-      secret: secret
-      allow_unverified_ssl_cert: true
-    auth:
-      target_header: x-api-key
----
-apiVersion: v1
 kind: Secret
 metadata:
-  name: apigee-server-tls
+  name: apigee-mock-tls
   namespace: apigee
 type: Opaque
 data:

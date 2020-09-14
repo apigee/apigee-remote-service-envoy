@@ -15,7 +15,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: test-envoy-config
+  name: envoy-config
   namespace: apigee
 data:
   config.yaml: |
@@ -69,7 +69,7 @@ data:
                       - remote-service-client
                       remote_jwks:
                         http_uri:
-                          uri: http://mock-apigee.apigee.svc.cluster.local:6000/certs
+                          uri: https://mock-apigee.apigee.svc.cluster.local:6000/certs
                           cluster: apigee-remote-service-envoy
                           timeout: 5s
                         cache_duration:
@@ -151,14 +151,14 @@ data:
         common_lb_config:
           healthy_panic_threshold:
             value: 50.0
-        # health_checks:
-        #   - timeout: 1s
-        #     interval: 10s
-        #     interval_jitter: 1s
-        #     no_traffic_interval: 5s
-        #     unhealthy_threshold: 1
-        #     healthy_threshold: 3
-        #     grpc_health_check: {}
+        health_checks:
+          - timeout: 1s
+            interval: 10s
+            interval_jitter: 1s
+            no_traffic_interval: 5s
+            unhealthy_threshold: 1
+            healthy_threshold: 3
+            grpc_health_check: {}
         connect_timeout: 2s
         transport_socket:
           name: envoy.transport_sockets.tls

@@ -15,60 +15,64 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: target
+  name: prometheus
   namespace: apigee
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: target
-      version: v1
+      app: prometheus
   template:
     metadata:
       labels:
-        app: target
-        version: v1
+        app: prometheus
     spec:
+      serviceAccountName: prometheus
+      automountServiceAccountToken: false
       tolerations:
-      - key: "mock-target"
+      - key: "prometheus"
         operator: "Exists"
         effect: "NoSchedule"
       containers:
-      - image: gcr.io/[PROJECT_ID]/target-mock:test
+      - image: docker.io/prom/prometheus
         imagePullPolicy: IfNotPresent
-        name: target-mock
-        args:
-          - -addr
-          - :6001
-      - image: docker.io/envoyproxy/envoy:v1.15.0
-        name: envoy-proxy
+        name: prometheus
         ports:
-          - containerPort: 8080
+        - containerPort: 9090
         args:
-          - -c
-          - /config/config.yaml
-          # - -l
-          # - debug
+        - --config.file=/etc/prometheus/prometheus.yaml
+        - --storage.tsdb.path=/data
+        - --storage.tsdb.retention.time=12h
         volumeMounts:
-          - mountPath: /config
-            name: envoy-config
-            readOnly: true
+        - mountPath: /etc/prometheus
+          name: config-volume
+          readOnly: true
+        - mountPath: /data
+          name: data-volume
+        - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+          name: sa-token
       volumes:
-        - name: envoy-config
-          configMap:
-            name: envoy-config
+      - name: config-volume
+        configMap:
+          name: prometheus-config
+      - name: data-volume
+        emptyDir: {}
+      - name: sa-token
+        secret:
+          defaultMode: 420
+          secretName: prometheus-token
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: target
+  name: prometheus
   namespace: apigee
   labels:
-    app: target
+    app: prometheus
 spec:
   ports:
   - name: http
-    port: 80
-    targetPort: 8080
+    port: 9090
+    targetPort: 9090
   selector:
-    app: target
+    app: prometheus

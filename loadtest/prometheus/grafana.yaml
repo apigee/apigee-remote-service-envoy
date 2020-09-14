@@ -15,60 +15,40 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: target
+  name: grafana
   namespace: apigee
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: target
-      version: v1
+      app: grafana
   template:
     metadata:
       labels:
-        app: target
-        version: v1
+        app: grafana
     spec:
       tolerations:
-      - key: "mock-target"
+      - key: "prometheus"
         operator: "Exists"
         effect: "NoSchedule"
       containers:
-      - image: gcr.io/[PROJECT_ID]/target-mock:test
+      - image: docker.io/grafana/grafana:5.1.0
         imagePullPolicy: IfNotPresent
-        name: target-mock
-        args:
-          - -addr
-          - :6001
-      - image: docker.io/envoyproxy/envoy:v1.15.0
-        name: envoy-proxy
+        name: grafana
         ports:
-          - containerPort: 8080
-        args:
-          - -c
-          - /config/config.yaml
-          # - -l
-          # - debug
-        volumeMounts:
-          - mountPath: /config
-            name: envoy-config
-            readOnly: true
-      volumes:
-        - name: envoy-config
-          configMap:
-            name: envoy-config
+        - containerPort: 3000
 ---
-apiVersion: v1
-kind: Service
-metadata:
-  name: target
-  namespace: apigee
-  labels:
-    app: target
-spec:
-  ports:
-  - name: http
-    port: 80
-    targetPort: 8080
-  selector:
-    app: target
+  apiVersion: v1
+  kind: Service
+  metadata:
+    name: grafana
+    namespace: apigee
+    labels:
+      app: grafana
+  spec:
+    ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+    selector:
+      app: grafana

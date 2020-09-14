@@ -19,11 +19,6 @@ metadata:
   namespace: apigee
   annotations:
     sidecar.istio.io/rewriteAppHTTPProbers: "true"
-    prometheus.io/path: /metrics
-    prometheus.io/port: "5001"
-    prometheus.io/scheme: https
-    prometheus.io/scrape: "true"
-    prometheus.io/type: prometheusspec
 spec:
   replicas: 1
   selector:
@@ -34,6 +29,12 @@ spec:
       labels:
         app: apigee-remote-service-envoy
         version: v1
+      annotations:
+        prometheus.io/path: /metrics
+        prometheus.io/port: "5001"
+        prometheus.io/scheme: https
+        prometheus.io/scrape: "true"
+        prometheus.io/type: prometheusspec
     spec:
       tolerations:
         - key: "adapter"
@@ -83,21 +84,14 @@ spec:
         - mountPath: /tls
           name: tls-volume
           readOnly: true
-        # - mountPath: /policy-secret
-        #   name: policy-secret
-        #   readOnly: true
       volumes:
       - name: apigee-remote-service-envoy
         configMap:
-          name: test-apigee-remote-service-envoy
+          name: apigee-remote-service-envoy
       - name: tls-volume
         secret:
           defaultMode: 420
-          secretName: test-apigee-server-tls
-      # - name: policy-secret
-      #   secret:
-      #     defaultMode: 420
-      #     secretName: lwge-apigee-test-policy-secret
+          secretName: apigee-server-tls
 ---
 apiVersion: v1
 kind: Service
