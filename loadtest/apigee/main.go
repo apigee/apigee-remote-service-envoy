@@ -98,6 +98,7 @@ func main() {
 	if tlsDir == "" {
 		_ = ts.srv.ListenAndServe()
 	} else {
+		ts.hasTLS = true
 		crt := path.Join(tlsDir, "tls.crt")
 		key := path.Join(tlsDir, "tls.key")
 		_ = ts.srv.ListenAndServeTLS(crt, key)
@@ -112,6 +113,7 @@ type (
 		quotas      map[string]*quota.Result
 		quotaLock   sync.Mutex
 		host        string
+		hasTLS      bool
 	}
 
 	JWKS struct {
@@ -289,6 +291,9 @@ func (ts *TestServer) URL() string {
 	}
 	if ts.host != "" {
 		host = ts.host
+	}
+	if ts.hasTLS {
+		return fmt.Sprintf("https://%s:%s", host, port)
 	}
 	return fmt.Sprintf("http://%s:%s", host, port)
 }

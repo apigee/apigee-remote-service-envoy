@@ -90,13 +90,13 @@ kubectl create namespace apigee
 
 Build and upload the docker images of the mock apigee and target servers to the project's container registry.
 ```
-gcloud builds submit --tag gcr.io/$PROJECT/apigee-mock:latest ../apigee/.
-gcloud builds submit --tag gcr.io/$PROJECT/target-mock:latest ../target/.
+gcloud builds submit --tag gcr.io/$PROJECT/apigee-mock:latest apigee/.
+gcloud builds submit --tag gcr.io/$PROJECT/target-mock:latest target/.
 ```
 
 Optionally, a local image of the Apigee Envoy Adapter can also be built in the same fashion.
 ```
-gcloud builds submit --tag gcr.io/$PROJECT/apigee-envoy-adapter:latest ../../.
+gcloud builds submit --tag gcr.io/$PROJECT/apigee-envoy-adapter:latest ../.
 ```
 
 ### Prepare self-signed certs
