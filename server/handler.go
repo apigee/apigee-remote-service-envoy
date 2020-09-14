@@ -100,6 +100,7 @@ func NewHandler(config *Config) (*Handler, error) {
 	if config.Tenant.AllowUnverifiedSSLCert {
 		trans := tr.(*http.Transport).Clone()
 		trans.TLSClientConfig.InsecureSkipVerify = true
+		tr = trans
 	}
 
 	// add authorization to transport
