@@ -16,13 +16,12 @@ package server
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/apigee/apigee-remote-service-golib/analytics"
@@ -52,6 +51,24 @@ type Handler struct {
 	authMan      auth.Manager
 	analyticsMan analytics.Manager
 	quotaMan     quota.Manager
+}
+
+// Close waits for all managers to close
+func (h *Handler) Close() {
+	wg := sync.WaitGroup{}
+	wg.Add(4)
+	type Closable interface {
+		Close()
+	}
+	close := func(c Closable) {
+		c.Close()
+		wg.Done()
+	}
+	go close(h.productMan)
+	go close(h.authMan)
+	go close(h.analyticsMan)
+	go close(h.quotaMan)
+	wg.Wait()
 }
 
 // InternalAPI is the internal api base (legacy)
@@ -100,19 +117,9 @@ func NewHandler(config *Config) (*Handler, error) {
 
 	tr := http.DefaultTransport
 	if config.Tenant.AllowUnverifiedSSLCert {
-		tr = &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			DialContext: (&net.Dialer{
-				Timeout:   30 * time.Second,
-				KeepAlive: 30 * time.Second,
-				DualStack: true,
-			}).DialContext,
-			MaxIdleConns:          100,
-			IdleConnTimeout:       90 * time.Second,
-			TLSHandshakeTimeout:   10 * time.Second,
-			ExpectContinueTimeout: 1 * time.Second,
-			TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
-		}
+		trans := tr.(*http.Transport).Clone()
+		trans.TLSClientConfig.InsecureSkipVerify = true
+		tr = trans
 	}
 
 	// add authorization to transport
