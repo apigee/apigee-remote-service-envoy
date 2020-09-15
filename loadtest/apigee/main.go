@@ -21,6 +21,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -78,12 +79,6 @@ func main() {
 		Addr:    addr,
 		Handler: ts.Handler(),
 	}
-
-	// testDir, err := ioutil.TempDir("", "")
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// defer os.RemoveAll(testDir)
 
 	config := ts.Config()
 	crd, err := makeConfigCRD(config)
