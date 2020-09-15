@@ -153,7 +153,7 @@ func (ts *TestServer) Handler() http.Handler {
 	m := http.NewServeMux()
 
 	m.HandleFunc("/products", func(w http.ResponseWriter, r *http.Request) {
-		consumeBody(r)
+		_, _ = io.Copy(ioutil.Discard, r.Body)
 		time.Sleep(RESPONSE_DELAY)
 		resp := productsResponse
 		w.Header().Set("Content-Type", "application/json")
@@ -222,7 +222,7 @@ func (ts *TestServer) Handler() http.Handler {
 	})
 
 	m.HandleFunc("/certs", func(w http.ResponseWriter, r *http.Request) {
-		consumeBody(r)
+		_, _ = io.Copy(ioutil.Discard, r.Body)
 		time.Sleep(RESPONSE_DELAY)
 		resp := jwks
 		w.Header().Set("Content-Type", "application/json")
@@ -233,7 +233,7 @@ func (ts *TestServer) Handler() http.Handler {
 
 	// this is SaaS analytics
 	m.HandleFunc("/analytics/", func(w http.ResponseWriter, r *http.Request) {
-		consumeBody(r)
+		_, _ = io.Copy(ioutil.Discard, r.Body)
 		time.Sleep(RESPONSE_DELAY)
 		url := "%s/signed-upload-url?relative_file_path=%s&tenant=%s"
 		resp := map[string]interface{}{
@@ -247,7 +247,7 @@ func (ts *TestServer) Handler() http.Handler {
 
 	// this is UAP analytics
 	m.HandleFunc("/v1/organizations/", func(w http.ResponseWriter, r *http.Request) {
-		consumeBody(r)
+		_, _ = io.Copy(ioutil.Discard, r.Body)
 		time.Sleep(RESPONSE_DELAY)
 		url := "%s/signed-upload-url?relative_file_path=%s&tenant=%s"
 		resp := map[string]interface{}{
@@ -261,7 +261,7 @@ func (ts *TestServer) Handler() http.Handler {
 
 	// upload
 	m.HandleFunc("/signed-upload-url", func(w http.ResponseWriter, r *http.Request) {
-		consumeBody(r)
+		_, _ = io.Copy(ioutil.Discard, r.Body)
 		time.Sleep(RESPONSE_DELAY)
 		w.WriteHeader(http.StatusOK)
 		if _, err := w.Write([]byte("ok")); err != nil {
@@ -296,21 +296,6 @@ func (ts *TestServer) URL() string {
 		return fmt.Sprintf("https://%s:%s", host, port)
 	}
 	return fmt.Sprintf("http://%s:%s", host, port)
-}
-
-func consumeBody(r *http.Request) {
-	bytes := []byte{}
-	for {
-		n, err := r.Body.Read(bytes)
-		if n < 1 || err == io.EOF {
-			break
-		} else if err != nil {
-			log.Fatal(err)
-		}
-	}
-	if err := r.Body.Close(); err != nil {
-		log.Fatal(err)
-	}
 }
 
 // product-n where n in [1...num]
