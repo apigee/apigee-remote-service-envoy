@@ -13,16 +13,11 @@
 # limitations under the License.
 
 apiVersion: v1
-kind: ConfigMap
+kind: Secret
 metadata:
-  name: test-apigee-remote-service-envoy
+  name: apigee-mock-tls
   namespace: apigee
+type: Opaque
 data:
-  config.yaml: |
-    tenant:
-      internal_api: http://127.0.0.1:6000
-      remote_service_api: http://127.0.0.1:6000
-      org_name: org
-      env_name: test
-      key: key
-      secret: secret
+  tls.crt: {{base64 encoded crt}}
+  tls.key: {{base64 encoded key}}

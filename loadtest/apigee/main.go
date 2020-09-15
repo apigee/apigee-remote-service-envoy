@@ -1,3 +1,17 @@
+// Copyright 2020 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package main
 
 import (
@@ -7,10 +21,10 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"path"
 	"strings"
 	"sync"
 	"time"
@@ -38,8 +52,12 @@ const (
 
 func main() {
 	var addr string
+	var host string
 	var numProducts int
+	var tlsDir string
 	flag.StringVar(&addr, "addr", "", "address, default is random free port")
+	flag.StringVar(&host, "host", "", "host for signed url")
+	flag.StringVar(&tlsDir, "tls", "", "directory for tls files")
 	flag.IntVar(&numProducts, "num-products", DEFAULT_NUM_PRODUCTS, "num products")
 	flag.Parse()
 
@@ -53,6 +71,7 @@ func main() {
 
 	ts := &TestServer{
 		numProducts: numProducts,
+		host:        host,
 	}
 	defer ts.Close()
 	ts.srv = &http.Server{
@@ -60,11 +79,11 @@ func main() {
 		Handler: ts.Handler(),
 	}
 
-	testDir, err := ioutil.TempDir("", "")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer os.RemoveAll(testDir)
+	// testDir, err := ioutil.TempDir("", "")
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// defer os.RemoveAll(testDir)
 
 	config := ts.Config()
 	crd, err := makeConfigCRD(config)
@@ -76,7 +95,14 @@ func main() {
 		log.Fatal(err)
 	}
 
-	_ = ts.srv.ListenAndServe()
+	if tlsDir == "" {
+		_ = ts.srv.ListenAndServe()
+	} else {
+		ts.hasTLS = true
+		crt := path.Join(tlsDir, "tls.crt")
+		key := path.Join(tlsDir, "tls.key")
+		_ = ts.srv.ListenAndServeTLS(crt, key)
+	}
 	select {} // forever
 }
 
@@ -86,6 +112,8 @@ type (
 		numProducts int
 		quotas      map[string]*quota.Result
 		quotaLock   sync.Mutex
+		host        string
+		hasTLS      bool
 	}
 
 	JWKS struct {
@@ -260,6 +288,12 @@ func (ts *TestServer) URL() string {
 	}
 	if host == "" {
 		host = "127.0.0.1"
+	}
+	if ts.host != "" {
+		host = ts.host
+	}
+	if ts.hasTLS {
+		return fmt.Sprintf("https://%s:%s", host, port)
 	}
 	return fmt.Sprintf("http://%s:%s", host, port)
 }

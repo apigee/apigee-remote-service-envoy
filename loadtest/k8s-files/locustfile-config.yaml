@@ -15,14 +15,25 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: test-apigee-remote-service-envoy
+  name: locust-config
   namespace: apigee
 data:
-  config.yaml: |
-    tenant:
-      internal_api: http://127.0.0.1:6000
-      remote_service_api: http://127.0.0.1:6000
-      org_name: org
-      env_name: test
-      key: key
-      secret: secret
+  locustfile.py: |
+    import random
+    from locust import task, between, constant
+    from locust.contrib.fasthttp import FastHttpUser
+
+    class HttpbinUser(FastHttpUser):
+    
+        # users wait between n1 and n2 seconds after each task
+        # wait_time = between(1, 2)
+        wait_time = constant(1)
+    
+        @task(1000)
+        def good_request(self):
+          product_id = "product-" + str(random.randint(1, 1000))
+          headers = {
+              'x-api-key': product_id,
+          }
+          self.client.get("/target", headers=headers)
+    
