@@ -29,9 +29,14 @@ import (
 )
 
 func TestKubeHealth(t *testing.T) {
+	fail := true
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var result = product.APIResponse{
 			APIProducts: []product.APIProduct{},
+		}
+		if fail {
+			w.WriteHeader(500)
+			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(result)
@@ -67,6 +72,7 @@ func TestKubeHealth(t *testing.T) {
 		t.Errorf("expected %s, got: %s", exp, err)
 	}
 
+	fail = false
 	// give it a moment to load
 	time.Sleep(5 * time.Millisecond)
 	err = kubeHealth.error()
