@@ -157,10 +157,10 @@ func serve(config *server.Config) {
 	ls := &server.AccessLogServer{}
 	ls.Register(grpcServer, rsHandler)
 
-	// health
-	health := health.NewServer()
-	health.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
-	grpc_health_v1.RegisterHealthServer(grpcServer, health)
+	// grpc health
+	grpcHealth := health.NewServer()
+	grpc_health_v1.RegisterHealthServer(grpcServer, grpcHealth)
+	kubeHealth := server.NewKubeHealth(rsHandler, grpcHealth)
 
 	// grpc listener
 	grpcListener, err := net.Listen("tcp", config.Global.APIAddress)
@@ -183,22 +183,7 @@ func serve(config *server.Config) {
 
 	mux := http.NewServeMux()
 	mux.Handle(prometheusPath, promhttp.Handler())
-	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		in := &grpc_health_v1.HealthCheckRequest{}
-		response, err := health.Check(context.Background(), in)
-		if err != nil {
-			if _, err := w.Write([]byte(err.Error())); err != nil {
-				log.Infof("healthz unable to respond: %s", err)
-			}
-		} else {
-			if response.Status != grpc_health_v1.HealthCheckResponse_SERVING {
-				w.WriteHeader(500)
-			}
-			if _, err := w.Write([]byte(response.Status.String())); err != nil {
-				log.Infof("healthz unable to respond: %s", err)
-			}
-		}
-	})
+	mux.HandleFunc("/healthz", kubeHealth.HandlerFunc())
 
 	httpServer := &http.Server{
 		Addr:    config.Global.MetricsAddress,
