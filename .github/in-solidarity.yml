@@ -1,0 +1,12 @@
+rules:
+  master:
+    level: off
+  slave:
+    level: failure
+  whitelist:
+    level: failure
+  blacklist:
+    level: failure
+ignore:
+ - ".github/in-solidarity.yml"
+ - "**/*.yml"
