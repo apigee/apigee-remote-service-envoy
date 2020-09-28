@@ -203,10 +203,6 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string) 
 		}
 	}
 
-	if err = c.Validate(); err != nil {
-		return err
-	}
-
 	// if no Secret, try files in policySecretPath
 	if c.IsGCPManaged() {
 
