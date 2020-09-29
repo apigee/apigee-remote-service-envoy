@@ -344,6 +344,66 @@ func TestLoadLegacyConfig(t *testing.T) {
 	equal(t, c.Global.TempDir, "/tmp/apigee-istio")
 }
 
+func TestLoadAnalytics(t *testing.T) {
+	const config = `
+tenant:
+  remote_service_api: https://org-test.apigee.net/remote-service
+  org_name: org
+  env_name: env`
+
+	configCRD := makeConfigCRD(config)
+
+	tf, err := ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tf.Name())
+
+	// put ConfigMap in the end
+	configMapYAML, err := makeYAML(configCRD)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := tf.WriteString(configMapYAML); err != nil {
+		t.Fatal(err)
+	}
+	if err := tf.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	credDir, err := ioutil.TempDir("", "analytics-secret")
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	credFile := path.Join(credDir, ServiceAccount)
+	if err := ioutil.WriteFile(credFile, fakeServiceAccount(), 0644); err != nil {
+		t.Fatalf("%v", err)
+	}
+	defer os.RemoveAll(credDir)
+
+	c := DefaultConfig()
+	if err := c.Load(tf.Name(), "", credDir); err != nil {
+		t.Error(err)
+	}
+
+	c = DefaultConfig()
+	err = c.Load(tf.Name(), "", credFile)
+
+	wantErrs := []string{
+		"tenant.internal_api or tenant.analytics.fluentd_endpoint is required if no service account",
+	}
+	merr := err.(*multierror.Error)
+	if merr.Len() != len(wantErrs) {
+		t.Fatalf("got %d errors, want: %d, errors: %s", merr.Len(), len(wantErrs), merr)
+	}
+
+	errs := merr.Errors
+	for i, e := range errs {
+		equal(t, e.Error(), wantErrs[i])
+	}
+}
+
 func TestInvalidConfig(t *testing.T) {
 	tf, err := ioutil.TempFile("", "")
 	if err != nil {

@@ -173,7 +173,6 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string) 
 		if crd.Kind == "ConfigMap" {
 			configBytes = []byte(crd.Data["config.yaml"])
 			if configBytes != nil {
-				fmt.Println(string(configBytes))
 				if err = yaml.Unmarshal(configBytes, c); err != nil {
 					return errors.Wrap(err, "bad config file format")
 				}
@@ -202,10 +201,6 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string) 
 		if err = yaml.Unmarshal(yamlFile, c); err != nil {
 			return errors.Wrap(err, "bad config file format")
 		}
-	}
-
-	if err = c.Validate(); err != nil {
-		return err
 	}
 
 	// if no Secret, try files in policySecretPath
