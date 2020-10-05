@@ -20,6 +20,6 @@ set -e
 echo "Starting integration test of the Apigee Envoy Adapter..."
 
 echo "Building the Docker image..."
-docker build -t apigee-envoy-adapter:test ../..
+docker build -t apigee-envoy-adapter:test ${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-envoy
 
 echo "Docker image built successfully."
