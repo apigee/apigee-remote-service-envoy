@@ -26,6 +26,7 @@ import (
 
 	"github.com/apigee/apigee-remote-service-golib/analytics"
 	"github.com/apigee/apigee-remote-service-golib/auth"
+	"github.com/apigee/apigee-remote-service-golib/log"
 	"github.com/apigee/apigee-remote-service-golib/product"
 	"github.com/apigee/apigee-remote-service-golib/quota"
 	"github.com/prometheus/client_golang/prometheus"
@@ -167,18 +168,21 @@ func NewHandler(config *Config) (*Handler, error) {
 		return nil, err
 	}
 
-	var analyticsClient *http.Client
-	// It tries to get a credentials authorized client if the credentials json is not empty.
-	// Otherwise it uses the same setting as the other managers do.
-	if config.Analytics.CredentialsJSON != nil {
-		analyticsClient, err = clientAuthorizedByCredentials(config, "analytics", config.Analytics.CredentialsJSON)
-		if err != nil {
-			return nil, err
-		}
-		// overwrites internalAPI to the GCP managed base
-		// no need to check error since it's a well-defined const
+	// Attempts to get an authorized http client with the following orders:
+	// 1. get a client with google.DefaultClient which reads the default credentials
+	//    (see: https://pkg.go.dev/golang.org/x/oauth2/google#FindDefaultCredentials)
+	// 2. construct a client with the provided credentials json
+	// 3. use a default one with no special authorization
+	analyticsClient, err := clientAuthorizedByCredentials(config, "analytics", config.Analytics.CredentialsJSON)
+	if err != nil {
+		return nil, err
+	}
+	// overwrites internalAPI to the GCP managed base
+	// no need to check error since it's a well-defined const
+	if analyticsClient != nil {
 		internalAPI, _ = url.Parse(GCPExperienceBase)
 	} else {
+		log.Debugf("analytics http client not using any authorization")
 		analyticsClient = instrumentedClientFor(config, "analytics", tr)
 	}
 
@@ -236,15 +240,24 @@ func roundTripperWithPrometheus(config *Config, api string, rt http.RoundTripper
 }
 
 // clientAuthorizedByServiceAccount returns a http client authorized with the
-// service account credentials provided as json data
+// application default credentials or service account credentials provided as json data
 func clientAuthorizedByCredentials(config *Config, api string, jsonData []byte) (*http.Client, error) {
 	const scope = "https://www.googleapis.com/auth/cloud-platform" // scope Apigee API needs
 	ctx := context.Background()
-	cred, err := google.CredentialsFromJSON(ctx, jsonData, scope)
-	if err != nil {
-		return nil, err
+	client, err := google.DefaultClient(ctx, scope)
+	if err == nil {
+		log.Debugf("analytics http client using application default credentials")
+	} else if jsonData == nil {
+		// not returning error if no service account credentials are given to fall back to a bare http client
+		return nil, nil
+	} else {
+		cred, err := google.CredentialsFromJSON(ctx, jsonData, scope)
+		if err != nil {
+			return nil, err
+		}
+		log.Debugf("analytics http client using provided analytics service account credentials")
+		client = oauth2.NewClient(ctx, cred.TokenSource)
 	}
-	client := oauth2.NewClient(ctx, cred.TokenSource)
 	rt := client.Transport
 	// modify base roundtripper to strip auth header on PUT requests
 	if rt, ok := rt.(*oauth2.Transport); ok {
