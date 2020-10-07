@@ -166,8 +166,10 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string) 
 	var configBytes []byte
 	decoder := yaml.NewDecoder(bytes.NewReader(yamlFile))
 
+	const maxNumConfigMaps = 3 // at most 3 CRDs to read
+
 	crd := &ConfigMapCRD{}
-	ctr := 3 // at most 3 CRDs to read
+	ctr := maxNumConfigMaps
 	for decoder.Decode(crd) != io.EOF && ctr > 0 {
 		ctr -= 1 // decrement the counter
 		if crd.Kind == "ConfigMap" {
@@ -231,8 +233,9 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string) 
 			}
 		}
 
-		// attempts to load the service account credentials if the credentials are not set yet
-		if analyticsSecretPath != "" && c.Analytics.CredentialsJSON == nil {
+		// attempts to load the service account credentials if a path is given
+		if analyticsSecretPath != "" {
+			log.Debugf("using analytics service account credentials from the given path")
 			c.Analytics.CredentialsJSON, err = ioutil.ReadFile(path.Join(analyticsSecretPath, ServiceAccount))
 			if err != nil { // not returning the error since it may fall back to using fluentd endpoint
 				c.Analytics.CredentialsJSON = nil
@@ -265,8 +268,17 @@ func (c *Config) Validate() error {
 	if c.Tenant.RemoteServiceAPI == "" {
 		errs = multierror.Append(errs, fmt.Errorf("tenant.remote_service_api is required"))
 	}
-	if c.Tenant.InternalAPI == "" && c.Analytics.FluentdEndpoint == "" && c.Analytics.CredentialsJSON == nil {
-		errs = multierror.Append(errs, fmt.Errorf("tenant.internal_api or tenant.analytics.fluentd_endpoint is required if no service account"))
+	if c.Analytics.CredentialsJSON == nil {
+		if c.Tenant.InternalAPI == "" && c.Analytics.FluentdEndpoint == "" {
+			errs = multierror.Append(errs, fmt.Errorf("tenant.internal_api or tenant.analytics.fluentd_endpoint is required if no service account"))
+		}
+		// if c.Tenant.InternalAPI != "" && c.Analytics.FluentdEndpoint != "" {
+		// 	errs = multierror.Append(errs, fmt.Errorf("tenant.internal_api and tenant.analytics.fluentd_endpoint are mutually exclusive"))
+		// }
+	} else {
+		if c.Tenant.InternalAPI != "" {
+			errs = multierror.Append(errs, fmt.Errorf("tenant.internal_api and analytics credentials are mutually exclusive"))
+		}
 	}
 	if c.Tenant.OrgName == "" {
 		errs = multierror.Append(errs, fmt.Errorf("tenant.org_name is required"))

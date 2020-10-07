@@ -17,9 +17,17 @@ package server
 
 import (
 	"testing"
+
+	"github.com/apigee/apigee-remote-service-envoy/testutil"
 )
 
 func TestNewHandler(t *testing.T) {
+
+	kid := "kid"
+	privateKey, _, err := testutil.GenerateKeyAndJWKs(kid)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	config := DefaultConfig()
 	config.Tenant = TenantConfig{
@@ -28,6 +36,8 @@ func TestNewHandler(t *testing.T) {
 		OrgName:                "org",
 		EnvName:                "env",
 		AllowUnverifiedSSLCert: true,
+		PrivateKeyID:           kid,
+		PrivateKey:             privateKey,
 	}
 	config.Auth = AuthConfig{
 		APIKeyClaim:        "claim",
@@ -94,6 +104,7 @@ func TestNewHandler(t *testing.T) {
 	}
 
 	config.Tenant.RemoteServiceAPI = config.Tenant.InternalAPI
+	config.Tenant.InternalAPI = ""
 	config.Analytics.CredentialsJSON = fakeServiceAccount()
 	h, err = NewHandler(config)
 	if err != nil {
@@ -101,6 +112,12 @@ func TestNewHandler(t *testing.T) {
 	}
 	if h.internalAPI.Host != "apigee.googleapis.com" {
 		t.Errorf("intervalAPI error: want %s got %s", "apigee.googleapis.com", h.internalAPI.Host)
+	}
+
+	config.Analytics.CredentialsJSON = nil
+	_, err = NewHandler(config)
+	if err != nil {
+		t.Errorf("want no error got %v", err)
 	}
 
 	config.Analytics.CredentialsJSON = []byte("invalid sa")
