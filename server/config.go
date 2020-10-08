@@ -42,6 +42,9 @@ const (
 
 	// ServiceAccount is the json file with application credentials
 	ServiceAccount = "client_secret.json"
+
+	// DefaultAnalyticsSecretPath is the default path the analytics credentials directory
+	DefaultAnalyticsSecretPath = "/analytics-secret"
 )
 
 // DefaultConfig returns a config with defaults set
@@ -238,9 +241,15 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string) 
 			svc := path.Join(analyticsSecretPath, ServiceAccount)
 			log.Debugf("using analytics service account credentials from: %s", svc)
 			c.Analytics.CredentialsJSON, err = ioutil.ReadFile(svc)
-			if err != nil { // not returning the error since it may fall back to using fluentd endpoint
-				c.Analytics.CredentialsJSON = nil
-				log.Warnf("reading analytics service account credentials: %v", err)
+			if err != nil {
+				if analyticsSecretPath == DefaultAnalyticsSecretPath {
+					// allows fall back to default credentials or fluentd if the path is the default one
+					c.Analytics.CredentialsJSON = nil
+					log.Warnf("reading analytics service account credentials from default path: %v", err)
+				} else {
+					// returns error if the invalid path is explicitly specified
+					return err
+				}
 			}
 		}
 	}

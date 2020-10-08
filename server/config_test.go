@@ -163,7 +163,7 @@ func TestHybridSingleFile(t *testing.T) {
 	}
 
 	c := DefaultConfig()
-	if err := c.Load(tf.Name(), "xxx", "xxx"); err != nil {
+	if err := c.Load(tf.Name(), "xxx", DefaultAnalyticsSecretPath); err != nil {
 		t.Fatal(err)
 	}
 
@@ -382,13 +382,24 @@ tenant:
 	}
 	defer os.RemoveAll(credDir)
 
+	// valid path to analytics credentials
 	c := DefaultConfig()
 	if err := c.Load(tf.Name(), "", credDir); err != nil {
 		t.Error(err)
 	}
 
+	// invalid path to analytics credentials
 	c = DefaultConfig()
-	err = c.Load(tf.Name(), "", credFile)
+	err = c.Load(tf.Name(), "", "no such path")
+	if err == nil {
+		t.Error("want error got none")
+	} else {
+		equal(t, err.Error(), "open no such path/client_secret.json: no such file or directory")
+	}
+
+	// no analytics credentials given and invalid config
+	c = DefaultConfig()
+	err = c.Load(tf.Name(), "", "")
 
 	wantErrs := []string{
 		"tenant.internal_api or tenant.analytics.fluentd_endpoint is required if no service account",
