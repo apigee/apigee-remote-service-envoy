@@ -300,49 +300,31 @@ func TestStreamAccessLogs(t *testing.T) {
 		t.Fatalf("failed to get client: %v", err)
 	}
 
-	httpLog := &als.StreamAccessLogsMessage{
-		LogEntries: &als.StreamAccessLogsMessage_HttpLogs{
-			HttpLogs: &als.StreamAccessLogsMessage_HTTPAccessLogEntries{
-				LogEntry: []*v2.HTTPAccessLogEntry{
-					&v2.HTTPAccessLogEntry{
-						Request: &v2.HTTPRequestProperties{
-							RequestHeaders: map[string]string{
-								":authority": "",
-							},
-						},
-						Response: &v2.HTTPResponseProperties{},
-					},
-				},
-			},
-		},
-	}
+	httpLog := getHTTPLog()
 
 	if err := stream.Send(httpLog); err != nil {
 		t.Error(err)
 	}
 
-	// if err := stream.Send(&als.StreamAccessLogsMessage{}); err != nil {
-	// 	t.Error(err)
-	// }
+	stream, err = client.StreamAccessLogs(ctx)
+	if err != nil {
+		t.Fatalf("failed to get client: %v", err)
+	}
 
-	// stream, err = client.StreamAccessLogs(ctx)
-	// if err != nil {
-	// 	t.Fatalf("failed to get client: %v", err)
-	// }
+	if err := stream.Send(&als.StreamAccessLogsMessage{}); err != nil {
+		t.Error(err)
+	}
 
-	// tcpLog := &als.StreamAccessLogsMessage{
-	// 	LogEntries: &als.StreamAccessLogsMessage_TcpLogs{
-	// 		TcpLogs: &als.StreamAccessLogsMessage_TCPAccessLogEntries{},
-	// 	},
-	// }
+	stream, err = client.StreamAccessLogs(ctx)
+	if err != nil {
+		t.Fatalf("failed to get client: %v", err)
+	}
 
-	// if err := stream.Send(tcpLog); err != nil {
-	// 	t.Error(err)
-	// }
+	tcpLog := getTCPLog()
 
-	// if _, err := stream.CloseAndRecv(); err != nil {
-	// 	t.Log(err)
-	// }
+	if err := stream.Send(tcpLog); err != nil {
+		t.Error(err)
+	}
 }
 
 type testAccessLogService struct {
@@ -374,5 +356,32 @@ func (tals *testAccessLogService) startAccessLogServer(t *testing.T) *grpc.Serve
 func (tals *testAccessLogService) getBufDialer() func(context.Context, string) (net.Conn, error) {
 	return func(ctx context.Context, url string) (net.Conn, error) {
 		return tals.listener.Dial()
+	}
+}
+
+func getHTTPLog() *als.StreamAccessLogsMessage {
+	return &als.StreamAccessLogsMessage{
+		LogEntries: &als.StreamAccessLogsMessage_HttpLogs{
+			HttpLogs: &als.StreamAccessLogsMessage_HTTPAccessLogEntries{
+				LogEntry: []*v2.HTTPAccessLogEntry{
+					&v2.HTTPAccessLogEntry{
+						Request: &v2.HTTPRequestProperties{
+							RequestHeaders: map[string]string{
+								":authority": "",
+							},
+						},
+						Response: &v2.HTTPResponseProperties{},
+					},
+				},
+			},
+		},
+	}
+}
+
+func getTCPLog() *als.StreamAccessLogsMessage {
+	return &als.StreamAccessLogsMessage{
+		LogEntries: &als.StreamAccessLogsMessage_TcpLogs{
+			TcpLogs: &als.StreamAccessLogsMessage_TCPAccessLogEntries{},
+		},
 	}
 }
