@@ -235,8 +235,9 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string) 
 
 		// attempts to load the service account credentials if a path is given
 		if analyticsSecretPath != "" {
-			log.Debugf("using analytics service account credentials from the given path")
-			c.Analytics.CredentialsJSON, err = ioutil.ReadFile(path.Join(analyticsSecretPath, ServiceAccount))
+			svc := path.Join(analyticsSecretPath, ServiceAccount)
+			log.Debugf("using analytics service account credentials from: %s", svc)
+			c.Analytics.CredentialsJSON, err = ioutil.ReadFile(svc)
 			if err != nil { // not returning the error since it may fall back to using fluentd endpoint
 				c.Analytics.CredentialsJSON = nil
 				log.Warnf("reading analytics service account credentials: %v", err)
@@ -272,9 +273,6 @@ func (c *Config) Validate() error {
 		if c.Tenant.InternalAPI == "" && c.Analytics.FluentdEndpoint == "" {
 			errs = multierror.Append(errs, fmt.Errorf("tenant.internal_api or tenant.analytics.fluentd_endpoint is required if no service account"))
 		}
-		// if c.Tenant.InternalAPI != "" && c.Analytics.FluentdEndpoint != "" {
-		// 	errs = multierror.Append(errs, fmt.Errorf("tenant.internal_api and tenant.analytics.fluentd_endpoint are mutually exclusive"))
-		// }
 	} else {
 		if c.Tenant.InternalAPI != "" {
 			errs = multierror.Append(errs, fmt.Errorf("tenant.internal_api and analytics credentials are mutually exclusive"))

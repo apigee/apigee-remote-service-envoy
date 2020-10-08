@@ -259,9 +259,7 @@ func clientAuthorizedByCredentials(config *Config, api string, jsonData []byte) 
 		}
 		log.Debugf("analytics http client using provided analytics service account credentials")
 		client = oauth2.NewClient(ctx, cred.TokenSource)
-	}
-
-	if client == nil {
+	} else {
 		var err error
 		client, err = google.DefaultClient(ctx, scope)
 		if err != nil { // not returning the error to fall back to client without authorization
