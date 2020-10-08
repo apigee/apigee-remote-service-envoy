@@ -18,6 +18,8 @@ package server
 import (
 	"encoding/base64"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -104,4 +106,44 @@ func TestJWTAuthManager(t *testing.T) {
 	}
 
 	jam.stop()
+}
+
+func TestNoAuthPUTRoundTripper(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPut:
+			if auth := r.Header.Get("Authorization"); auth != "" {
+				t.Errorf("want no auth header in PUT request, got %s", auth)
+			}
+		default:
+			if u, p, ok := r.BasicAuth(); !ok || u != "key" || p != "secret" {
+				t.Errorf("want basic auth header key:secret, got %s:%s", u, p)
+			}
+		}
+	}))
+	defer ts.Close()
+
+	client := http.DefaultClient
+	client.Transport = NoAuthPUTRoundTripper()
+
+	var req *http.Request
+	var err error
+
+	req, err = http.NewRequest(http.MethodGet, ts.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.SetBasicAuth("key", "secret")
+	if _, err := client.Do(req); err != nil {
+		t.Fatal(err)
+	}
+
+	req, err = http.NewRequest(http.MethodPut, ts.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.SetBasicAuth("key", "secret")
+	if _, err := client.Do(req); err != nil {
+		t.Fatal(err)
+	}
 }

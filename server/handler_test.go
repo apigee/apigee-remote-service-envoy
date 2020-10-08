@@ -16,10 +16,20 @@
 package server
 
 import (
+	"io/ioutil"
+	"os"
 	"testing"
+
+	"github.com/apigee/apigee-remote-service-envoy/testutil"
 )
 
 func TestNewHandler(t *testing.T) {
+
+	kid := "kid"
+	privateKey, _, err := testutil.GenerateKeyAndJWKs(kid)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	config := DefaultConfig()
 	config.Tenant = TenantConfig{
@@ -28,6 +38,8 @@ func TestNewHandler(t *testing.T) {
 		OrgName:                "org",
 		EnvName:                "env",
 		AllowUnverifiedSSLCert: true,
+		PrivateKeyID:           kid,
+		PrivateKey:             privateKey,
 	}
 	config.Auth = AuthConfig{
 		APIKeyClaim:        "claim",
@@ -93,7 +105,9 @@ func TestNewHandler(t *testing.T) {
 		t.Error("should get error")
 	}
 
+	// valid credentials given in config; internalAPI set to GCP managed URL
 	config.Tenant.RemoteServiceAPI = config.Tenant.InternalAPI
+	config.Tenant.InternalAPI = ""
 	config.Analytics.CredentialsJSON = fakeServiceAccount()
 	h, err = NewHandler(config)
 	if err != nil {
@@ -103,6 +117,36 @@ func TestNewHandler(t *testing.T) {
 		t.Errorf("intervalAPI error: want %s got %s", "apigee.googleapis.com", h.internalAPI.Host)
 	}
 
+	tf, err := ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tf.Name())
+
+	// write credentials to file and set GOOGLE_APPLICATION_CREDENTIALS to its path
+	if _, err := tf.Write(config.Analytics.CredentialsJSON); err != nil {
+		t.Fatal(err)
+	}
+	if err := tf.Close(); err != nil {
+		t.Fatal(err)
+	}
+	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", tf.Name())
+	// remove credentials in config
+	// valid default application credentials given by GOOGLE_APPLICATION_CREDENTIALS
+	config.Analytics.CredentialsJSON = nil
+	_, err = NewHandler(config)
+	if err != nil {
+		t.Errorf("want no error got %v", err)
+	}
+
+	// no valid default application credentials; fall back to client without auth
+	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "invalid path")
+	_, err = NewHandler(config)
+	if err != nil {
+		t.Errorf("want no error got %v", err)
+	}
+
+	// invalid credentials given in config; returns error and no fall back
 	config.Analytics.CredentialsJSON = []byte("invalid sa")
 	_, err = NewHandler(config)
 	if err == nil {
