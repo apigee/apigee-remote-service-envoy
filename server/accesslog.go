@@ -15,6 +15,7 @@
 package server
 
 import (
+	"io"
 	"strings"
 
 	"github.com/apigee/apigee-remote-service-golib/analytics"
@@ -43,26 +44,31 @@ func (a *AccessLogServer) Register(s *grpc.Server, handler *Handler) {
 
 // StreamAccessLogs streams
 func (a *AccessLogServer) StreamAccessLogs(srv als.AccessLogService_StreamAccessLogsServer) error {
-	msg, err := srv.Recv()
-	if err != nil {
-		return err
-	}
-
-	switch msg := msg.GetLogEntries().(type) {
-
-	case *als.StreamAccessLogsMessage_HttpLogs:
-		status := "ok"
-		if err := a.handleHTTPLogs(msg); err != nil {
-			status = "error"
+	for {
+		msg, err := srv.Recv()
+		if err == io.EOF {
+			return nil
 		}
-		prometheusAnalyticsRequests.WithLabelValues(a.handler.orgName, a.handler.envName, status).Inc()
-		return err
+		if err != nil {
+			return err
+		}
 
-	case *als.StreamAccessLogsMessage_TcpLogs:
-		log.Infof("TcpLogs not supported: %#v", msg)
+		switch msg := msg.GetLogEntries().(type) {
+
+		case *als.StreamAccessLogsMessage_HttpLogs:
+			status := "ok"
+			if err := a.handleHTTPLogs(msg); err != nil {
+				status = "error"
+			}
+			prometheusAnalyticsRequests.WithLabelValues(a.handler.orgName, a.handler.envName, status).Inc()
+			if err != nil {
+				return err
+			}
+
+		case *als.StreamAccessLogsMessage_TcpLogs:
+			log.Infof("TcpLogs not supported: %#v", msg)
+		}
 	}
-
-	return nil
 }
 
 func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLogs) error {
