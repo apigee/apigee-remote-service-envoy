@@ -16,6 +16,9 @@
 package server
 
 import (
+	"context"
+	"log"
+	"net"
 	"testing"
 	"time"
 
@@ -23,6 +26,8 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/analytics"
 	"github.com/apigee/apigee-remote-service-golib/auth"
 	"github.com/golang/protobuf/ptypes"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/test/bufconn"
 
 	core "github.com/envoyproxy/go-control-plane/envoy/api/v2/core"
 	v2 "github.com/envoyproxy/go-control-plane/envoy/data/accesslog/v2"
@@ -261,4 +266,113 @@ func (a *testAnalyticsMan) SendRecords(ctx *auth.Context, records []analytics.Re
 
 	a.records = append(a.records, records...)
 	return nil
+}
+
+func TestStreamAccessLogs(t *testing.T) {
+	const bufferSize = 1024 * 1024
+
+	tals := &testAccessLogService{
+		listener: bufconn.Listen(bufferSize),
+	}
+	srv := tals.startAccessLogServer(t)
+	ctx := context.Background()
+
+	defer srv.GracefulStop()
+	conn, err := grpc.DialContext(ctx, "", grpc.WithContextDialer(tals.getBufDialer()), grpc.WithInsecure())
+	if err != nil {
+		t.Fatalf("failed to dial: %v", err)
+	}
+	defer conn.Close()
+
+	client := als.NewAccessLogServiceClient(conn)
+	stream, err := client.StreamAccessLogs(ctx)
+	if err != nil {
+		t.Fatalf("failed to get client: %v", err)
+	}
+
+	// close stream before sending anything
+	if _, err := stream.CloseAndRecv(); err == nil {
+		t.Error("want rpc error not none")
+	}
+
+	stream, err = client.StreamAccessLogs(ctx)
+	if err != nil {
+		t.Fatalf("failed to get client: %v", err)
+	}
+
+	httpLog := &als.StreamAccessLogsMessage{
+		LogEntries: &als.StreamAccessLogsMessage_HttpLogs{
+			HttpLogs: &als.StreamAccessLogsMessage_HTTPAccessLogEntries{
+				LogEntry: []*v2.HTTPAccessLogEntry{
+					&v2.HTTPAccessLogEntry{
+						Request: &v2.HTTPRequestProperties{
+							RequestHeaders: map[string]string{
+								":authority": "",
+							},
+						},
+						Response: &v2.HTTPResponseProperties{},
+					},
+				},
+			},
+		},
+	}
+
+	if err := stream.Send(httpLog); err != nil {
+		t.Error(err)
+	}
+
+	// if err := stream.Send(&als.StreamAccessLogsMessage{}); err != nil {
+	// 	t.Error(err)
+	// }
+
+	// stream, err = client.StreamAccessLogs(ctx)
+	// if err != nil {
+	// 	t.Fatalf("failed to get client: %v", err)
+	// }
+
+	// tcpLog := &als.StreamAccessLogsMessage{
+	// 	LogEntries: &als.StreamAccessLogsMessage_TcpLogs{
+	// 		TcpLogs: &als.StreamAccessLogsMessage_TCPAccessLogEntries{},
+	// 	},
+	// }
+
+	// if err := stream.Send(tcpLog); err != nil {
+	// 	t.Error(err)
+	// }
+
+	// if _, err := stream.CloseAndRecv(); err != nil {
+	// 	t.Log(err)
+	// }
+}
+
+type testAccessLogService struct {
+	listener *bufconn.Listener
+}
+
+func (tals *testAccessLogService) startAccessLogServer(t *testing.T) *grpc.Server {
+	srv := grpc.NewServer()
+
+	testAnalyticsMan := &testAnalyticsMan{}
+	h := &Handler{
+		orgName:      "hi",
+		envName:      "test",
+		analyticsMan: testAnalyticsMan,
+	}
+	server := AccessLogServer{}
+
+	server.Register(srv, h)
+
+	go func() {
+		if err := srv.Serve(tals.listener); err != nil {
+			log.Fatalf("failed to start grpc server: %v", err)
+		}
+	}()
+
+	return srv
+}
+
+func (tals *testAccessLogService) getBufDialer() func(context.Context, string) (net.Conn, error) {
+	return func(ctx context.Context, url string) (net.Conn, error) {
+		return tals.listener.Dial()
+	}
 }
