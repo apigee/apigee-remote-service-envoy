@@ -17,6 +17,7 @@ package server
 
 import (
 	"context"
+	"io"
 	"log"
 	"net"
 	"testing"
@@ -277,6 +278,7 @@ func TestStreamAccessLogs(t *testing.T) {
 	srv := tals.startAccessLogServer(t)
 	ctx := context.Background()
 
+	defer time.Sleep(5 * time.Millisecond)
 	defer srv.GracefulStop()
 	conn, err := grpc.DialContext(ctx, "", grpc.WithContextDialer(tals.getBufDialer()), grpc.WithInsecure())
 	if err != nil {
@@ -290,39 +292,23 @@ func TestStreamAccessLogs(t *testing.T) {
 		t.Fatalf("failed to get client: %v", err)
 	}
 
-	// close stream before sending anything
-	if _, err := stream.CloseAndRecv(); err == nil {
-		t.Error("want rpc error not none")
-	}
-
-	stream, err = client.StreamAccessLogs(ctx)
-	if err != nil {
-		t.Fatalf("failed to get client: %v", err)
-	}
-
 	httpLog := getHTTPLog()
 
 	if err := stream.Send(httpLog); err != nil {
 		t.Error(err)
 	}
 
-	stream, err = client.StreamAccessLogs(ctx)
-	if err != nil {
-		t.Fatalf("failed to get client: %v", err)
+	tcpLog := getTCPLog()
+
+	if err := stream.Send(tcpLog); err != nil {
+		t.Error(err)
 	}
 
 	if err := stream.Send(&als.StreamAccessLogsMessage{}); err != nil {
 		t.Error(err)
 	}
 
-	stream, err = client.StreamAccessLogs(ctx)
-	if err != nil {
-		t.Fatalf("failed to get client: %v", err)
-	}
-
-	tcpLog := getTCPLog()
-
-	if err := stream.Send(tcpLog); err != nil {
+	if _, err := stream.CloseAndRecv(); err != nil && err != io.EOF {
 		t.Error(err)
 	}
 }
