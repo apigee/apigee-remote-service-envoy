@@ -74,7 +74,7 @@ func TestKubeHealth(t *testing.T) {
 
 	fail = false
 	// give it a moment to load
-	time.Sleep(5 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 	err = kubeHealth.error()
 	if err != nil {
 		t.Errorf("expected no error, got: %s", err)
