@@ -1,0 +1,26 @@
+{
+  "name": "httpbin-product",
+  "displayName": "httpbin product",
+  "approvalType": "auto",
+  "attributes": [
+    {
+      "name": "access",
+      "value": "private"
+    },
+    {
+      "name": "apigee-remote-service-targets",
+      "value": "httpbin.org,httpbin.default.svc.cluster.local"
+    }
+  ],
+  "description": "httpbin product for test purpose",
+  "apiResources": [
+    "/httpbin/headers",
+    "/headers"
+  ],
+  "environments": [
+    "test"
+  ],
+  "quota": "5",
+  "quotaInterval": "1",
+  "quotaTimeUnit": "minute"
+}

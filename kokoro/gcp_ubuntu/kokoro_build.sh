@@ -17,6 +17,4 @@
 # Fail on any error.
 set -e
 
-cd ${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-envoy/kokoro/scripts
-
-./integration_test.sh
+${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-envoy/kokoro/scriptsintegration_test_hybrid.sh
