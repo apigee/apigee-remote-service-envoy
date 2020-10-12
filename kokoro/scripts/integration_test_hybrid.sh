@@ -35,8 +35,8 @@ function setEnvironmentVariables {
 function buildRemoteServiceCLI {
   echo -e "\nBuilding apigee-remote-service-cli..."
   cd ${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-cli
-  go mod download
-  CGO_ENABLED=0 go build -a -o apigee-remote-service-cli .
+  sudo go mod download
+  sudo CGO_ENABLED=0 go build -a -o apigee-remote-service-cli .
   CLI=$PWD/apigee-remote-service-cli
   cd -
 }
