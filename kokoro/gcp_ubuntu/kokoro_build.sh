@@ -17,4 +17,6 @@
 # Fail on any error.
 set -e
 
+sudo apt install kubectl jq curl -y
+
 ${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-envoy/kokoro/scriptsintegration_test_hybrid.sh

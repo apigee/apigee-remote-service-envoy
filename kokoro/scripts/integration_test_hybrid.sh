@@ -34,15 +34,15 @@ function setEnvironmentVariables {
 ################################################################################
 function buildRemoteServiceCLI {
   echo -e "\nInstalling go 1.15..."
-  wget https://golang.org/dl/go1.15.2.linux-amd64.tar.gz
-  tar -C /usr/local -xzf go1.15.2.linux-amd64.tar.gz
-  export PATH=$PATH:/usr/local/go/bin
+  curl -LO https://golang.org/dl/go1.15.2.linux-amd64.tar.gz
+  tar -C . -xzf go1.15.2.linux-amd64.tar.gz
+  export PATH=$PATH:$PWD/go/bin
 
   echo -e "\nBuilding apigee-remote-service-cli..."
   cd ${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-cli
   go mod download
-  go build -a -o apigee-remote-service-cli .
-  $CLI=$PWD/apigee-remote-service-cli
+  CGO_ENABLED=0 go build -a -o apigee-remote-service-cli .
+  CLI=$PWD/apigee-remote-service-cli
   cd -
 }
 
