@@ -19,4 +19,4 @@ set -e
 
 sudo apt install jq curl -y
 
-${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-envoy/kokoro/scriptsintegration_test_hybrid.sh
+${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-envoy/kokoro/scripts/integration_test_hybrid.sh
