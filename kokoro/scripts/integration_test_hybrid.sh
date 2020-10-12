@@ -69,7 +69,7 @@ function provisionRemoteService {
     https://apigee.googleapis.com/v1/organizations/${ORG}/apiproducts \
     -H "Authorization: Bearer ${TOKEN}" \
     -H "Content-Type: application/json" \
-    -d @httpbin_product.json)
+    -d @${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-envoy/kokoro/scripts/httpbin_product.json)
   if [[ $STATUS_CODE -ge 299 ]] ; then
     echo -e "\nError creating API Product httpbin-product: $STATUS_CODE"
     cleanUp
@@ -81,7 +81,7 @@ function provisionRemoteService {
     https://apigee.googleapis.com/v1/organizations/${ORG}/developers \
     -H "Authorization: Bearer ${TOKEN}" \
     -H "Content-Type: application/json" \
-    -d @developer.json)
+    -d @${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-envoy/kokoro/scripts/developer.json)
   if [[ $STATUS_CODE -ge 299 ]] ; then
     echo -e "\nError creating Application Developer integration@test.com: $STATUS_CODE"
     cleanUp
@@ -93,7 +93,7 @@ function provisionRemoteService {
     https://apigee.googleapis.com/v1/organizations/${ORG}/developers/integration@test.com/apps \
     -H "Authorization: Bearer ${TOKEN}" \
     -H "Content-Type: application/json" \
-    -d @application.json)
+    -d @${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-envoy/kokoro/scripts/application.json)
   if [[ $STATUS_CODE -ge 299 ]] ; then
     echo -e "\nError creating Application httpbin-app: $STATUS_CODE"
     cleanUp
