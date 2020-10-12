@@ -18,5 +18,6 @@
 set -e
 
 sudo apt install jq curl -y
+gcloud components update --quiet
 
 ${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-envoy/kokoro/scripts/integration_test_hybrid.sh
