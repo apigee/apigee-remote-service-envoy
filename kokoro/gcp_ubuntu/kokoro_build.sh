@@ -21,10 +21,14 @@ sudo apt install jq curl -y
 gcloud components update --quiet
 
 echo -e "\nInstalling go 1.15..."
-if [[ -d "/usr/local/go" ]] ; then sudo rm -r /usr/local/go ; fi
+if [[ -d "/usr/local/go" ]] ; then 
+  ls -l /usr/local/go
+  sudo rm -r /usr/local/go
+fi
 curl -LO https://golang.org/dl/go1.15.2.linux-amd64.tar.gz
 sudo tar -C /usr/local -xzf go1.15.2.linux-amd64.tar.gz
 export PATH=$PATH:/usr/local/go/bin
-export go_exec="sudo /usr/local/go/bin/go"
+ls -l /usr/local/go
+sudo chmod 777 /usr/local/go
 
 ${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-envoy/kokoro/scripts/integration_test_hybrid.sh
