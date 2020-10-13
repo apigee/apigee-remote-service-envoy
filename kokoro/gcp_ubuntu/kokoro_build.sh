@@ -23,4 +23,4 @@ ${BUILD_DIR}/scripts/init.sh
 
 ${BUILD_DIR}/scripts/integration_test_hybrid.sh
 
-${BUILD_DIR}/scripts/integration_test_cgsaas.sh
+#${BUILD_DIR}/scripts/integration_test_cgsaas.sh

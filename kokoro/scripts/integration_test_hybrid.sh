@@ -144,13 +144,13 @@ function applyToCluster {
 function undeployRemoteServiceProxies {
   TOKEN=$(gcloud auth print-access-token)
   echo -e "\nGet deployed revision of API Proxies remote-service..."
-  REV=$(curl --silent \
+  REV=$(curl -v --silent \
     https://${MGMT}/v1/organizations/${ORG}/apis/remote-service/deployments \
     -H "Authorization: Bearer ${TOKEN}" | jq -r ".deployments[0].revision")
 
   if [[ ! -z $REV ]] ; then
     echo -e "\nUndeploying revision $REV of API Proxies remote-service..."
-    STATUS_CODE=$(curl -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
+    STATUS_CODE=$(curl -v -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
       https://${MGMT}/v1/organizations/${ORG}/environments/${ENV}/apis/remote-service/revisions/${REV}/deployments \
       -H "Authorization: Bearer ${TOKEN}")
     if [[ $STATUS_CODE -ge 299 ]] ; then
@@ -177,7 +177,7 @@ function deployRemoteServiceProxies {
   if [[ ! -z $1 ]] ; then
     TOKEN=$(gcloud auth print-access-token)
     echo -e "\nDeploying revision $1 of API Proxies remote-service..."
-    STATUS_CODE=$(curl -X POST --silent -o /dev/stderr -w "%{http_code}" \
+    STATUS_CODE=$(curl -v -X POST --silent -o /dev/stderr -w "%{http_code}" \
       https://${MGMT}/v1/organizations/${ORG}/environments/${ENV}/apis/remote-service/revisions/$1/deployments \
       -H "Authorization: Bearer ${TOKEN}")
     if [[ $STATUS_CODE -ge 299 ]] ; then
