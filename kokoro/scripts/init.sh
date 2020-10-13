@@ -37,7 +37,6 @@ function installPrerequisites {
   sudo ./configure --with-ssl 
   sudo make
   sudo make install
-  sudo mv /usr/bin/curl /usr/bin/curl.bak
   sudo cp /usr/local/bin/curl /usr/bin/curl
   curl -V
 
