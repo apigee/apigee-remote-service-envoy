@@ -141,7 +141,7 @@ function undeployRemoteServiceProxies {
   echo -e "\nGet deployed revision of API Proxies remote-service..."
   REV=$(docker run curlimages/curl:7.72.0 --silent \
     https://${MGMT}/v1/organizations/${ORG}/apis/remote-service \
-    -u $USER:$PASSWORD | jq -r ".revision[length-1]")
+    -u $USER:$PASSWORD | jq -r ".revision | max")
   echo -e "\nGot deployed revision $REV"
 
   if [[ ! -z $REV ]] ; then
@@ -175,7 +175,7 @@ function deployRemoteServiceProxies {
 # Call Local Target With APIKey
 ################################################################################
 function callTargetWithAPIKey {
-  STATUS_CODE=$(docker run curlimages/curl:7.72.0 --silent -o /dev/stderr -w "%{http_code}" \
+  STATUS_CODE=$(docker run --network=host curlimages/curl:7.72.0 --silent -o /dev/stderr -w "%{http_code}" \
     localhost:8080/headers -Hhost:httpbin.org \
     -Hx-api-key:$1)
 
@@ -196,7 +196,7 @@ function callTargetWithAPIKey {
 # call Local Target With JWT
 ################################################################################
 function callTargetWithJWT {
-  STATUS_CODE=$(docker run curlimages/curl:7.72.0 --silent -o /dev/stderr -w "%{http_code}" \
+  STATUS_CODE=$(docker run --network=host curlimages/curl:7.72.0 --silent -o /dev/stderr -w "%{http_code}" \
     localhost:8080/headers -Hhost:httpbin.org \
     -H "Authorization: Bearer $1")
 
