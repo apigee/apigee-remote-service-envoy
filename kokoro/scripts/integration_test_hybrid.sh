@@ -147,6 +147,7 @@ function undeployRemoteServiceProxies {
   REV=$(docker run curlimages/curl:7.72.0 --silent \
     https://${MGMT}/v1/organizations/${ORG}/apis/remote-service/deployments \
     -H "Authorization: Bearer ${TOKEN}" | jq -r ".deployments[0].revision")
+  echo -e "\nGot deployed revision $REV"
 
   if [[ ! -z $REV ]] ; then
     echo -e "\nUndeploying revision $REV of API Proxies remote-service..."
