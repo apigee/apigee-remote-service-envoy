@@ -21,24 +21,15 @@ set -e
 # Fetching environment variables from secrets in the GCP project
 ################################################################################
 function setEnvironmentVariables {
-  echo -e "\nSetting up environment variables from the GCP secret hybrid-env..."
-  gcloud secrets versions access 1 --secret="hybrid-env" > hybrid-env
-  source ./hybrid-env
-  CLI=${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-cli/apigee-remote-service-cli
-  MGMT=apigee.googleapis.com
-  REPO=${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-envoy
+  echo -e "\nSetting up environment variables from the GCP secret cgsaas-env..."
+  gcloud secrets versions access 1 --secret="cgsaas-env" > cgsaas-env
+  source ./cgsaas-env
 
+  CLI=${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-cli/apigee-remote-service-cli
+  MGMT=api.enterprise.apigee.com
+  REPO=${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-envoy
   echo -e "\nGetting Hybrid cluster credentials and configuring kubectl..."
   gcloud container clusters get-credentials $CLUSTER --zone $ZONE --project $PROJECT
-}
-
-################################################################################
-# Building Docker images based on the latest source code
-################################################################################
-function buildDockerImages {
-  echo -e "\nBuilding the Docker image to gcr.io..."
-  gcloud builds submit -t gcr.io/${PROJECT}/apigee-envoy-adapter:test ${REPO}
-  echo -e "\nDocker image built successfully."
 }
 
 ################################################################################
@@ -46,10 +37,10 @@ function buildDockerImages {
 ################################################################################
 function provisionRemoteService {
   echo -e "\nProvisioning via CLI..."
-  TOKEN=$(gcloud auth print-access-token)
 
   {
-    $CLI provision -o $ORG -e $ENV -t $TOKEN -r $RUNTIME -f -v > config.yaml
+    $CLI provision -o $ORG -e $ENV -u $USER -p $PASSWORD --legacy -f -v > config.yaml
+    chmod 644 config.yaml
   } || { # clean up and exit directly if cli encounters any error
     cleanUp
     exit 1
@@ -57,8 +48,8 @@ function provisionRemoteService {
 
   echo -e "\nCreating API Product httpbin-product..."
   STATUS_CODE=$(curl -X POST --silent -o /dev/stderr -w "%{http_code}"\
-    https://${MGMT}/v1/organizations/${ORG}/apiproducts \
-    -H "Authorization: Bearer ${TOKEN}" \
+    https://api.enterprise.apigee.com/v1/organizations/${ORG}/apiproducts \
+    -u $USER:$PASSWORD \
     -H "Content-Type: application/json" \
     -d @${REPO}/kokoro/scripts/httpbin_product.json)
   if [[ $STATUS_CODE -ge 299 ]] ; then
@@ -70,7 +61,7 @@ function provisionRemoteService {
   echo -e "\nCreating Application Developer integration@test.com..."
   STATUS_CODE=$(curl -X POST --silent -o /dev/stderr -w "%{http_code}" \
     https://${MGMT}/v1/organizations/${ORG}/developers \
-    -H "Authorization: Bearer ${TOKEN}" \
+    -u $USER:$PASSWORD \
     -H "Content-Type: application/json" \
     -d @${REPO}/kokoro/scripts/developer.json)
   if [[ $STATUS_CODE -ge 299 ]] ; then
@@ -82,7 +73,7 @@ function provisionRemoteService {
   echo -e "\nCreating Application httpbin-app..."
   STATUS_CODE=$(curl -X POST --silent -o /dev/stderr -w "%{http_code}" \
     https://${MGMT}/v1/organizations/${ORG}/developers/integration@test.com/apps \
-    -H "Authorization: Bearer ${TOKEN}" \
+    -u $USER:$PASSWORD \
     -H "Content-Type: application/json" \
     -d @${REPO}/kokoro/scripts/application.json)
   if [[ $STATUS_CODE -ge 299 ]] ; then
@@ -94,7 +85,7 @@ function provisionRemoteService {
   echo -e "\nExtracting Application httpbin-app credentials..."
   APP=$(curl --silent \
     https://${MGMT}/v1/organizations/${ORG}/developers/integration@test.com/apps/httpbin-app \
-    -H "Authorization: Bearer ${TOKEN}" \
+    -u $USER:$PASSWORD \
     -H "Content-Type: application/json")
   {
     APIKEY=$(echo $APP | jq -r ".credentials[0].consumerKey")
@@ -120,8 +111,10 @@ function generateSampleConfigurations {
   echo -e "\nGenerating sample configurations files for $1 via the CLI..."
 
   {
-    $CLI samples create -c config.yaml --out samples --template $1 --tag test
-    sed -i -e "s/google/gcr.io\/${PROJECT}/g" samples/apigee-envoy-adapter.yaml
+    $CLI samples create -c config.yaml --out istio-samples --template $1 --tag test
+    sed -i -e "s/google/gcr.io\/${PROJECT}/g" istio-samples/apigee-envoy-adapter.yaml
+    $CLI samples create -c config.yaml --out native-samples --template native --tag test
+    chmod 644 native-samples/envoy-config.yaml
   } || { # clean up and exit directly if cli encounters any error
     cleanUp
     exit 1
@@ -135,7 +128,7 @@ function applyToCluster {
   echo -e "\nDeploying config files to the cluster..."
 
   kubectl apply -f config.yaml
-  kubectl apply -f samples
+  kubectl apply -f istio-samples
 }
 
 ################################################################################
@@ -145,29 +138,18 @@ function undeployRemoteServiceProxies {
   TOKEN=$(gcloud auth print-access-token)
   echo -e "\nGet deployed revision of API Proxies remote-service..."
   REV=$(curl --silent \
-    https://${MGMT}/v1/organizations/${ORG}/apis/remote-service/deployments \
-    -H "Authorization: Bearer ${TOKEN}" | jq -r ".deployments[0].revision")
+    https://${MGMT}/v1/organizations/${ORG}/apis/remote-service \
+    -u $USER:$PASSWORD | jq -r ".revision[-1]")
 
   if [[ ! -z $REV ]] ; then
     echo -e "\nUndeploying revision $REV of API Proxies remote-service..."
     STATUS_CODE=$(curl -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
       https://${MGMT}/v1/organizations/${ORG}/environments/${ENV}/apis/remote-service/revisions/${REV}/deployments \
-      -H "Authorization: Bearer ${TOKEN}")
+      -u $USER:$PASSWORD)
     if [[ $STATUS_CODE -ge 299 ]] ; then
       echo -e "\nError undeploying API Proxies remote-service: $STATUS_CODE"
     fi
   fi
-
-  for i in {1..20}
-  do
-    STATUS_CODE=$(curl --silent -o /dev/stderr -w "%{http_code}" \
-     $RUNTIME/remote-service/version)
-    if [[ $STATUS_CODE -ne 200 ]] ; then
-      echo -e "\nUndeployed remote-service API Proxies"
-      break
-    fi
-    sleep 10
-  done
 }
 
 ################################################################################
@@ -179,90 +161,71 @@ function deployRemoteServiceProxies {
     echo -e "\nDeploying revision $1 of API Proxies remote-service..."
     STATUS_CODE=$(curl -X POST --silent -o /dev/stderr -w "%{http_code}" \
       https://${MGMT}/v1/organizations/${ORG}/environments/${ENV}/apis/remote-service/revisions/$1/deployments \
-      -H "Authorization: Bearer ${TOKEN}")
+      -u $USER:$PASSWORD)
     if [[ $STATUS_CODE -ge 299 ]] ; then
       echo -e "\nError undeploying API Proxies remote-service: $STATUS_CODE"
     fi
   fi
-
-  for i in {1..20}
-  do
-    STATUS_CODE=$(curl --silent -o /dev/stderr -w "%{http_code}" \
-     $RUNTIME/remote-service/version)
-    if [[ $STATUS_CODE -eq 200 ]] ; then
-      echo -e "\nDeployed remote-service API Proxies"
-      break
-    fi
-    sleep 10
-  done
 }
 
 ################################################################################
-# Call Target With APIKey
+# Call Local Target With APIKey
 ################################################################################
 function callTargetWithAPIKey {
-  STATUS_CODE=$(kubectl exec curl -c curl -- \
-    curl --silent -o /dev/stderr -w "%{http_code}" \
-    httpbin.default.svc.cluster.local/headers \
+  STATUS_CODE=$(curl --silent -o /dev/stderr -w "%{http_code}" \
+    localhost:8080/headers -Hhost:httpbin.org \
     -Hx-api-key:$1)
 
   if [[ ! -z $2 ]] ; then
     if [[ $STATUS_CODE -ne $2 ]] ; then
-      echo -e "\nError calling target with API key: expected status $2; got $STATUS_CODE"
+      echo -e "\nError calling local target with API key: expected status $2; got $STATUS_CODE"
       cleanUp
       exit 1
     else 
-      echo -e "\nCalling target with API key got $STATUS_CODE as expected"
+      echo -e "\nCalling local target with API key got $STATUS_CODE as expected"
     fi
   else
-    echo -e "\nCalling target with API key got $STATUS_CODE"
+    echo -e "\nCalling local target with API key got $STATUS_CODE"
   fi
 }
 
 ################################################################################
-# call Target With JWT
+# call Local Target With JWT
 ################################################################################
 function callTargetWithJWT {
-  STATUS_CODE=$(kubectl exec curl -c curl -- \
-    curl --silent -o /dev/stderr -w "%{http_code}" \
-    httpbin.default.svc.cluster.local/headers \
+  STATUS_CODE=$(curl --silent -o /dev/stderr -w "%{http_code}" \
+    localhost:8080/headers -Hhost:httpbin.org \
     -H "Authorization: Bearer $1")
 
   if [[ ! -z $2 ]] ; then
     if [[ $STATUS_CODE -ne $2 ]] ; then
-      echo -e "\nError calling target with JWT: expected status $2; got $STATUS_CODE"
+      echo -e "\nError calling local target with JWT: expected status $2; got $STATUS_CODE"
       cleanUp
       exit 1
     else 
-      echo -e "\nCalling target with JWT got $STATUS_CODE as expected"
+      echo -e "\nCalling local target with JWT got $STATUS_CODE as expected"
     fi
   else
-    echo -e "\nCalling target with JWT got $STATUS_CODE"
+    echo -e "\nCalling local target with JWT got $STATUS_CODE"
   fi
 }
 
 ################################################################################
-# Run actual tests
+# Run actual tests with native Envoy
 ################################################################################
-function runTests {
-  echo -e "\nStarting to run tests..."
-  cat <<EOF | kubectl apply -f -
-apiVersion: v1
-kind: Pod
-metadata:
-  name: curl
-  labels:
-    app: curl
-spec:
-  containers:
-  - name: curl
-    image: radial/busyboxplus:curl
-    ports:
-    - containerPort: 80
-    command: ["/bin/sh", "-ec", "while :; do echo '.'; sleep 5 ; done"]
-EOF
-
+function runEnvoyTests {
+  echo -e "\nStarting to run tests with native Envoy..."
   {
+    echo -e "\nStarting Envoy docker image..."
+    docker run -v $PWD/native-samples/envoy-config.yaml:/envoy.yaml \
+      --name=envoy --network=host --rm -d \
+      docker.io/envoyproxy/envoy:v1.16.0 -c /envoy.yaml -l debug
+
+    echo -e "\nStarting Adapter docker image..."
+    docker run -v $PWD/config.yaml:/config.yaml \
+      --name=adapter -p 5000:5000 --rm -d \
+      apigee-envoy-adapter:test -c /config.yaml -l DEBUG
+
     for i in {1..20}
     do
       JWT=$($CLI token create -c config.yaml -i $APIKEY -s $APISECRET)
@@ -318,16 +281,135 @@ EOF
 }
 
 ################################################################################
+# Call Target on Istio With APIKey
+################################################################################
+function callIstioTargetWithAPIKey {
+  STATUS_CODE=$(kubectl exec curl -c curl -- \
+    curl --silent -o /dev/stderr -w "%{http_code}" \
+    httpbin.default.svc.cluster.local/headers \
+    -Hx-api-key:$1)
+
+  if [[ ! -z $2 ]] ; then
+    if [[ $STATUS_CODE -ne $2 ]] ; then
+      echo -e "\nError calling target with API key: expected status $2; got $STATUS_CODE"
+      cleanUp
+      exit 1
+    else 
+      echo -e "\nCalling target with API key got $STATUS_CODE as expected"
+    fi
+  else
+    echo -e "\nCalling target with API key got $STATUS_CODE"
+  fi
+}
+
+################################################################################
+# call Target on Istio With JWT
+################################################################################
+function callIstioTargetWithJWT {
+  STATUS_CODE=$(kubectl exec curl -c curl -- \
+    curl --silent -o /dev/stderr -w "%{http_code}" \
+    httpbin.default.svc.cluster.local/headers \
+    -H "Authorization: Bearer $1")
+
+  if [[ ! -z $2 ]] ; then
+    if [[ $STATUS_CODE -ne $2 ]] ; then
+      echo -e "\nError calling target with JWT: expected status $2; got $STATUS_CODE"
+      cleanUp
+      exit 1
+    else 
+      echo -e "\nCalling target with JWT got $STATUS_CODE as expected"
+    fi
+  else
+    echo -e "\nCalling target with JWT got $STATUS_CODE"
+  fi
+}
+
+################################################################################
+# Run actual tests on Istio
+################################################################################
+function runIstioTests {
+  echo -e "\nStarting to run tests on Istio..."
+  cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: curl
+  labels:
+    app: curl
+spec:
+  containers:
+  - name: curl
+    image: radial/busyboxplus:curl
+    ports:
+    - containerPort: 80
+    command: ["/bin/sh", "-ec", "while :; do echo '.'; sleep 5 ; done"]
+EOF
+
+  {
+    for i in {1..20}
+    do
+      JWT=$($CLI token create -c config.yaml -i $APIKEY -s $APISECRET)
+      callIstioTargetWithJWT $JWT
+      sleep 60
+      if [[ $STATUS_CODE -eq 200 ]] ; then
+        echo -e "\nServices are ready to be tested"
+        break
+      fi
+    done
+
+    callIstioTargetWithAPIKey $APIKEY 200
+    callIstioTargetWithAPIKey APIKEY 403
+    for i in {1..20}
+    do
+      callIstioTargetWithAPIKey $APIKEY
+      if [[ $STATUS_CODE -eq 403 ]] ; then
+        echo -e "\nQuota depleted"
+        break
+      fi
+      sleep 1
+    done
+    callIstioTargetWithAPIKey $APIKEY 403
+    
+    sleep 65
+
+    echo -e "\nQuota should have restored"
+    callIstioTargetWithAPIKey $APIKEY 200
+
+    undeployRemoteServiceProxies
+
+    for i in {1..20}
+    do
+      callIstioTargetWithAPIKey $APIKEY
+      if [[ $STATUS_CODE -eq 403 ]] ; then
+        echo -e "\nLocal quota depleted"
+        break
+      fi
+      sleep 1
+    done
+    callIstioTargetWithAPIKey $APIKEY 403
+    
+    sleep 65
+    
+    echo -e "\nLocal quota should have restored"
+    callIstioTargetWithAPIKey $APIKEY 200
+
+    deployRemoteServiceProxies $REV
+  } || { # clean up resources on failure
+    cleanUp
+    exit 1
+  }
+}
+
+################################################################################
 # Clean up
 ################################################################################
 function cleanUp {
   echo -e "\nCleaning up resources applied to the Hybrid cluster..."
-  TOKEN=$(gcloud auth print-access-token)
 
   echo -e "\nDeleting Application httpbin-app..."
   STATUS_CODE=$(curl -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
     https://${MGMT}/v1/organizations/${ORG}/developers/integration@test.com/apps/httpbin-app \
-    -H "Authorization: Bearer ${TOKEN}")
+    -u $USER:$PASSWORD)
   if [[ $STATUS_CODE -ge 299 ]] ; then
     echo -e "\nError deleting Application httpbin-app: $STATUS_CODE"
   fi
@@ -335,7 +417,7 @@ function cleanUp {
   echo -e "\nDeleting Application Developer integration@test.com..."
   STATUS_CODE=$(curl -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
     https://${MGMT}/v1/organizations/${ORG}/developers/integration@test.com \
-    -H "Authorization: Bearer ${TOKEN}")
+    -u $USER:$PASSWORD)
   if [[ $STATUS_CODE -ge 299 ]] ; then
     echo -e "\nError deleting Application Developer integration@test.com: $STATUS_CODE"
   fi
@@ -343,7 +425,7 @@ function cleanUp {
   echo -e "\nDeleting API Product httpbin-product..."
   STATUS_CODE=$(curl -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
     https://${MGMT}/v1/organizations/${ORG}/apiproducts/httpbin-product \
-    -H "Authorization: Bearer ${TOKEN}")
+    -u $USER:$PASSWORD)
   if [[ $STATUS_CODE -ge 299 ]] ; then
     echo -e "\nError deleting API Product httpbin-product: $STATUS_CODE"
   fi
@@ -351,7 +433,7 @@ function cleanUp {
   echo -e "\nDeleting API Product remote-service..."
   STATUS_CODE=$(curl -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
     https://${MGMT}/v1/organizations/${ORG}/apiproducts/remote-service \
-    -H "Authorization: Bearer ${TOKEN}")
+    -u $USER:$PASSWORD)
   if [[ $STATUS_CODE -ge 299 ]] ; then
     echo -e "\nError deleting API Product remote-service: $STATUS_CODE"
   fi
@@ -361,14 +443,14 @@ function cleanUp {
   echo -e "\nDeleting API Proxies remote-service..."
   STATUS_CODE=$(curl -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
     https://${MGMT}/v1/organizations/${ORG}/apis/remote-service \
-    -H "Authorization: Bearer ${TOKEN}")
+    -u $USER:$PASSWORD)
   if [[ $STATUS_CODE -ge 299 ]] ; then
     echo -e "\nError deleting API Proxies remote-service: $STATUS_CODE"
   fi
 
   echo -e "\nDeleting configuration files..."
-  if [[ -f "hybrid-env" ]]; then
-    rm hybrid-env
+  if [[ -f "cgsaas-env" ]]; then
+    rm cgsaas-env
   fi
   if [[ -f "config.yaml" ]]; then
     {
@@ -378,26 +460,34 @@ function cleanUp {
       rm config.yaml
     }
   fi
-  if [[ -d "samples" ]]; then
+  if [[ -d "istio-samples" ]]; then
     {
-      kubectl delete -f samples
-      rm -r samples
+      kubectl delete -f istio-samples
+      rm -r istio-samples
     } || { # in the case of k8s deletion failure
-      rm -r samples
+      rm -r istio-samples
     }
   fi
+  if [[ -d "native-samples" ]]; then
+    rm -r native-samples
+  fi
   kubectl delete pods curl
+
+  echo -e "\nStopping local Docker containers..."
+  docker stop envoy
+  docker stop adapter
+  echo -e "\nContainers stopped."
 }
 
-echo -e "\nStarting integration test of the Apigee Envoy Adapter with Apigee Hybrid..."
+
+echo -e "\nStarting integration test of the Apigee Envoy Adapter with Apigee SaaS..."
 
 setEnvironmentVariables
 provisionRemoteService
-generateSampleConfigurations istio-1.6
+generateSampleConfigurations istio-1.7
+runEnvoyTests
 applyToCluster
-runTests
+runIstioTests
 cleanUp
 
-echo -e "\nFinished integration test of the Apigee Envoy Adapter with Apigee Hybrid."
-
-
+echo -e "\nFinished integration test of the Apigee Envoy Adapter with Apigee SaaS."
