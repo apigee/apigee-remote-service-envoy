@@ -24,12 +24,10 @@ function setEnvironmentVariables {
   echo -e "\nSetting up environment variables from the GCP secret cgsaas-env..."
   gcloud secrets versions access 1 --secret="cgsaas-env" > cgsaas-env
   source ./cgsaas-env
-
   CLI=${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-cli/apigee-remote-service-cli
-  #CLI=$HOME/repos/apigee-remote-service-cli/dist/default_linux_amd64/apigee-remote-service-cli
   MGMT=api.enterprise.apigee.com
   REPO=${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-envoy
-  #REPO=$HOME/repos/apigee-remote-service-envoy
+  
   echo -e "\nGetting Hybrid cluster credentials and configuring kubectl..."
   gcloud container clusters get-credentials $CLUSTER --zone $ZONE --project $PROJECT
 }
