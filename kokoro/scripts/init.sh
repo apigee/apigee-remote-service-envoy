@@ -24,6 +24,23 @@ function installPrerequisites {
   echo -e "\nInstalling jq..."
   sudo apt install jq -y
 
+  echo -e "\nUpgrading curl..."
+  sudo apt remove curl -y
+  sudo apt update
+  sudo apt install -y libssl-dev autoconf libtool make
+  cd /usr/local/src
+  rm -rf curl*
+  wget https://curl.haxx.se/download/curl-7.72.0.zip
+  unzip curl-7.72.0.zip
+  cd curl-7.70.0     # enter the directory where curl was unpacked #
+  ./buildconf
+  ./configure --with-ssl 
+  sudo make
+  sudo make install
+  sudo mv /usr/bin/curl /usr/bin/curl.bak
+  sudo cp /usr/local/bin/curl /usr/bin/curl
+  curl -V
+
   echo -e "\nUpdating gcloud SDK..."
   gcloud components update --quiet
 
@@ -45,7 +62,6 @@ function buildRemoteServiceCLI {
   cd ${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-cli
   go mod download
   CGO_ENABLED=0 go build -a -o apigee-remote-service-cli .
-  cd -
 }
 
 ################################################################################
@@ -55,7 +71,6 @@ function buildAdapterDocker {
   echo -e "\nBuilding local Docker image of apigee-remote-service-envoy..."
   cd ${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-envoy
   docker build -t apigee-envoy-adapter:test .
-  cd -
 }
 
 installPrerequisites
