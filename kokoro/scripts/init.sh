@@ -29,10 +29,10 @@ function installPrerequisites {
   sudo apt update
   sudo apt install -y libssl-dev autoconf libtool make
   cd /usr/local/src
-  rm -rf curl*
-  wget https://curl.haxx.se/download/curl-7.72.0.zip
-  unzip curl-7.72.0.zip
-  cd curl-7.70.0     # enter the directory where curl was unpacked #
+  sudo rm -rf curl*
+  sudo wget https://curl.haxx.se/download/curl-7.72.0.zip
+  sudo unzip curl-7.72.0.zip
+  cd curl-7.72.0     # enter the directory where curl was unpacked #
   ./buildconf
   ./configure --with-ssl 
   sudo make
