@@ -33,8 +33,8 @@ function installPrerequisites {
   sudo wget https://curl.haxx.se/download/curl-7.72.0.zip
   sudo unzip curl-7.72.0.zip
   cd curl-7.72.0     # enter the directory where curl was unpacked #
-  ./buildconf
-  ./configure --with-ssl 
+  sudo ./buildconf
+  sudo ./configure --with-ssl 
   sudo make
   sudo make install
   sudo mv /usr/bin/curl /usr/bin/curl.bak
