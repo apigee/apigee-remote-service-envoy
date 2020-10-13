@@ -24,22 +24,6 @@ function installPrerequisites {
   echo -e "\nInstalling jq..."
   sudo apt install jq -y
 
-  echo -e "\nUpgrading curl..."
-  sudo apt remove curl -y
-  sudo apt update
-  sudo apt install -y libssl-dev autoconf libtool make
-  cd /usr/local/src
-  sudo rm -rf curl*
-  sudo wget https://curl.haxx.se/download/curl-7.72.0.zip
-  sudo unzip curl-7.72.0.zip
-  cd curl-7.72.0     # enter the directory where curl was unpacked #
-  sudo ./buildconf
-  sudo ./configure --with-ssl 
-  sudo make
-  sudo make install
-  sudo cp /usr/local/bin/curl /usr/bin/curl
-  curl -V
-
   echo -e "\nUpdating gcloud SDK..."
   gcloud components update --quiet
 

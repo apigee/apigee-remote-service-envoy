@@ -26,8 +26,10 @@ function setEnvironmentVariables {
   source ./cgsaas-env
 
   CLI=${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-cli/apigee-remote-service-cli
+  #CLI=$HOME/repos/apigee-remote-service-cli/dist/default_linux_amd64/apigee-remote-service-cli
   MGMT=api.enterprise.apigee.com
   REPO=${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-envoy
+  #REPO=$HOME/repos/apigee-remote-service-envoy
   echo -e "\nGetting Hybrid cluster credentials and configuring kubectl..."
   gcloud container clusters get-credentials $CLUSTER --zone $ZONE --project $PROJECT
 }
@@ -137,13 +139,13 @@ function applyToCluster {
 function undeployRemoteServiceProxies {
   TOKEN=$(gcloud auth print-access-token)
   echo -e "\nGet deployed revision of API Proxies remote-service..."
-  REV=$(curl --silent \
+  REV=$(docker run curlimages/curl:7.72.0 --silent \
     https://${MGMT}/v1/organizations/${ORG}/apis/remote-service \
     -u $USER:$PASSWORD | jq -r ".revision[-1]")
 
   if [[ ! -z $REV ]] ; then
     echo -e "\nUndeploying revision $REV of API Proxies remote-service..."
-    STATUS_CODE=$(curl -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
+    STATUS_CODE=$(docker run curlimages/curl:7.72.0 -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
       https://${MGMT}/v1/organizations/${ORG}/environments/${ENV}/apis/remote-service/revisions/${REV}/deployments \
       -u $USER:$PASSWORD)
     if [[ $STATUS_CODE -ge 299 ]] ; then
@@ -159,7 +161,7 @@ function deployRemoteServiceProxies {
   if [[ ! -z $1 ]] ; then
     TOKEN=$(gcloud auth print-access-token)
     echo -e "\nDeploying revision $1 of API Proxies remote-service..."
-    STATUS_CODE=$(curl -X POST --silent -o /dev/stderr -w "%{http_code}" \
+    STATUS_CODE=$(docker run curlimages/curl:7.72.0 -X POST --silent -o /dev/stderr -w "%{http_code}" \
       https://${MGMT}/v1/organizations/${ORG}/environments/${ENV}/apis/remote-service/revisions/$1/deployments \
       -u $USER:$PASSWORD)
     if [[ $STATUS_CODE -ge 299 ]] ; then
