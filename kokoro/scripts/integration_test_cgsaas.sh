@@ -39,7 +39,7 @@ function provisionRemoteService {
   echo -e "\nProvisioning via CLI..."
 
   {
-    $CLI provision -o $ORG -e $ENV -u $USER -p $PASSWORD --legacy -f -v > config.yaml
+    $CLI provision -o $ORG -e $ENV -u $USER -p $PASSWORD --legacy -f > config.yaml
     chmod 644 config.yaml
   } || { # clean up and exit directly if cli encounters any error
     cleanUp
