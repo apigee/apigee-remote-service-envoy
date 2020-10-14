@@ -155,7 +155,7 @@ func serve(config *server.Config) {
 	as := &server.AuthorizationServer{}
 	as.Register(grpcServer, rsHandler)
 	ls := &server.AccessLogServer{}
-	ls.Register(grpcServer, rsHandler)
+	ls.Register(grpcServer, rsHandler, config.Global.KeepAliveMaxConnectionAge)
 
 	// grpc health
 	grpcHealth := health.NewServer()

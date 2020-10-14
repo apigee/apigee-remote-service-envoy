@@ -17,6 +17,7 @@ package server
 import (
 	"io"
 	"strings"
+	"time"
 
 	"github.com/apigee/apigee-remote-service-golib/analytics"
 	"github.com/apigee/apigee-remote-service-golib/log"
@@ -33,17 +34,22 @@ const gatewaySource = "envoy"
 
 // AccessLogServer server
 type AccessLogServer struct {
-	handler *Handler
+	handler       *Handler
+	streamTimeout time.Duration // the duration for a stream to live
 }
 
 // Register registers
-func (a *AccessLogServer) Register(s *grpc.Server, handler *Handler) {
+func (a *AccessLogServer) Register(s *grpc.Server, handler *Handler, d time.Duration) {
 	als.RegisterAccessLogServiceServer(s, a)
 	a.handler = handler
+	a.streamTimeout = d
 }
 
 // StreamAccessLogs streams
 func (a *AccessLogServer) StreamAccessLogs(srv als.AccessLogService_StreamAccessLogsServer) error {
+	// set the expiring time
+	endTime := time.Now().Add(a.streamTimeout)
+
 	for {
 		msg, err := srv.Recv()
 		if err == io.EOF {
@@ -67,6 +73,11 @@ func (a *AccessLogServer) StreamAccessLogs(srv als.AccessLogService_StreamAccess
 
 		case *als.StreamAccessLogsMessage_TcpLogs:
 			log.Infof("TcpLogs not supported: %#v", msg)
+		}
+
+		// close the client stream once the timeout reaches
+		if endTime.Before(time.Now()) {
+			return srv.SendAndClose(nil)
 		}
 	}
 }

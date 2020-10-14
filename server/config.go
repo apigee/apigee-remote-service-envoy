@@ -52,7 +52,7 @@ func DefaultConfig() *Config {
 	return &Config{
 		Global: GlobalConfig{
 			TempDir:                   "/tmp/apigee-istio",
-			KeepAliveMaxConnectionAge: 10 * time.Minute,
+			KeepAliveMaxConnectionAge: time.Minute,
 			APIAddress:                ":5000",
 			MetricsAddress:            ":5001",
 		},
