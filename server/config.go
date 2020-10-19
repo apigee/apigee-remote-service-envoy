@@ -153,7 +153,7 @@ type AuthConfig struct {
 	APIKeyHeader        string        `yaml:"api_key_header,omitempty" json:"api_key_header,omitempty"`
 	TargetHeader        string        `yaml:"target_header,omitempty" json:"target_header,omitempty"`
 	RejectUnauthorized  bool          `yaml:"reject_unauthorized,omitempty" json:"reject_unauthorized,omitempty"`
-	JWTProviderKey      string        `yaml:"-" json:"-"`
+	JWTProviderKey      string        `yaml:"jwt_provider_key,omitempty" json:"jwt_provider_key,omitempty"`
 }
 
 // Load config
