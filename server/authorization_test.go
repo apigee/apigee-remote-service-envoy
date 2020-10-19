@@ -37,21 +37,23 @@ func TestCheck(t *testing.T) {
 	jwtClaims := &pb.Struct{
 		Fields: map[string]*pb.Value{
 			"apigee": {
-				Kind: &pb.Value_StringValue{StringValue: "x"},
+				Kind: &pb.Value_StructValue{
+					StructValue: &pb.Struct{
+						Fields: map[string]*pb.Value{
+							"api_product_list": {
+								Kind: &pb.Value_StringValue{
+									StringValue: "product1,product2",
+								},
+							},
+						},
+					},
+				},
 			},
 		},
 	}
 
 	headers := map[string]string{
 		headerClientID: "clientID",
-		// headerAPI: "api",
-		// headerAPIProducts:    "product1,product2",
-		// headerAccessToken:    "token",
-		// headerApplication:    "app",
-		// headerDeveloperEmail: "email@google.com",
-		// headerEnvironment:    "env",
-		// headerOrganization:   "org",
-		// headerScope:          "scope1 scope2",
 	}
 
 	products := product.ProductsMap{
@@ -59,9 +61,6 @@ func TestCheck(t *testing.T) {
 			DisplayName: "product1",
 		},
 	}
-
-	// protoBufStruct := req.Attributes.GetMetadataContext().GetFilterMetadata()[jwtFilterMetadataKey]
-	// fieldsMap := protoBufStruct.GetFields()
 
 	uri := "path?x-api-key=foo"
 	req := &v2.CheckRequest{
@@ -201,6 +200,34 @@ func TestCheck(t *testing.T) {
 		t.Errorf("got: %s, want: %s", testAuthMan.apiKeyClaimKey, headerClientID)
 	}
 
+	// non-existing jwtProviderKey
+	server.handler.jwtProviderKey = "not-apigee"
+	if resp, err = server.Check(context.Background(), req); err != nil {
+		t.Errorf("should not get error. got: %s", err)
+	}
+	if resp.Status.Code != int32(rpc.OK) {
+		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.OK))
+	}
+
+	// testAuthMan.claims should be nil
+	if len(testAuthMan.claims) != 0 {
+		t.Errorf("got: %d, want: empty claims", len(testAuthMan.claims))
+	}
+
+	// empty jwtProviderKey to enter the claims loop
+	server.handler.jwtProviderKey = ""
+	if resp, err = server.Check(context.Background(), req); err != nil {
+		t.Errorf("should not get error. got: %s", err)
+	}
+	if resp.Status.Code != int32(rpc.OK) {
+		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.OK))
+	}
+
+	// testAuthMan.claims should be nil
+	if len(testAuthMan.claims) != 1 {
+		t.Errorf("got: %d, want: claims length to be 1", len(testAuthMan.claims))
+	}
+
 	// check deny when rejectUnauthorized = false
 	server.handler.rejectUnauthorized = false
 	testProductMan.resolve = false
@@ -235,7 +262,6 @@ func (a *testAuthMan) Authenticate(ctx apigeeContext.Context, apiKey string, cla
 	ac := &auth.Context{
 		Context:     ctx,
 		APIProducts: []string{"product 1"},
-		// ClientID: claims[apiKeyClaimKey].(string),
 	}
 	return ac, nil
 }

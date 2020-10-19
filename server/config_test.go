@@ -67,7 +67,8 @@ auth:
   api_key_header: x-api-key
   target_header: :authority
   reject_unauthorized: true
-  jwks_poll_interval: 0s`
+  jwks_poll_interval: 0s
+  jwt_provider_key: apigee`
 
 	configMapConfigKey = "config.yaml"
 )

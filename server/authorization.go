@@ -67,18 +67,20 @@ func (a *AuthorizationServer) Check(ctx context.Context, req *auth.CheckRequest)
 	fieldsMap := protoBufStruct.GetFields()
 	var claims map[string]interface{}
 
-	// TODO: use jwtProviderKey check instead of apiKeyClaim loop when we drop Istio 1.4 support,
-	//       will also need to enable jwtProviderKey for YAML in config
-	// claimsStruct, ok := fieldsMap[a.handler.jwtProviderKey]
-	// if ok {
-	// 	log.Debugf("Using JWT at provider key: %s", a.handler.jwtProviderKey)
-	// 	claims = DecodeToMap(claimsStruct.GetStructValue())
-	// }
-	for k, v := range fieldsMap {
-		vFields := v.GetStructValue().GetFields()
-		if vFields[a.handler.apiKeyClaim] != nil || vFields["api_product_list"] != nil {
-			log.Debugf("Using JWT with provider key: %s", k)
-			claims = DecodeToMap(v.GetStructValue())
+	// use jwtProviderKey check if jwtProviderKey is set in config
+	if a.handler.jwtProviderKey != "" {
+		claimsStruct, ok := fieldsMap[a.handler.jwtProviderKey]
+		if ok {
+			log.Debugf("Using JWT at provider key: %s", a.handler.jwtProviderKey)
+			claims = DecodeToMap(claimsStruct.GetStructValue())
+		}
+	} else { // otherwise iterate over apiKeyClaim loop
+		for k, v := range fieldsMap {
+			vFields := v.GetStructValue().GetFields()
+			if vFields[a.handler.apiKeyClaim] != nil || vFields["api_product_list"] != nil {
+				log.Debugf("Using JWT with provider key: %s", k)
+				claims = DecodeToMap(v.GetStructValue())
+			}
 		}
 	}
 
