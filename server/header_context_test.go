@@ -30,7 +30,7 @@ func TestMetadataHeaders(t *testing.T) {
 		orgName: "org",
 		envName: "env",
 	}
-	ac := &auth.Context{
+	authContext := &auth.Context{
 		Context:        h,
 		ClientID:       "clientid",
 		AccessToken:    "accesstoken",
@@ -40,7 +40,7 @@ func TestMetadataHeaders(t *testing.T) {
 		Scopes:         []string{"scope1", "scope2"},
 	}
 	api := "api"
-	opts = makeMetadataHeaders(api, ac)
+	opts = makeMetadataHeaders(api, authContext)
 	headers := map[string]string{}
 	for _, o := range opts {
 		headers[o.Header.Key] = o.Header.Value
@@ -52,23 +52,23 @@ func TestMetadataHeaders(t *testing.T) {
 		}
 	}
 
-	equal(headerAccessToken, ac.AccessToken)
+	equal(headerAccessToken, authContext.AccessToken)
 	equal(headerAPI, api)
-	equal(headerAPIProducts, strings.Join(ac.APIProducts, ","))
-	equal(headerApplication, ac.Application)
-	equal(headerClientID, ac.ClientID)
-	equal(headerDeveloperEmail, ac.DeveloperEmail)
-	equal(headerEnvironment, ac.Environment())
-	equal(headerOrganization, ac.Organization())
-	equal(headerScope, strings.Join(ac.Scopes, " "))
+	equal(headerAPIProducts, strings.Join(authContext.APIProducts, ","))
+	equal(headerApplication, authContext.Application)
+	equal(headerClientID, authContext.ClientID)
+	equal(headerDeveloperEmail, authContext.DeveloperEmail)
+	equal(headerEnvironment, authContext.Environment())
+	equal(headerOrganization, authContext.Organization())
+	equal(headerScope, strings.Join(authContext.Scopes, " "))
 
 	api2, ac2 := h.decodeMetadataHeaders(headers)
 	if api != api2 {
 		t.Errorf("got: '%s', want: '%s'", api2, api)
 	}
 
-	if !reflect.DeepEqual(*ac, *ac2) {
-		t.Errorf("\ngot:\n%#v,\nwant\n%#v\n", *ac2, *ac)
+	if !reflect.DeepEqual(*authContext, *ac2) {
+		t.Errorf("\ngot:\n%#v,\nwant\n%#v\n", *ac2, *authContext)
 	}
 }
 

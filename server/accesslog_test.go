@@ -263,7 +263,7 @@ func (a *testAnalyticsMan) Start() {
 	a.records = []analytics.Record{}
 }
 func (a *testAnalyticsMan) Close() {}
-func (a *testAnalyticsMan) SendRecords(ctx *auth.Context, records []analytics.Record) error {
+func (a *testAnalyticsMan) SendRecords(authContext *auth.Context, records []analytics.Record) error {
 
 	a.records = append(a.records, records...)
 	return nil

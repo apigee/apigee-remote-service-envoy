@@ -56,7 +56,7 @@ func TestCheck(t *testing.T) {
 		headerClientID: "clientID",
 	}
 
-	products := product.ProductsMap{
+	products := product.ProductsNameMap{
 		"product1": &product.APIProduct{
 			DisplayName: "product1",
 		},
@@ -259,11 +259,11 @@ func (a *testAuthMan) Authenticate(ctx apigeeContext.Context, apiKey string, cla
 		return nil, a.sendError
 	}
 
-	ac := &auth.Context{
+	authContext := &auth.Context{
 		Context:     ctx,
 		APIProducts: []string{"product 1"},
 	}
-	return ac, nil
+	return authContext, nil
 }
 
 type testProductMan struct {
@@ -272,16 +272,19 @@ type testProductMan struct {
 }
 
 func (p *testProductMan) Close() {}
-func (p *testProductMan) Products() product.ProductsMap {
+func (p *testProductMan) Products() product.ProductsNameMap {
 	return p.products
 }
-func (p *testProductMan) Resolve(ac *auth.Context, api, path string) []*product.APIProduct {
+func (p *testProductMan) Authorize(ac *auth.Context, target, path, method string) []product.AuthorizedOperation {
 	if !p.resolve {
 		return nil
 	}
-	values := []*product.APIProduct{}
-	for _, value := range p.products {
-		values = append(values, value)
+	values := []product.AuthorizedOperation{}
+	for _, p := range p.products {
+		values = append(values, product.AuthorizedOperation{
+			ID:         p.DisplayName,
+			QuotaLimit: 42,
+		})
 	}
 	return values
 }
@@ -293,7 +296,7 @@ type testQuotaMan struct {
 
 func (q *testQuotaMan) Start() {}
 func (q *testQuotaMan) Close() {}
-func (q *testQuotaMan) Apply(auth *auth.Context, p *product.APIProduct, args quota.Args) (*quota.Result, error) {
+func (q *testQuotaMan) Apply(auth *auth.Context, p product.AuthorizedOperation, args quota.Args) (*quota.Result, error) {
 	if q.sendError != nil {
 		return nil, q.sendError
 	}
