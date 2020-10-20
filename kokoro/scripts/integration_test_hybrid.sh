@@ -393,6 +393,7 @@ function cleanUp {
 echo -e "\nStarting integration test of the Apigee Envoy Adapter with Apigee Hybrid..."
 
 setEnvironmentVariables
+buildDockerImages
 provisionRemoteService
 generateSampleConfigurations istio-1.6
 applyToCluster
