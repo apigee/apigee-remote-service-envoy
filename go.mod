@@ -2,8 +2,10 @@ module github.com/apigee/apigee-remote-service-envoy
 
 go 1.15
 
+// replace github.com/apigee/apigee-remote-service-golib => ../apigee-remote-service-golib
+
 require (
-	github.com/apigee/apigee-remote-service-golib v1.2.1-0.20201014193308-d793914cce47
+	github.com/apigee/apigee-remote-service-golib v1.2.1-0.20201020221247-3391bb81c8bf
 	github.com/envoyproxy/go-control-plane v0.9.6
 	github.com/gogo/googleapis v1.4.0
 	github.com/golang/protobuf v1.4.2

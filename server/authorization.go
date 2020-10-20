@@ -56,7 +56,7 @@ func (a *AuthorizationServer) Check(ctx context.Context, req *auth.CheckRequest)
 	tracker := prometheusRequestTracker(a.handler)
 	defer tracker.record()
 
-	api, ok := req.Attributes.Request.Http.Headers[a.handler.targetHeader]
+	target, ok := req.Attributes.Request.Http.Headers[a.handler.targetHeader]
 	if !ok {
 		log.Debugf("missing target header %s", a.handler.targetHeader)
 		return a.unauthorized(tracker), nil
@@ -102,33 +102,34 @@ func (a *AuthorizationServer) Check(ctx context.Context, req *auth.CheckRequest)
 	case libAuth.ErrNoAuth:
 		return a.unauthorized(tracker), nil
 	case libAuth.ErrBadAuth:
-		return a.denied(tracker, authContext, api), nil
+		return a.denied(tracker, authContext, target), nil
 	case libAuth.ErrInternalError:
 		return a.internalError(tracker, err), nil
 	}
 
 	if len(authContext.APIProducts) == 0 {
-		return a.denied(tracker, authContext, api), nil
+		return a.denied(tracker, authContext, target), nil
 	}
 
-	// match products
-	products := a.handler.productMan.Resolve(authContext, api, path)
-	if len(products) == 0 {
-		return a.denied(tracker, authContext, api), nil
+	// authorize against products
+	method := req.Attributes.Request.Http.Method
+	authorizedOps := a.handler.productMan.Authorize(authContext, target, path, method)
+	if len(authorizedOps) == 0 {
+		return a.denied(tracker, authContext, target), nil
 	}
 
-	// apply quotas to all matched products
+	// apply quotas to matched operations
 	var quotaArgs = quota.Args{QuotaAmount: 1}
 	var exceeded bool
 	var anyError error
-	for _, p := range products {
-		if p.QuotaLimitInt > 0 {
-			result, err := a.handler.quotaMan.Apply(authContext, p, quotaArgs)
+	for _, op := range authorizedOps {
+		if op.QuotaLimit > 0 {
+			result, err := a.handler.quotaMan.Apply(authContext, op, quotaArgs)
 			if err != nil {
 				log.Errorf("quota check: %v", err)
 				anyError = err
 			} else if result.Exceeded > 0 {
-				log.Debugf("quota exceeded: %v", p.Name)
+				log.Debugf("quota exceeded: %v", op.ID)
 				exceeded = true
 			}
 		}
@@ -137,15 +138,15 @@ func (a *AuthorizationServer) Check(ctx context.Context, req *auth.CheckRequest)
 		return a.internalError(tracker, anyError), nil
 	}
 	if exceeded {
-		return a.quotaExceeded(tracker, authContext, api), nil
+		return a.quotaExceeded(tracker, authContext, target), nil
 	}
 
-	return a.authOK(tracker, authContext, api), nil
+	return a.authOK(tracker, authContext, target), nil
 }
 
-func (a *AuthorizationServer) authOK(tracker *prometheusRequestMetricTracker, authContext *aauth.Context, api string) *auth.CheckResponse {
+func (a *AuthorizationServer) authOK(tracker *prometheusRequestMetricTracker, authContext *aauth.Context, target string) *auth.CheckResponse {
 
-	headers := makeMetadataHeaders(api, authContext)
+	headers := makeMetadataHeaders(target, authContext)
 	headers = append(headers, &core.HeaderValueOption{
 		Header: &core.HeaderValue{
 			Key:   headerAuthorized,
@@ -175,15 +176,15 @@ func (a *AuthorizationServer) internalError(tracker *prometheusRequestMetricTrac
 	return a.createDenyResponse(tracker, nil, "", rpc.INTERNAL)
 }
 
-func (a *AuthorizationServer) denied(tracker *prometheusRequestMetricTracker, authContext *aauth.Context, api string) *auth.CheckResponse {
-	return a.createDenyResponse(tracker, authContext, api, rpc.PERMISSION_DENIED)
+func (a *AuthorizationServer) denied(tracker *prometheusRequestMetricTracker, authContext *aauth.Context, target string) *auth.CheckResponse {
+	return a.createDenyResponse(tracker, authContext, target, rpc.PERMISSION_DENIED)
 }
 
-func (a *AuthorizationServer) quotaExceeded(tracker *prometheusRequestMetricTracker, authContext *aauth.Context, api string) *auth.CheckResponse {
-	return a.createDenyResponse(tracker, authContext, api, rpc.RESOURCE_EXHAUSTED)
+func (a *AuthorizationServer) quotaExceeded(tracker *prometheusRequestMetricTracker, authContext *aauth.Context, target string) *auth.CheckResponse {
+	return a.createDenyResponse(tracker, authContext, target, rpc.RESOURCE_EXHAUSTED)
 }
 
-func (a *AuthorizationServer) createDenyResponse(tracker *prometheusRequestMetricTracker, authContext *aauth.Context, api string, code rpc.Code) *auth.CheckResponse {
+func (a *AuthorizationServer) createDenyResponse(tracker *prometheusRequestMetricTracker, authContext *aauth.Context, target string, code rpc.Code) *auth.CheckResponse {
 
 	// use intended code, not OK
 	switch code {
@@ -231,7 +232,7 @@ func (a *AuthorizationServer) createDenyResponse(tracker *prometheusRequestMetri
 		},
 		HttpResponse: &auth.CheckResponse_OkResponse{
 			OkResponse: &auth.OkHttpResponse{
-				Headers: makeMetadataHeaders(api, authContext),
+				Headers: makeMetadataHeaders(target, authContext),
 			},
 		},
 	}
