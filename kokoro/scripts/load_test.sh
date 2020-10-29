@@ -18,8 +18,7 @@
 set -e
 
 # load necessary function definitions
-#. ${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-envoy/kokoro/scripts/lib.sh
-. /usr/local/google/home/lwge/repos/apigee-remote-service-envoy/kokoro/scripts/lib.sh
+. ${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-envoy/kokoro/scripts/lib.sh
 
 setEnvironmentVariables loadtest-env
 
