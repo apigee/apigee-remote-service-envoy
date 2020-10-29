@@ -35,6 +35,15 @@ spec:
         prometheus.io/scrape: "true"
         prometheus.io/type: prometheusspec
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: cloud.google.com/gke-nodepool
+                operator: In
+                values:
+                - adapter-pool
       tolerations:
         - key: "adapter"
           operator: "Exists"
@@ -48,7 +57,7 @@ spec:
         - name: GODEBUG
           value: x509ignoreCN=0
         name: apigee-remote-service-envoy
-        image: "google/apigee-envoy-adapter:v1.1.0"
+        image: "google/apigee-envoy-adapter:test"
         imagePullPolicy: Always
         ports:
         - containerPort: 5000
@@ -70,9 +79,6 @@ spec:
           # - --log-level=debug
           - --config=/config/config.yaml
         resources:
-          limits:
-            cpu: 1000m
-            memory: 100Mi
           requests:
             cpu: 10m
             memory: 100Mi

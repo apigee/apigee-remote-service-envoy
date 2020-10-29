@@ -12,22 +12,45 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+kind: Service
+apiVersion: v1
+metadata:
+  name: locust-manager
+  namespace: apigee
+  labels:
+    app: locust-manager
+spec:
+  ports:
+    - port: 8089
+      targetPort: loc-manager-web
+      protocol: TCP
+      name: loc-manager-web
+    - port: 5557
+      targetPort: loc-manager-p1
+      protocol: TCP
+      name: loc-manager-p1
+    - port: 5558
+      targetPort: loc-manager-p2
+      protocol: TCP
+      name: loc-manager-p2
+  selector:
+    app: locust-manager
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: locust-worker
+  name: locust-manager
   namespace: apigee
   labels:
-    name: locust-worker
+    name: locust-manager
 spec:
-  replicas: 100
   selector:
     matchLabels:
-      app: locust-worker
+      app: locust-manager
   template:
     metadata:
       labels:
-        app: locust-worker
+        app: locust-manager
     spec:
       affinity:
         nodeAffinity:
@@ -43,20 +66,38 @@ spec:
         operator: "Exists"
         effect: "NoSchedule"
       containers:
-      - name: locust-worker
+      - name: locust-manager
         image: docker.io/locustio/locust
         args:
           - -f
           - /config/locustfile.py
           - -H
           - http://target.apigee.svc.cluster.local
-          - --master-host
-          - locust-manager.apigee.svc.cluster.local
-          - --worker
+          - --master
+          - --headless
+          - -u
+          - "5000"
+          - -r
+          - "50"
+          - --run-time
+          - 60m
+          - --expect-workers
+          - "100"
+          - --csv=adapter-load-test
         resources:
           requests:
-            cpu: 50m
+            cpu: 100m
             memory: 100Mi
+        ports:
+          - name: loc-manager-web
+            containerPort: 8089
+            protocol: TCP
+          - name: loc-manager-p1
+            containerPort: 5557
+            protocol: TCP
+          - name: loc-manager-p2
+            containerPort: 5558
+            protocol: TCP
         volumeMounts:
           - mountPath: /config
             name: locust-config
