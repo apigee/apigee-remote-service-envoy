@@ -40,7 +40,7 @@ spec:
         args:
           - -addr
           - :6001
-      - image: docker.io/envoyproxy/envoy:v1.15.0
+      - image: docker.io/envoyproxy/envoy:v1.16.0
         name: envoy-proxy
         ports:
           - containerPort: 8080
