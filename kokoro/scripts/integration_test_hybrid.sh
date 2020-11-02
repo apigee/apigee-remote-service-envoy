@@ -27,8 +27,7 @@ function provisionRemoteService {
 
   {
     $CLI provision -o $ORG -e $ENV -t $TOKEN -r $RUNTIME -f -v > config.yaml
-  } || { # clean up and exit directly if cli encounters any error
-    cleanUp
+  } || { # exit directly if cli encounters any error
     exit 8
   }
 
@@ -40,7 +39,6 @@ function provisionRemoteService {
     -d @${REPO}/kokoro/scripts/httpbin_product.json)
   if [[ $STATUS_CODE -ge 299 ]] ; then
     echo -e "\nError creating API Product httpbin-product: $STATUS_CODE"
-    cleanUp
     exit 8
   fi  
 
@@ -52,7 +50,6 @@ function provisionRemoteService {
     -d @${REPO}/kokoro/scripts/developer.json)
   if [[ $STATUS_CODE -ge 299 ]] ; then
     echo -e "\nError creating Application Developer integration@test.com: $STATUS_CODE"
-    cleanUp
     exit 8
   fi
 
@@ -64,7 +61,6 @@ function provisionRemoteService {
     -d @${REPO}/kokoro/scripts/application.json)
   if [[ $STATUS_CODE -ge 299 ]] ; then
     echo -e "\nError creating Application httpbin-app: $STATUS_CODE"
-    cleanUp
     exit 8
   fi
 
@@ -80,12 +76,10 @@ function provisionRemoteService {
     echo -e "\nAPISECRET: $APISECRET"
   } || {
     echo -e "\nError extracting credentials from Application httpbin-app: $STATUS_CODE"
-    cleanUp
     exit 8
   }
   if [[ -z $APIKEY ]] || [[ -z $APISECRET ]] ; then
     echo -e "\nError extracting credentials from Application httpbin-app: $STATUS_CODE"
-    cleanUp
     exit 8
   fi
 }
@@ -99,8 +93,7 @@ function generateSampleConfigurations {
   {
     $CLI samples create -c config.yaml --out samples --template $1 --tag test
     sed -i -e "s/google/gcr.io\/${PROJECT}/g" samples/apigee-envoy-adapter.yaml
-  } || { # clean up and exit directly if cli encounters any error
-    cleanUp
+  } || { # exit directly if cli encounters any error
     exit 1
   }
 }
@@ -166,11 +159,12 @@ function deployRemoteServiceProxies {
 }
 
 ################################################################################
-# Clean up
+# Clean up Apigee resources
 ################################################################################
-function cleanUp {
-  echo -e "\nCleaning up resources applied to the Hybrid cluster..."
+function cleanUpApigee {
+  echo -e "\nCleaning up resources applied to the Apigee Hybrid..."
   TOKEN=$(gcloud auth print-access-token)
+  MGMT=apigee.googleapis.com
 
   echo -e "\nDeleting Application httpbin-app..."
   STATUS_CODE=$(curl -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
@@ -214,27 +208,6 @@ function cleanUp {
     echo -e "\nError deleting API Proxies remote-service: $STATUS_CODE"
   fi
 
-  echo -e "\nDeleting configuration files..."
-  if [[ -f "hybrid-env" ]]; then
-    rm hybrid-env
-  fi
-  if [[ -f "config.yaml" ]]; then
-    {
-      kubectl delete -f config.yaml
-      rm config.yaml
-    } || { # in the case of k8s deletion failure
-      rm config.yaml
-    }
-  fi
-  if [[ -d "istio-samples" ]]; then
-    {
-      kubectl delete -f samples
-      rm -r istio-samples
-    } || { # in the case of k8s deletion failure
-      rm -r istio-samples
-    }
-  fi
-  kubectl delete pods curl
 }
 
 echo -e "\nStarting integration test of the Apigee Envoy Adapter with Apigee Hybrid..."
@@ -243,15 +216,22 @@ echo -e "\nStarting integration test of the Apigee Envoy Adapter with Apigee Hyb
 . ${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-envoy/kokoro/scripts/lib.sh
 
 setEnvironmentVariables hybrid-env
+
+{
+  cleanUpApigee
+} || {
+  echo -e "\n Apigee resources do not all exist."
+}
+
 buildDockerImages
 provisionRemoteService
 
 generateIstioSampleConfigurations istio-1.6
 
+cleanUpKubernetes
+
 applyToCluster istio-samples
 runIstioTests
-
-cleanUp
 
 echo -e "\nFinished integration test of the Apigee Envoy Adapter with Apigee Hybrid."
 

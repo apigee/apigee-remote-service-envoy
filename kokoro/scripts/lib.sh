@@ -49,8 +49,7 @@ function generateIstioSampleConfigurations {
   {
     $CLI samples create -c config.yaml --out istio-samples --template $1 --tag test
     sed -i -e "s/google/gcr.io\/${PROJECT}/g" istio-samples/apigee-envoy-adapter.yaml
-  } || { # clean up and exit directly if cli encounters any error
-    cleanUp
+  } || { # exit directly if cli encounters any error
     exit 1
   }
 }
@@ -64,8 +63,7 @@ function generateEnvoySampleConfigurations {
   {
     $CLI samples create -c config.yaml --out native-samples --template native --tag test
     chmod 644 native-samples/envoy-config.yaml
-  } || { # clean up and exit directly if cli encounters any error
-    cleanUp
+  } || { # exit directly if cli encounters any error
     exit 1
   }
 }
@@ -91,7 +89,6 @@ function callTargetWithAPIKey {
   if [[ ! -z $2 ]] ; then
     if [[ $STATUS_CODE -ne $2 ]] ; then
       echo -e "\nError calling local target with API key: expected status $2; got $STATUS_CODE"
-      cleanUp
       exit 2
     else 
       echo -e "\nCalling local target with API key got $STATUS_CODE as expected"
@@ -112,7 +109,6 @@ function callTargetWithJWT {
   if [[ ! -z $2 ]] ; then
     if [[ $STATUS_CODE -ne $2 ]] ; then
       echo -e "\nError calling local target with JWT: expected status $2; got $STATUS_CODE"
-      cleanUp
       exit 3
     else 
       echo -e "\nCalling local target with JWT got $STATUS_CODE as expected"
@@ -134,7 +130,6 @@ function callIstioTargetWithAPIKey {
   if [[ ! -z $2 ]] ; then
     if [[ $STATUS_CODE -ne $2 ]] ; then
       echo -e "\nError calling target with API key: expected status $2; got $STATUS_CODE"
-      cleanUp
       exit 4
     else 
       echo -e "\nCalling target with API key got $STATUS_CODE as expected"
@@ -156,7 +151,6 @@ function callIstioTargetWithJWT {
   if [[ ! -z $2 ]] ; then
     if [[ $STATUS_CODE -ne $2 ]] ; then
       echo -e "\nError calling target with JWT: expected status $2; got $STATUS_CODE"
-      cleanUp
       exit 5
     else 
       echo -e "\nCalling target with JWT got $STATUS_CODE as expected"
@@ -236,8 +230,31 @@ EOF
     callIstioTargetWithAPIKey $APIKEY 200
 
     deployRemoteServiceProxies $REV
-  } || { # clean up resources on failure
-    cleanUp
+  } || { # exit on failure
     exit 6
+  }
+}
+
+################################################################################
+# Clean up Apigee resources
+################################################################################
+function cleanUpKubernetes {
+  if [[ -f "config.yaml" ]]; then
+    {
+      kubectl delete -f config.yaml
+    } || {
+      echo -e "\nconfig map does not exist."
+    }
+  fi
+  if [[ -d "istio-samples" ]]; then
+    { kubectl delete -f istio-samples
+    } || {
+      echo -e "\n istio sample configurations do not exist."
+    }
+  fi
+  {
+    kubectl delete pods curl
+  } || {
+    echo -e "\n pod curl does not exist."
   }
 }

@@ -26,8 +26,7 @@ function provisionRemoteService {
   {
     $CLI provision -o $ORG -e $ENV -u $USER -p $PASSWORD --legacy -f > config.yaml
     chmod 644 config.yaml
-  } || { # clean up and exit directly if cli encounters any error
-    cleanUp
+  } || { # exit directly if cli encounters any error
     exit 9
   }
 
@@ -39,7 +38,6 @@ function provisionRemoteService {
     -d @${REPO}/kokoro/scripts/httpbin_product.json)
   if [[ $STATUS_CODE -ge 299 ]] ; then
     echo -e "\nError creating API Product httpbin-product: $STATUS_CODE"
-    cleanUp
     exit 9
   fi  
 
@@ -51,7 +49,6 @@ function provisionRemoteService {
     -d @${REPO}/kokoro/scripts/developer.json)
   if [[ $STATUS_CODE -ge 299 ]] ; then
     echo -e "\nError creating Application Developer integration@test.com: $STATUS_CODE"
-    cleanUp
     exit 9
   fi
 
@@ -63,7 +60,6 @@ function provisionRemoteService {
     -d @${REPO}/kokoro/scripts/application.json)
   if [[ $STATUS_CODE -ge 299 ]] ; then
     echo -e "\nError creating Application httpbin-app: $STATUS_CODE"
-    cleanUp
     exit 9
   fi
 
@@ -79,12 +75,10 @@ function provisionRemoteService {
     echo -e "\nAPISECRET: $APISECRET"
   } || {
     echo -e "\nError extracting credentials from Application httpbin-app: $STATUS_CODE"
-    cleanUp
     exit 9
   }
   if [[ -z $APIKEY ]] || [[ -z $APISECRET ]] ; then
     echo -e "\nError extracting credentials from Application httpbin-app: $STATUS_CODE"
-    cleanUp
     exit 9
   fi
 }
@@ -138,7 +132,6 @@ function callTargetWithAPIKey {
   if [[ ! -z $2 ]] ; then
     if [[ $STATUS_CODE -ne $2 ]] ; then
       echo -e "\nError calling local target with API key: expected status $2; got $STATUS_CODE"
-      cleanUp
       exit 1
     else 
       echo -e "\nCalling local target with API key got $STATUS_CODE as expected"
@@ -159,7 +152,6 @@ function callTargetWithJWT {
   if [[ ! -z $2 ]] ; then
     if [[ $STATUS_CODE -ne $2 ]] ; then
       echo -e "\nError calling local target with JWT: expected status $2; got $STATUS_CODE"
-      cleanUp
       exit 1
     else 
       echo -e "\nCalling local target with JWT got $STATUS_CODE as expected"
@@ -233,17 +225,17 @@ function runEnvoyTests {
     callTargetWithAPIKey $APIKEY 200
 
     deployRemoteServiceProxies $REV
-  } || { # clean up resources on failure
-    cleanUp
+  } || { # exit on failure
     exit 7
   }
 }
 
 ################################################################################
-# Clean up
+# Clean up Apigee resources
 ################################################################################
-function cleanUp {
-  echo -e "\nCleaning up resources applied to the Hybrid cluster..."
+function cleanUpApigee {
+  echo -e "\nCleaning up resources applied to the Apigee CG SaaS..."
+  MGMT=api.enterprise.apigee.com
 
   echo -e "\nDeleting Application httpbin-app..."
   STATUS_CODE=$(curl -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
@@ -287,37 +279,7 @@ function cleanUp {
     echo -e "\nError deleting API Proxies remote-service: $STATUS_CODE"
   fi
 
-  echo -e "\nDeleting configuration files..."
-  if [[ -f "cgsaas-env" ]]; then
-    rm cgsaas-env
-  fi
-  if [[ -f "config.yaml" ]]; then
-    {
-      kubectl delete -f config.yaml
-      rm config.yaml
-    } || { # in the case of k8s deletion failure
-      rm config.yaml
-    }
-  fi
-  if [[ -d "istio-samples" ]]; then
-    {
-      kubectl delete -f istio-samples
-      rm -r istio-samples
-    } || { # in the case of k8s deletion failure
-      rm -r istio-samples
-    }
-  fi
-  if [[ -d "native-samples" ]]; then
-    rm -r native-samples
-  fi
-  kubectl delete pods curl
-
-  echo -e "\nStopping local Docker containers..."
-  docker stop envoy
-  docker stop adapter
-  echo -e "\nContainers stopped."
 }
-
 
 echo -e "\nStarting integration test of the Apigee Envoy Adapter with Apigee SaaS..."
 
@@ -325,16 +287,23 @@ echo -e "\nStarting integration test of the Apigee Envoy Adapter with Apigee Saa
 . ${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-envoy/kokoro/scripts/lib.sh
 
 setEnvironmentVariables cgsaas-env
+
+{
+  cleanUpApigee
+} || {
+  echo -e "\n Apigee resources do not all exist."
+}
+
 provisionRemoteService
 
 generateIstioSampleConfigurations istio-1.7
 generateEnvoySampleConfigurations
 
+cleanUpKubernetes
+
 runEnvoyTests
 
 applyToCluster istio-samples
 runIstioTests
-
-cleanUp
 
 echo -e "\nFinished integration test of the Apigee Envoy Adapter with Apigee SaaS."
