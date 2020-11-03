@@ -45,7 +45,9 @@ function buildDockerImages {
 ################################################################################
 function generateIstioSampleConfigurations {
   echo -e "\nGenerating sample configurations files for $1 via the CLI..."
-
+  if [[ -d "istio-samples" ]]; then
+    rm -r istio-samples
+  fi
   {
     $CLI samples create -c config.yaml --out istio-samples --template $1 --tag test
     sed -i -e "s/google/gcr.io\/${PROJECT}/g" istio-samples/apigee-envoy-adapter.yaml
@@ -59,7 +61,9 @@ function generateIstioSampleConfigurations {
 ################################################################################
 function generateEnvoySampleConfigurations {
   echo -e "\nGenerating sample configurations files for $1 via the CLI..."
-
+  if [[ -d "native-samples" ]]; then
+    rm -r native-samples
+  fi
   {
     $CLI samples create -c config.yaml --out native-samples --template native --tag test
     chmod 644 native-samples/envoy-config.yaml
