@@ -114,7 +114,7 @@ func TestNewHandler(t *testing.T) {
 		t.Error(err)
 	}
 	if h.internalAPI.Host != "apigee.googleapis.com" {
-		t.Errorf("intervalAPI error: want %s got %s", "apigee.googleapis.com", h.internalAPI.Host)
+		t.Errorf("internalAPI error: want %s got %s", "apigee.googleapis.com", h.internalAPI.Host)
 	}
 
 	tf, err := ioutil.TempFile("", "")

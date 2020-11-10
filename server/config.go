@@ -240,16 +240,18 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string) 
 		if analyticsSecretPath != "" {
 			svc := path.Join(analyticsSecretPath, ServiceAccount)
 			log.Debugf("using analytics service account credentials from: %s", svc)
-			c.Analytics.CredentialsJSON, err = ioutil.ReadFile(svc)
+			sa, err := ioutil.ReadFile(svc)
 			if err != nil {
 				if analyticsSecretPath == DefaultAnalyticsSecretPath {
 					// allows fall back to default credentials or fluentd if the path is the default one
-					c.Analytics.CredentialsJSON = nil
 					log.Warnf("reading analytics service account credentials from default path: %v", err)
 				} else {
 					// returns error if the invalid path is explicitly specified
 					return err
 				}
+			} else {
+				// overwrites the credentials if read from the config
+				c.Analytics.CredentialsJSON = sa
 			}
 		}
 	}

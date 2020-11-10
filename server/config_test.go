@@ -389,15 +389,6 @@ tenant:
 		t.Error(err)
 	}
 
-	// invalid path to analytics credentials
-	c = DefaultConfig()
-	err = c.Load(tf.Name(), "", "no such path")
-	if err == nil {
-		t.Error("want error got none")
-	} else {
-		equal(t, err.Error(), "open no such path/client_secret.json: no such file or directory")
-	}
-
 	// no analytics credentials given and invalid config
 	c = DefaultConfig()
 	err = c.Load(tf.Name(), "", "")
@@ -413,6 +404,52 @@ tenant:
 	errs := merr.Errors
 	for i, e := range errs {
 		equal(t, e.Error(), wantErrs[i])
+	}
+}
+
+func TestAnalyticsRollback(t *testing.T) {
+	configCRD, policySecretCRD, analyticsSecretCRD, err := makeCRDs()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tf, err := ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tf.Name())
+
+	// put ConfigMap in the end
+	configMapYAML, err := makeYAML(policySecretCRD, analyticsSecretCRD, configCRD)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := tf.WriteString(configMapYAML); err != nil {
+		t.Fatal(err)
+	}
+	if err := tf.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	var c *Config
+
+	c = DefaultConfig()
+	err = c.Load(tf.Name(), "", DefaultAnalyticsSecretPath)
+	if err != nil {
+		t.Errorf("want no error got %v", err)
+	}
+	if string(c.Analytics.CredentialsJSON) != `{"type": "service_account"}` {
+		t.Errorf("want the analytics credentials to be rolled back")
+	}
+
+	// invalid path to analytics credentials
+	c = DefaultConfig()
+	err = c.Load(tf.Name(), "", "no such path")
+	if err == nil {
+		t.Error("want error got none")
+	} else {
+		equal(t, err.Error(), "open no such path/client_secret.json: no such file or directory")
 	}
 }
 
