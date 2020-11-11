@@ -16,11 +16,11 @@
 package server
 
 import (
-	"io/ioutil"
-	"os"
+	"context"
 	"testing"
 
 	"github.com/apigee/apigee-remote-service-envoy/testutil"
+	"golang.org/x/oauth2/google"
 )
 
 func TestNewHandler(t *testing.T) {
@@ -108,49 +108,17 @@ func TestNewHandler(t *testing.T) {
 	// valid credentials given in config; internalAPI set to GCP managed URL
 	config.Tenant.RemoteServiceAPI = config.Tenant.InternalAPI
 	config.Tenant.InternalAPI = ""
-	config.Analytics.CredentialsJSON = fakeServiceAccount()
+	cred, err := google.CredentialsFromJSON(context.Background(), fakeServiceAccount(), ApigeeAPIScope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config.Analytics.Credentials = cred
 	h, err = NewHandler(config)
 	if err != nil {
 		t.Error(err)
 	}
 	if h.internalAPI.Host != "apigee.googleapis.com" {
 		t.Errorf("internalAPI error: want %s got %s", "apigee.googleapis.com", h.internalAPI.Host)
-	}
-
-	tf, err := ioutil.TempFile("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.Remove(tf.Name())
-
-	// write credentials to file and set GOOGLE_APPLICATION_CREDENTIALS to its path
-	if _, err := tf.Write(config.Analytics.CredentialsJSON); err != nil {
-		t.Fatal(err)
-	}
-	if err := tf.Close(); err != nil {
-		t.Fatal(err)
-	}
-	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", tf.Name())
-	// remove credentials in config
-	// valid default application credentials given by GOOGLE_APPLICATION_CREDENTIALS
-	config.Analytics.CredentialsJSON = nil
-	_, err = NewHandler(config)
-	if err != nil {
-		t.Errorf("want no error got %v", err)
-	}
-
-	// no valid default application credentials; fall back to client without auth
-	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "invalid path")
-	_, err = NewHandler(config)
-	if err != nil {
-		t.Errorf("want no error got %v", err)
-	}
-
-	// invalid credentials given in config; returns error and no fall back
-	config.Analytics.CredentialsJSON = []byte("invalid sa")
-	_, err = NewHandler(config)
-	if err == nil {
-		t.Error("should get error")
 	}
 
 	h.Close()

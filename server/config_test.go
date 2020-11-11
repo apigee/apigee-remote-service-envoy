@@ -164,7 +164,7 @@ func TestHybridSingleFile(t *testing.T) {
 	}
 
 	c := DefaultConfig()
-	if err := c.Load(tf.Name(), "xxx", DefaultAnalyticsSecretPath); err != nil {
+	if err := c.Load(tf.Name(), "xxx", DefaultAnalyticsSecretPath, true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -206,7 +206,7 @@ func TestMultifileConfig(t *testing.T) {
 	}
 
 	c := DefaultConfig()
-	if err := c.Load(tf.Name(), secretDir, ""); err != nil {
+	if err := c.Load(tf.Name(), secretDir, "", true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -241,7 +241,7 @@ func TestIncompletePolicySecret(t *testing.T) {
 	}
 
 	c := DefaultConfig()
-	if err := c.Load(tf.Name(), "", ""); err != nil {
+	if err := c.Load(tf.Name(), "", "", true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -274,7 +274,7 @@ func TestLoadOrders(t *testing.T) {
 	}
 
 	c := DefaultConfig()
-	if err := c.Load(tf.Name(), "", ""); err != nil {
+	if err := c.Load(tf.Name(), "", "", true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -305,7 +305,7 @@ func TestLoadOrders(t *testing.T) {
 	}
 
 	c = DefaultConfig()
-	if err := c.Load(tf.Name(), "", ""); err != nil {
+	if err := c.Load(tf.Name(), "", "", true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -337,7 +337,7 @@ func TestLoadLegacyConfig(t *testing.T) {
 	}
 
 	c := &Config{}
-	if err := c.Load(tf.Name(), "xxx", ""); err != nil {
+	if err := c.Load(tf.Name(), "xxx", "", true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -385,16 +385,33 @@ tenant:
 
 	// valid path to analytics credentials
 	c := DefaultConfig()
-	if err := c.Load(tf.Name(), "", credDir); err != nil {
+	if err := c.Load(tf.Name(), "", credDir, true); err != nil {
+		t.Error(err)
+	}
+
+	// cache original GOOGLE_APPLICATION_CREDENTIALS for recoverage
+	oldEnv := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
+	defer os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", oldEnv)
+
+	// set valid GOOGLE_APPLICATION_CREDENTIALS
+	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", credFile)
+	c = DefaultConfig()
+	if err := c.Load(tf.Name(), "", "", true); err != nil {
 		t.Error(err)
 	}
 
 	// no analytics credentials given and invalid config
+	// explicitly set invalid GOOGLE_APPLICATION_CREDENTIALS to avoid
+	// any interference from the test environment
+	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "not valid")
 	c = DefaultConfig()
-	err = c.Load(tf.Name(), "", "")
+	err = c.Load(tf.Name(), "", "", true)
+	if err == nil {
+		t.Fatal("want error got none")
+	}
 
 	wantErrs := []string{
-		"tenant.internal_api or tenant.analytics.fluentd_endpoint is required if no service account",
+		"tenant.internal_api or tenant.analytics.fluentd_endpoint is required if analytics credentials not given",
 	}
 	merr := err.(*multierror.Error)
 	if merr.Len() != len(wantErrs) {
@@ -434,8 +451,9 @@ func TestAnalyticsRollback(t *testing.T) {
 
 	var c *Config
 
+	// analytics to be rolled back to that from config file
 	c = DefaultConfig()
-	err = c.Load(tf.Name(), "", DefaultAnalyticsSecretPath)
+	err = c.Load(tf.Name(), "", DefaultAnalyticsSecretPath, true)
 	if err != nil {
 		t.Errorf("want no error got %v", err)
 	}
@@ -445,7 +463,7 @@ func TestAnalyticsRollback(t *testing.T) {
 
 	// invalid path to analytics credentials
 	c = DefaultConfig()
-	err = c.Load(tf.Name(), "", "no such path")
+	err = c.Load(tf.Name(), "", "no such path", true)
 	if err == nil {
 		t.Error("want error got none")
 	} else {
@@ -469,7 +487,7 @@ func TestInvalidConfig(t *testing.T) {
 	}
 
 	c := &Config{}
-	if err := c.Load(tf.Name(), "", ""); err == nil {
+	if err := c.Load(tf.Name(), "", "", true); err == nil {
 		t.Error("should have gotten error")
 	}
 
@@ -493,7 +511,7 @@ func TestInvalidConfig(t *testing.T) {
 	}
 
 	c = &Config{}
-	if err := c.Load(tf.Name(), "", ""); err == nil {
+	if err := c.Load(tf.Name(), "", "", true); err == nil {
 		t.Error("should have gotten error")
 	}
 }
@@ -512,25 +530,54 @@ func makeConfigCRD(config string) *ConfigMapCRD {
 }
 
 func TestValidate(t *testing.T) {
+	// cache original GOOGLE_APPLICATION_CREDENTIALS for recoverage
+	oldEnv := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
+	defer os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", oldEnv)
+
+	// explicitly set invalid GOOGLE_APPLICATION_CREDENTIALS to avoid
+	// any interference from the test environment
+	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "invalid path")
+
 	c := &Config{}
-	err := c.Validate()
+	var wantErrs []string
+	var merr *multierror.Error
+
+	err := c.Validate(true)
 	if err == nil {
 		t.Fatal("should have gotten errors")
 	}
 
-	wantErrs := []string{
+	wantErrs = []string{
 		"tenant.remote_service_api is required",
-		"tenant.internal_api or tenant.analytics.fluentd_endpoint is required if no service account",
+		"tenant.internal_api or tenant.analytics.fluentd_endpoint is required if analytics credentials not given",
 		"tenant.org_name is required",
 		"tenant.env_name is required",
 	}
-	merr := err.(*multierror.Error)
+	merr = err.(*multierror.Error)
 	if merr.Len() != len(wantErrs) {
 		t.Fatalf("got %d errors, want: %d, errors: %s", merr.Len(), len(wantErrs), merr)
 	}
 
-	errs := merr.Errors
-	for i, e := range errs {
+	for i, e := range merr.Errors {
+		equal(t, e.Error(), wantErrs[i])
+	}
+
+	err = c.Validate(false)
+	if err == nil {
+		t.Fatal("should have gotten errors")
+	}
+
+	wantErrs = []string{
+		"tenant.remote_service_api is required",
+		"tenant.org_name is required",
+		"tenant.env_name is required",
+	}
+	merr = err.(*multierror.Error)
+	if merr.Len() != len(wantErrs) {
+		t.Fatalf("got %d errors, want: %d, errors: %s", merr.Len(), len(wantErrs), merr)
+	}
+
+	for i, e := range merr.Errors {
 		equal(t, e.Error(), wantErrs[i])
 	}
 }
@@ -563,7 +610,7 @@ func TestValidateTLS(t *testing.T) {
 		config.Analytics.TLS.CertFile = o[3]
 		config.Analytics.TLS.KeyFile = o[4]
 
-		err := config.Validate()
+		err := config.Validate(true)
 		if err == nil {
 			t.Fatal("should have gotten errors")
 		}
