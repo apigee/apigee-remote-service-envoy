@@ -457,7 +457,7 @@ func TestAnalyticsRollback(t *testing.T) {
 	if err != nil {
 		t.Errorf("want no error got %v", err)
 	}
-	if len(c.Analytics.CredentialsJSON) == 0 {
+	if string(c.Analytics.CredentialsJSON) != `{"type": "service_account"}` {
 		t.Errorf("want the analytics credentials to be rolled back")
 	}
 
