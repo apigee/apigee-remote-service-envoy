@@ -389,9 +389,26 @@ tenant:
 		t.Error(err)
 	}
 
+	// cache original GOOGLE_APPLICATION_CREDENTIALS for recoverage
+	oldEnv := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
+	defer os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", oldEnv)
+
+	// set valid GOOGLE_APPLICATION_CREDENTIALS
+	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", credFile)
+	c = DefaultConfig()
+	if err := c.Load(tf.Name(), "", ""); err != nil {
+		t.Error(err)
+	}
+
 	// no analytics credentials given and invalid config
+	// explicitly set invalid GOOGLE_APPLICATION_CREDENTIALS to avoid
+	// any interference from the test environment
+	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "not valid")
 	c = DefaultConfig()
 	err = c.Load(tf.Name(), "", "")
+	if err == nil {
+		t.Fatal("want error got none")
+	}
 
 	wantErrs := []string{
 		"tenant.internal_api or tenant.analytics.fluentd_endpoint is required if no service account",
@@ -434,12 +451,13 @@ func TestAnalyticsRollback(t *testing.T) {
 
 	var c *Config
 
+	// analytics to be rolled back to that from config file
 	c = DefaultConfig()
 	err = c.Load(tf.Name(), "", DefaultAnalyticsSecretPath)
 	if err != nil {
 		t.Errorf("want no error got %v", err)
 	}
-	if string(c.Analytics.CredentialsJSON) != `{"type": "service_account"}` {
+	if len(c.Analytics.CredentialsJSON) == 0 {
 		t.Errorf("want the analytics credentials to be rolled back")
 	}
 
@@ -512,6 +530,14 @@ func makeConfigCRD(config string) *ConfigMapCRD {
 }
 
 func TestValidate(t *testing.T) {
+	// cache original GOOGLE_APPLICATION_CREDENTIALS for recoverage
+	oldEnv := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
+	defer os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", oldEnv)
+
+	// explicitly set invalid GOOGLE_APPLICATION_CREDENTIALS to avoid
+	// any interference from the test environment
+	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "invalid path")
+
 	c := &Config{}
 	err := c.Validate()
 	if err == nil {

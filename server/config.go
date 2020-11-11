@@ -16,6 +16,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
@@ -30,6 +31,7 @@ import (
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/pkg/errors"
 	"github.com/prometheus/common/log"
+	"golang.org/x/oauth2/google"
 	"gopkg.in/yaml.v3"
 )
 
@@ -45,6 +47,8 @@ const (
 
 	// DefaultAnalyticsSecretPath is the default path the analytics credentials directory
 	DefaultAnalyticsSecretPath = "/analytics-secret"
+
+	ApigeeAPIScope = "https://www.googleapis.com/auth/cloud-platform" // scope Apigee API needs
 )
 
 // DefaultConfig returns a config with defaults set
@@ -136,13 +140,14 @@ type ProductsConfig struct {
 
 // AnalyticsConfig is analytics-related config
 type AnalyticsConfig struct {
-	LegacyEndpoint     bool            `yaml:"legacy_endpoint,omitempty" json:"legacy_endpoint,omitempty"`
-	FileLimit          int             `yaml:"file_limit,omitempty" json:"file_limit,omitempty"`
-	SendChannelSize    int             `yaml:"send_channel_size,omitempty" json:"send_channel_size,omitempty"`
-	CollectionInterval time.Duration   `yaml:"collection_interval,omitempty" json:"collection_interval,omitempty"`
-	FluentdEndpoint    string          `yaml:"fluentd_endpoint,omitempty" json:"fluentd_endpoint,omitempty"`
-	TLS                TLSClientConfig `yaml:"tls,omitempty" json:"tls,omitempty"`
-	CredentialsJSON    []byte          `yaml:"-" json:"-"`
+	LegacyEndpoint     bool                `yaml:"legacy_endpoint,omitempty" json:"legacy_endpoint,omitempty"`
+	FileLimit          int                 `yaml:"file_limit,omitempty" json:"file_limit,omitempty"`
+	SendChannelSize    int                 `yaml:"send_channel_size,omitempty" json:"send_channel_size,omitempty"`
+	CollectionInterval time.Duration       `yaml:"collection_interval,omitempty" json:"collection_interval,omitempty"`
+	FluentdEndpoint    string              `yaml:"fluentd_endpoint,omitempty" json:"fluentd_endpoint,omitempty"`
+	TLS                TLSClientConfig     `yaml:"tls,omitempty" json:"tls,omitempty"`
+	CredentialsJSON    []byte              `yaml:"-" json:"-"`
+	Credentials        *google.Credentials `yaml:"-" json:"-"`
 }
 
 // AuthConfig is auth-related config
@@ -197,6 +202,10 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string) 
 				}
 			} else if strings.Contains(crd.Metadata.Name, "analytics") {
 				c.Analytics.CredentialsJSON, _ = base64.StdEncoding.DecodeString(crd.Data[ServiceAccount])
+				c.Analytics.Credentials, err = google.CredentialsFromJSON(context.Background(), c.Analytics.CredentialsJSON, ApigeeAPIScope)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -244,7 +253,7 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string) 
 			if err != nil {
 				if analyticsSecretPath == DefaultAnalyticsSecretPath {
 					// allows fall back to default credentials or fluentd if the path is the default one
-					log.Warnf("reading analytics service account credentials from default path: %v", err)
+					log.Warnf("analytics service account credentials not found on default path, using credentials from config file")
 				} else {
 					// returns error if the invalid path is explicitly specified
 					return err
@@ -252,6 +261,10 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string) 
 			} else {
 				// overwrites the credentials if read from the config
 				c.Analytics.CredentialsJSON = sa
+				c.Analytics.Credentials, err = google.CredentialsFromJSON(context.Background(), sa, ApigeeAPIScope)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -280,9 +293,14 @@ func (c *Config) Validate() error {
 	if c.Tenant.RemoteServiceAPI == "" {
 		errs = multierror.Append(errs, fmt.Errorf("tenant.remote_service_api is required"))
 	}
-	if c.Analytics.CredentialsJSON == nil {
+	if len(c.Analytics.CredentialsJSON) == 0 {
 		if c.Tenant.InternalAPI == "" && c.Analytics.FluentdEndpoint == "" {
-			errs = multierror.Append(errs, fmt.Errorf("tenant.internal_api or tenant.analytics.fluentd_endpoint is required if no service account"))
+			cred, err := google.FindDefaultCredentials(context.Background(), ApigeeAPIScope)
+			if err != nil {
+				errs = multierror.Append(errs, fmt.Errorf("tenant.internal_api or tenant.analytics.fluentd_endpoint is required if no service account"))
+			} else { // to avoid the non-name error
+				c.Analytics.Credentials = cred
+			}
 		}
 	} else {
 		if c.Tenant.InternalAPI != "" {
