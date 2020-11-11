@@ -162,7 +162,7 @@ type AuthConfig struct {
 }
 
 // Load config
-func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string) error {
+func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string, requireAnalyticsCredentials bool) error {
 	log.Debugf("reading config from: %s", configFile)
 	yamlFile, err := ioutil.ReadFile(configFile)
 	if err != nil {
@@ -269,7 +269,7 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string) 
 		}
 	}
 
-	return c.Validate()
+	return c.Validate(requireAnalyticsCredentials)
 }
 
 // IsGCPManaged is true for hybrid and NG SaaS
@@ -288,13 +288,13 @@ func (c *Config) IsOPDK() bool {
 }
 
 // Validate validates the config
-func (c *Config) Validate() error {
+func (c *Config) Validate(requireAnalyticsCredentials bool) error {
 	var errs error
 	if c.Tenant.RemoteServiceAPI == "" {
 		errs = multierror.Append(errs, fmt.Errorf("tenant.remote_service_api is required"))
 	}
 	if len(c.Analytics.CredentialsJSON) == 0 {
-		if c.Tenant.InternalAPI == "" && c.Analytics.FluentdEndpoint == "" {
+		if c.Tenant.InternalAPI == "" && c.Analytics.FluentdEndpoint == "" && requireAnalyticsCredentials {
 			cred, err := google.FindDefaultCredentials(context.Background(), ApigeeAPIScope)
 			if err != nil {
 				errs = multierror.Append(errs, fmt.Errorf("tenant.internal_api or tenant.analytics.fluentd_endpoint is required if no service account"))
