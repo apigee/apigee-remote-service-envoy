@@ -253,7 +253,7 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string, 
 			if err != nil {
 				if analyticsSecretPath == DefaultAnalyticsSecretPath {
 					// allows fall back to default credentials or fluentd if the path is the default one
-					log.Warnf("analytics service account credentials not found on default path, using credentials from config file")
+					log.Warnf("analytics service account credentials not found on default path, falling back to credentials from config file")
 				} else {
 					// returns error if the invalid path is explicitly specified
 					return err
@@ -297,7 +297,7 @@ func (c *Config) Validate(requireAnalyticsCredentials bool) error {
 		if c.Tenant.InternalAPI == "" && c.Analytics.FluentdEndpoint == "" && requireAnalyticsCredentials {
 			cred, err := google.FindDefaultCredentials(context.Background(), ApigeeAPIScope)
 			if err != nil {
-				errs = multierror.Append(errs, fmt.Errorf("tenant.internal_api or tenant.analytics.fluentd_endpoint is required if no service account"))
+				errs = multierror.Append(errs, fmt.Errorf("tenant.internal_api or tenant.analytics.fluentd_endpoint is required if analytics credentials not given"))
 			} else { // to avoid the non-name error
 				c.Analytics.Credentials = cred
 			}

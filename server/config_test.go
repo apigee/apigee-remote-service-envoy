@@ -411,7 +411,7 @@ tenant:
 	}
 
 	wantErrs := []string{
-		"tenant.internal_api or tenant.analytics.fluentd_endpoint is required if no service account",
+		"tenant.internal_api or tenant.analytics.fluentd_endpoint is required if analytics credentials not given",
 	}
 	merr := err.(*multierror.Error)
 	if merr.Len() != len(wantErrs) {
@@ -549,7 +549,7 @@ func TestValidate(t *testing.T) {
 
 	wantErrs = []string{
 		"tenant.remote_service_api is required",
-		"tenant.internal_api or tenant.analytics.fluentd_endpoint is required if no service account",
+		"tenant.internal_api or tenant.analytics.fluentd_endpoint is required if analytics credentials not given",
 		"tenant.org_name is required",
 		"tenant.env_name is required",
 	}
