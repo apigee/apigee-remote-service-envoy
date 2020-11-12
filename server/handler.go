@@ -22,7 +22,6 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"time"
 
 	"github.com/apigee/apigee-remote-service-golib/analytics"
 	"github.com/apigee/apigee-remote-service-golib/auth"
@@ -186,7 +185,7 @@ func NewHandler(config *Config) (*Handler, error) {
 		BaseURL:            internalAPI,
 		Client:             analyticsClient,
 		SendChannelSize:    config.Analytics.SendChannelSize,
-		CollectionInterval: time.Minute,
+		CollectionInterval: config.Analytics.CollectionInterval,
 		FluentdEndpoint:    config.Analytics.FluentdEndpoint,
 		TLSCAFile:          config.Analytics.TLS.CAFile,
 		TLSCertFile:        config.Analytics.TLS.CertFile,
