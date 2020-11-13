@@ -152,6 +152,11 @@ function applyToCluster {
 
   kubectl apply -f config.yaml
 
+  gcloud iam service-accounts add-iam-policy-binding \
+    --role roles/iam.workloadIdentityUser \
+    --member "serviceAccount:${PROJECT}.svc.id.goog[apigee/apigee-remote-service-envoy]" \
+    apigee-udca@${PROJECT}.iam.gserviceaccount.com
+
   kubectl annotate serviceaccount \                                                                                                                                     20:46:49   
     --namespace apigee \
     apigee-remote-service-envoy \
