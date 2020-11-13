@@ -122,6 +122,16 @@ function deployRemoteServiceProxies {
 }
 
 ################################################################################
+# Apply configurations
+################################################################################
+function applyToCluster {
+  echo -e "\nDeploying config.yaml and config files in ${1} to the cluster..."
+
+  kubectl apply -f config.yaml
+  kubectl apply -f ${1}
+}
+
+################################################################################
 # Call Local Target With APIKey
 ################################################################################
 function callTargetWithAPIKey {
