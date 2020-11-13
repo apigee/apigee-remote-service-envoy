@@ -85,20 +85,6 @@ function provisionRemoteService {
 }
 
 ################################################################################
-# Generating sample configurations
-################################################################################
-function generateSampleConfigurations {
-  echo -e "\nGenerating sample configurations files for $1 via the CLI..."
-
-  {
-    $CLI samples create -c config.yaml --out samples --template $1 --tag test
-    sed -i -e "s/google/gcr.io\/${PROJECT}/g" samples/apigee-envoy-adapter.yaml
-  } || { # exit directly if cli encounters any error
-    exit 1
-  }
-}
-
-################################################################################
 # Undeploy remote-service API Proxies
 ################################################################################
 function undeployRemoteServiceProxies {
@@ -156,6 +142,22 @@ function deployRemoteServiceProxies {
     fi
     sleep 10
   done
+}
+
+################################################################################
+# Apply configurations
+################################################################################
+function applyToCluster {
+  echo -e "\nDeploying config.yaml and config files in ${1} to the cluster..."
+
+  kubectl apply -f config.yaml
+
+  kubectl annotate serviceaccount \                                                                                                                                     20:46:49   
+    --namespace apigee \
+    apigee-remote-service-envoy \
+    iam.gke.io/gcp-service-account=apigee-udca@${PROJECT}.iam.gserviceaccount.com
+
+  kubectl apply -f ${1}
 }
 
 ################################################################################
