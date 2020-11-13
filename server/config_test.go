@@ -312,6 +312,46 @@ func TestLoadOrders(t *testing.T) {
 	equal(t, c.Tenant.PrivateKeyID, "my kid")
 }
 
+func TestIgnoreIrrelevantConfig(t *testing.T) {
+	configCRD, policySecretCRD, analyticsSecretCRD, err := makeCRDs()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tf, err := ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tf.Name())
+
+	otherCRD := &ConfigMapCRD{
+		APIVersion: "v1",
+		Kind:       "ServiceAccount",
+		Metadata: Metadata{
+			Name:      "apigee-service-account",
+			Namespace: "apigee",
+		},
+	}
+
+	// put ConfigMap in the end
+	configMapYAML, err := makeYAML(configCRD, policySecretCRD, analyticsSecretCRD, otherCRD)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := tf.WriteString(configMapYAML); err != nil {
+		t.Fatal(err)
+	}
+	if err := tf.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	c := &Config{}
+	if err := c.Load(tf.Name(), "xxx", "", true); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestLoadLegacyConfig(t *testing.T) {
 	tf, err := ioutil.TempFile("", "")
 	if err != nil {

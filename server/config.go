@@ -174,12 +174,8 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string, 
 	var configBytes []byte
 	decoder := yaml.NewDecoder(bytes.NewReader(yamlFile))
 
-	const maxNumConfigMaps = 3 // at most 3 CRDs to read
-
 	crd := &ConfigMapCRD{}
-	ctr := maxNumConfigMaps
-	for decoder.Decode(crd) != io.EOF && ctr > 0 {
-		ctr -= 1 // decrement the counter
+	for decoder.Decode(crd) != io.EOF {
 		if crd.Kind == "ConfigMap" {
 			configBytes = []byte(crd.Data["config.yaml"])
 			if configBytes != nil {
