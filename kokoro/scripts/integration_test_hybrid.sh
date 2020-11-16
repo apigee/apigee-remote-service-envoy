@@ -157,7 +157,7 @@ function applyToCluster {
     --member "serviceAccount:${PROJECT}.svc.id.goog[apigee/apigee-remote-service-envoy]" \
     apigee-udca@${PROJECT}.iam.gserviceaccount.com
 
-  kubectl annotate serviceaccount \                                                                                                                                     20:46:49   
+  kubectl annotate serviceaccount --overwrite \
     --namespace apigee \
     apigee-remote-service-envoy \
     iam.gke.io/gcp-service-account=apigee-udca@${PROJECT}.iam.gserviceaccount.com
