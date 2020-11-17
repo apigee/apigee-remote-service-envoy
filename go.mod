@@ -5,7 +5,7 @@ go 1.15
 // replace github.com/apigee/apigee-remote-service-golib => ../apigee-remote-service-golib
 
 require (
-	github.com/apigee/apigee-remote-service-golib v1.2.1-0.20201110165033-7c506f052a6e
+	github.com/apigee/apigee-remote-service-golib v1.3.0-rc.1
 	github.com/envoyproxy/go-control-plane v0.9.7
 	github.com/gogo/googleapis v1.4.0
 	github.com/golang/protobuf v1.4.3
