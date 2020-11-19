@@ -61,12 +61,12 @@ function generateIstioSampleConfigurations {
 # Generating sample configurations for native Envoy
 ################################################################################
 function generateEnvoySampleConfigurations {
-  echo -e "\nGenerating sample configurations files for $1 via the CLI..."
+  echo -e "\nGenerating sample configurations files for native Envoy via the CLI..."
   if [[ -d "native-samples" ]]; then
     rm -r native-samples
   fi
   {
-    $CLI samples create -c config.yaml --out native-samples --template native --tag test
+    $CLI samples create -c config.yaml --out native-samples --template native
     chmod 644 native-samples/envoy-config.yaml
   } || { # exit directly if cli encounters any error
     exit 1
