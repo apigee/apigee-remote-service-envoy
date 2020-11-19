@@ -78,7 +78,6 @@ func DefaultConfig() *Config {
 			APIKeyHeader:        "x-api-key",
 			TargetHeader:        ":authority",
 			RejectUnauthorized:  false,
-			JWTProviderKey:      "apigee",
 		},
 	}
 }
