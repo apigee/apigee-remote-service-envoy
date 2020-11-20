@@ -53,8 +53,8 @@ github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d h1:UQZhZ2O0vMHr2c
 github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d/go.mod h1:rBZYJk541a8SKzHPHnH3zbiI+7dagKZ0cgpgrD7Fyho=
 github.com/apache/thrift v0.12.0/go.mod h1:cp2SuWMxlEZw2r+iP2GNCdIi4C1qmUzdZFSVb+bacwQ=
 github.com/apache/thrift v0.13.0/go.mod h1:cp2SuWMxlEZw2r+iP2GNCdIi4C1qmUzdZFSVb+bacwQ=
-github.com/apigee/apigee-remote-service-golib v1.3.0-rc.1 h1:NVtrOiIaWMUJSKqcdUiVpP+LdmWmzAc2funj1ZLngzQ=
-github.com/apigee/apigee-remote-service-golib v1.3.0-rc.1/go.mod h1:v8JlgWxYdj2CtCbV3qMWdjyVxtHjnbDnFZl6v1XCWEY=
+github.com/apigee/apigee-remote-service-golib v1.3.0-rc.2 h1:mvyESW1B6JwM6uJd6BhnImmYRH+6ochCSjCMLRVDhkc=
+github.com/apigee/apigee-remote-service-golib v1.3.0-rc.2/go.mod h1:v8JlgWxYdj2CtCbV3qMWdjyVxtHjnbDnFZl6v1XCWEY=
 github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e/go.mod h1:3U/XgcO3hCbHZ8TKRvWD2dDTCfh9M9ya+I9JpbB7O8o=
 github.com/armon/go-metrics v0.0.0-20180917152333-f0300d1749da/go.mod h1:Q73ZrmVTwzkszR9V5SSuryQ31EELlFMUz1kKyl939pY=
 github.com/armon/go-radix v0.0.0-20180808171621-7fddfc383310/go.mod h1:ufUuZ+zHj4x4TnLV4JWEpy2hxWSpsRywHrMgIH9cCH8=
