@@ -22,9 +22,10 @@ set -e
 ################################################################################
 function provisionRemoteService {
   echo -e "\nProvisioning via CLI..."
-  MGMT=api.enterprise.apigee.com
   {
-    $CLI provision -o $ORG -e $ENV -u $USER -p $PASSWORD --legacy -f > config.yaml
+    $CLI provision -o $ORG -e $ENV -u $USER -p $PASSWORD --opdk \
+      --management $MGMTURL --runtime $RUNTIME \
+      --virtual-hosts default -f > config.yaml
     chmod 644 config.yaml
   } || { # exit directly if cli encounters any error
     exit 9
@@ -32,7 +33,7 @@ function provisionRemoteService {
 
   echo -e "\nCreating API Product httpbin-product..."
   STATUS_CODE=$(curl -X POST --silent -o /dev/stderr -w "%{http_code}"\
-    https://${MGMT}/v1/organizations/${ORG}/apiproducts \
+    ${MGMTURL}/v1/organizations/${ORG}/apiproducts \
     -u $USER:$PASSWORD \
     -H "Content-Type: application/json" \
     -d @${REPO}/kokoro/scripts/httpbin_product.json)
@@ -43,7 +44,7 @@ function provisionRemoteService {
 
   echo -e "\nCreating Application Developer integration@test.com..."
   STATUS_CODE=$(curl -X POST --silent -o /dev/stderr -w "%{http_code}" \
-    https://${MGMT}/v1/organizations/${ORG}/developers \
+    ${MGMTURL}/v1/organizations/${ORG}/developers \
     -u $USER:$PASSWORD \
     -H "Content-Type: application/json" \
     -d @${REPO}/kokoro/scripts/developer.json)
@@ -54,7 +55,7 @@ function provisionRemoteService {
 
   echo -e "\nCreating Application httpbin-app..."
   STATUS_CODE=$(curl -X POST --silent -o /dev/stderr -w "%{http_code}" \
-    https://${MGMT}/v1/organizations/${ORG}/developers/integration@test.com/apps \
+    ${MGMTURL}/v1/organizations/${ORG}/developers/integration@test.com/apps \
     -u $USER:$PASSWORD \
     -H "Content-Type: application/json" \
     -d @${REPO}/kokoro/scripts/application.json)
@@ -65,7 +66,7 @@ function provisionRemoteService {
 
   echo -e "\nExtracting Application httpbin-app credentials..."
   APP=$(curl --silent \
-    https://${MGMT}/v1/organizations/${ORG}/developers/integration@test.com/apps/httpbin-app \
+    ${MGMTURL}/v1/organizations/${ORG}/developers/integration@test.com/apps/httpbin-app \
     -u $USER:$PASSWORD \
     -H "Content-Type: application/json")
   {
@@ -84,34 +85,13 @@ function provisionRemoteService {
 }
 
 ################################################################################
-# Undeploy remote-service API Proxies
-################################################################################
-function undeployRemoteServiceProxies {
-  echo -e "\nGet deployed revision of API Proxies remote-service..."
-  REV=$(docker run curlimages/curl:7.72.0 --silent \
-    https://${MGMT}/v1/organizations/${ORG}/apis/remote-service \
-    -u $USER:$PASSWORD | jq -r ".revision | max")
-  echo -e "\nGot deployed revision $REV"
-
-  if [[ ! -z $REV ]] ; then
-    echo -e "\nUndeploying revision $REV of API Proxies remote-service..."
-    STATUS_CODE=$(docker run curlimages/curl:7.72.0 -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
-      https://${MGMT}/v1/organizations/${ORG}/environments/${ENV}/apis/remote-service/revisions/${REV}/deployments \
-      -u $USER:$PASSWORD)
-    if [[ $STATUS_CODE -ge 299 ]] ; then
-      echo -e "\nError undeploying API Proxies remote-service: $STATUS_CODE"
-    fi
-  fi
-}
-
-################################################################################
 # Deploy remote-service API Proxies
 ################################################################################
 function deployRemoteServiceProxies {
   if [[ ! -z $1 ]] ; then
     echo -e "\nDeploying revision $1 of API Proxies remote-service..."
     STATUS_CODE=$(docker run curlimages/curl:7.72.0 -X POST --silent -o /dev/stderr -w "%{http_code}" \
-      https://${MGMT}/v1/organizations/${ORG}/environments/${ENV}/apis/remote-service/revisions/$1/deployments \
+      ${MGMTURL}/v1/organizations/${ORG}/environments/${ENV}/apis/remote-service/revisions/$1/deployments \
       -u $USER:$PASSWORD)
     if [[ $STATUS_CODE -ge 299 ]] ; then
       echo -e "\nError undeploying API Proxies remote-service: $STATUS_CODE"
@@ -120,32 +100,23 @@ function deployRemoteServiceProxies {
 }
 
 ################################################################################
-# Apply configurations
+# Undeploy remote-service API Proxies
 ################################################################################
-function applyToCluster {
-  echo -e "\nDeploying config.yaml and config files in ${1} to the cluster..."
+function undeployRemoteServiceProxies {
+  echo -e "\nGet deployed revision of API Proxies remote-service..."
+  REV=$(docker run curlimages/curl:7.72.0 --silent \
+    ${MGMTURL}/v1/organizations/${ORG}/apis/remote-service \
+    -u $USER:$PASSWORD | jq -r ".revision | max")
+  echo -e "\nGot deployed revision $REV"
 
-  kubectl apply -f config.yaml
-  kubectl apply -f ${1}
-}
-
-################################################################################
-# Call Local Target With APIKey
-################################################################################
-function callTargetWithAPIKey {
-  STATUS_CODE=$(docker run --network=host curlimages/curl:7.72.0 --silent -o /dev/stderr -w "%{http_code}" \
-    localhost:8080/headers -Hhost:httpbin.org \
-    -Hx-api-key:$1)
-
-  if [[ ! -z $2 ]] ; then
-    if [[ $STATUS_CODE -ne $2 ]] ; then
-      echo -e "\nError calling local target with API key: expected status $2; got $STATUS_CODE"
-      exit 1
-    else 
-      echo -e "\nCalling local target with API key got $STATUS_CODE as expected"
+  if [[ ! -z $REV ]] ; then
+    echo -e "\nUndeploying revision $REV of API Proxies remote-service..."
+    STATUS_CODE=$(docker run curlimages/curl:7.72.0 -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
+      ${MGMTURL}/v1/organizations/${ORG}/environments/${ENV}/apis/remote-service/revisions/${REV}/deployments \
+      -u $USER:$PASSWORD)
+    if [[ $STATUS_CODE -ge 299 ]] ; then
+      echo -e "\nError undeploying API Proxies remote-service: $STATUS_CODE"
     fi
-  else
-    echo -e "\nCalling local target with API key got $STATUS_CODE"
   fi
 }
 
@@ -153,12 +124,11 @@ function callTargetWithAPIKey {
 # Clean up Apigee resources
 ################################################################################
 function cleanUpApigee {
-  echo -e "\nCleaning up resources applied to the Apigee CG SaaS..."
-  MGMT=api.enterprise.apigee.com
+  echo -e "\nCleaning up resources applied to the Apigee OPDK..."
 
   echo -e "\nDeleting Application httpbin-app..."
   STATUS_CODE=$(curl -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
-    https://${MGMT}/v1/organizations/${ORG}/developers/integration@test.com/apps/httpbin-app \
+    ${MGMTURL}/v1/organizations/${ORG}/developers/integration@test.com/apps/httpbin-app \
     -u $USER:$PASSWORD)
   if [[ $STATUS_CODE -ge 299 ]] ; then
     echo -e "\nError deleting Application httpbin-app: $STATUS_CODE"
@@ -166,7 +136,7 @@ function cleanUpApigee {
 
   echo -e "\nDeleting Application Developer integration@test.com..."
   STATUS_CODE=$(curl -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
-    https://${MGMT}/v1/organizations/${ORG}/developers/integration@test.com \
+    ${MGMTURL}/v1/organizations/${ORG}/developers/integration@test.com \
     -u $USER:$PASSWORD)
   if [[ $STATUS_CODE -ge 299 ]] ; then
     echo -e "\nError deleting Application Developer integration@test.com: $STATUS_CODE"
@@ -174,7 +144,7 @@ function cleanUpApigee {
 
   echo -e "\nDeleting API Product httpbin-product..."
   STATUS_CODE=$(curl -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
-    https://${MGMT}/v1/organizations/${ORG}/apiproducts/httpbin-product \
+    ${MGMTURL}/v1/organizations/${ORG}/apiproducts/httpbin-product \
     -u $USER:$PASSWORD)
   if [[ $STATUS_CODE -ge 299 ]] ; then
     echo -e "\nError deleting API Product httpbin-product: $STATUS_CODE"
@@ -182,7 +152,7 @@ function cleanUpApigee {
 
   echo -e "\nDeleting API Product remote-service..."
   STATUS_CODE=$(curl -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
-    https://${MGMT}/v1/organizations/${ORG}/apiproducts/remote-service \
+    ${MGMTURL}/v1/organizations/${ORG}/apiproducts/remote-service \
     -u $USER:$PASSWORD)
   if [[ $STATUS_CODE -ge 299 ]] ; then
     echo -e "\nError deleting API Product remote-service: $STATUS_CODE"
@@ -192,7 +162,7 @@ function cleanUpApigee {
 
   echo -e "\nDeleting API Proxies remote-service..."
   STATUS_CODE=$(curl -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
-    https://${MGMT}/v1/organizations/${ORG}/apis/remote-service \
+    ${MGMTURL}/v1/organizations/${ORG}/apis/remote-service \
     -u $USER:$PASSWORD)
   if [[ $STATUS_CODE -ge 299 ]] ; then
     echo -e "\nError deleting API Proxies remote-service: $STATUS_CODE"
@@ -200,12 +170,12 @@ function cleanUpApigee {
 
 }
 
-echo -e "\nStarting integration test of the Apigee Envoy Adapter with Apigee SaaS..."
+echo -e "\nStarting integration test of the Apigee Envoy Adapter with Apigee OPDK..."
 
 # load necessary function definitions
 . ${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-envoy/kokoro/scripts/lib.sh
 
-setEnvironmentVariables cgsaas-env
+setEnvironmentVariables opdk-env
 
 {
   cleanUpApigee
@@ -217,14 +187,8 @@ setEnvironmentVariables cgsaas-env
 
 provisionRemoteService
 
-generateIstioSampleConfigurations $CGSAAS_ISTIO_TEMPLATE
-generateEnvoySampleConfigurations $CGSAAS_ENVOY_TEMPLATE
+generateEnvoySampleConfigurations $OPDK_ENVOY_TEMPLATE
 
-cleanUpKubernetes
+runEnvoyTests $OPDK_ENVOY_TAG
 
-runEnvoyTests $CGSAAS_ENVOY_TAG
-
-applyToCluster istio-samples
-runIstioTests
-
-echo -e "\nFinished integration test of the Apigee Envoy Adapter with Apigee SaaS."
+echo -e "\nFinished integration test of the Apigee Envoy Adapter with Apigee OPDK."

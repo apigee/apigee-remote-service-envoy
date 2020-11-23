@@ -49,7 +49,7 @@ function generateIstioSampleConfigurations {
     rm -r istio-samples
   fi
   {
-    $CLI samples create -c config.yaml --out istio-samples --template $1 --tag test
+    $CLI samples create -c config.yaml --out istio-samples --template $1 --tag test -f
     sed -i -e "s/google/gcr.io\/${PROJECT}/g" istio-samples/apigee-envoy-adapter.yaml
     sed -i -e "s/IfNotPresent/Always/g" istio-samples/apigee-envoy-adapter.yaml
   } || { # exit directly if cli encounters any error
@@ -66,7 +66,7 @@ function generateEnvoySampleConfigurations {
     rm -r native-samples
   fi
   {
-    $CLI samples create -c config.yaml --out native-samples --template native
+    $CLI samples create -c config.yaml --out native-samples --template ${1} -f
     chmod 644 native-samples/envoy-config.yaml
   } || { # exit directly if cli encounters any error
     exit 1
@@ -153,6 +153,76 @@ function callIstioTargetWithJWT {
   else
     echo -e "\nCalling target with JWT got $STATUS_CODE"
   fi
+}
+
+################################################################################
+# Run actual tests with native Envoy
+################################################################################
+function runEnvoyTests {
+  echo -e "\nStarting to run tests with native Envoy..."
+  {
+    echo -e "\nStarting Envoy docker image..."
+    docker run -v $PWD/native-samples/envoy-config.yaml:/envoy.yaml \
+      --name=envoy --network=host --rm -d \
+      docker.io/envoyproxy/envoy:${1} -c /envoy.yaml -l debug
+
+    echo -e "\nStarting Adapter docker image..."
+    docker run -v $PWD/config.yaml:/config.yaml \
+      --name=adapter -p 5000:5000 --rm -d \
+      apigee-envoy-adapter:test -c /config.yaml -l DEBUG
+
+    for i in {1..20}
+    do
+      JWT=$($CLI token create -c config.yaml -i $APIKEY -s $APISECRET)
+      sleep 5
+      callTargetWithJWT $JWT
+      sleep 55
+      if [[ $STATUS_CODE -eq 200 ]] ; then
+        echo -e "\nServices are ready to be tested"
+        break
+      fi
+    done
+
+    callTargetWithAPIKey $APIKEY 200
+    callTargetWithAPIKey APIKEY 403
+    for i in {1..20}
+    do
+      callTargetWithAPIKey $APIKEY
+      if [[ $STATUS_CODE -eq 403 ]] ; then
+        echo -e "\nQuota depleted"
+        break
+      fi
+      sleep 1
+    done
+    callTargetWithAPIKey $APIKEY 403
+    
+    sleep 65
+
+    echo -e "\nQuota should have restored"
+    callTargetWithAPIKey $APIKEY 200
+
+    undeployRemoteServiceProxies
+
+    for i in {1..20}
+    do
+      callTargetWithAPIKey $APIKEY
+      if [[ $STATUS_CODE -eq 403 ]] ; then
+        echo -e "\nLocal quota depleted"
+        break
+      fi
+      sleep 1
+    done
+    callTargetWithAPIKey $APIKEY 403
+    
+    sleep 65
+    
+    echo -e "\nLocal quota should have restored"
+    callTargetWithAPIKey $APIKEY 200
+
+    deployRemoteServiceProxies $REV
+  } || { # exit on failure
+    exit 7
+  }
 }
 
 ################################################################################

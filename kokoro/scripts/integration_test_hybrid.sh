@@ -233,7 +233,7 @@ setEnvironmentVariables hybrid-env
 buildDockerImages
 provisionRemoteService
 
-generateIstioSampleConfigurations istio-1.6
+generateIstioSampleConfigurations $HYBRID_ISTIO_TEMPLATE
 
 cleanUpKubernetes
 
