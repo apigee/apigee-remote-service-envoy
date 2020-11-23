@@ -25,4 +25,6 @@ ${BUILD_DIR}/scripts/integration_test_hybrid.sh
 
 ${BUILD_DIR}/scripts/integration_test_cgsaas.sh
 
+${BUILD_DIR}/scripts/integration_test_opdk.sh
+
 ${BUILD_DIR}/scripts/load_test.sh

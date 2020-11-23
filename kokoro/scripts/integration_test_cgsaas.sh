@@ -32,7 +32,7 @@ function provisionRemoteService {
 
   echo -e "\nCreating API Product httpbin-product..."
   STATUS_CODE=$(curl -X POST --silent -o /dev/stderr -w "%{http_code}"\
-    https://api.enterprise.apigee.com/v1/organizations/${ORG}/apiproducts \
+    https://${MGMT}/v1/organizations/${ORG}/apiproducts \
     -u $USER:$PASSWORD \
     -H "Content-Type: application/json" \
     -d @${REPO}/kokoro/scripts/httpbin_product.json)
@@ -152,95 +152,6 @@ function callTargetWithAPIKey {
 }
 
 ################################################################################
-# call Local Target With JWT
-################################################################################
-function callTargetWithJWT {
-  STATUS_CODE=$(docker run --network=host curlimages/curl:7.72.0 --silent -o /dev/stderr -w "%{http_code}" \
-    localhost:8080/headers -Hhost:httpbin.org \
-    -H "Authorization: Bearer $1")
-
-  if [[ ! -z $2 ]] ; then
-    if [[ $STATUS_CODE -ne $2 ]] ; then
-      echo -e "\nError calling local target with JWT: expected status $2; got $STATUS_CODE"
-      exit 1
-    else 
-      echo -e "\nCalling local target with JWT got $STATUS_CODE as expected"
-    fi
-  else
-    echo -e "\nCalling local target with JWT got $STATUS_CODE"
-  fi
-}
-
-################################################################################
-# Run actual tests with native Envoy
-################################################################################
-function runEnvoyTests {
-  echo -e "\nStarting to run tests with native Envoy..."
-  {
-    echo -e "\nStarting Envoy docker image..."
-    docker run -v $PWD/native-samples/envoy-config.yaml:/envoy.yaml \
-      --name=envoy --network=host --rm -d \
-      docker.io/envoyproxy/envoy:v1.16.0 -c /envoy.yaml -l debug
-
-    echo -e "\nStarting Adapter docker image..."
-    docker run -v $PWD/config.yaml:/config.yaml \
-      --name=adapter -p 5000:5000 --rm -d \
-      apigee-envoy-adapter:test -c /config.yaml -l DEBUG
-
-    for i in {1..20}
-    do
-      JWT=$($CLI token create -c config.yaml -i $APIKEY -s $APISECRET)
-      callTargetWithJWT $JWT
-      sleep 60
-      if [[ $STATUS_CODE -eq 200 ]] ; then
-        echo -e "\nServices are ready to be tested"
-        break
-      fi
-    done
-
-    callTargetWithAPIKey $APIKEY 200
-    callTargetWithAPIKey APIKEY 403
-    for i in {1..20}
-    do
-      callTargetWithAPIKey $APIKEY
-      if [[ $STATUS_CODE -eq 403 ]] ; then
-        echo -e "\nQuota depleted"
-        break
-      fi
-      sleep 1
-    done
-    callTargetWithAPIKey $APIKEY 403
-    
-    sleep 65
-
-    echo -e "\nQuota should have restored"
-    callTargetWithAPIKey $APIKEY 200
-
-    undeployRemoteServiceProxies
-
-    for i in {1..20}
-    do
-      callTargetWithAPIKey $APIKEY
-      if [[ $STATUS_CODE -eq 403 ]] ; then
-        echo -e "\nLocal quota depleted"
-        break
-      fi
-      sleep 1
-    done
-    callTargetWithAPIKey $APIKEY 403
-    
-    sleep 65
-    
-    echo -e "\nLocal quota should have restored"
-    callTargetWithAPIKey $APIKEY 200
-
-    deployRemoteServiceProxies $REV
-  } || { # exit on failure
-    exit 7
-  }
-}
-
-################################################################################
 # Clean up Apigee resources
 ################################################################################
 function cleanUpApigee {
@@ -300,6 +211,8 @@ setEnvironmentVariables cgsaas-env
 
 {
   cleanUpApigee
+  docker stop envoy
+  docker stop adapter
 } || {
   echo -e "\n Apigee resources do not all exist."
 }
@@ -307,11 +220,11 @@ setEnvironmentVariables cgsaas-env
 provisionRemoteService
 
 generateIstioSampleConfigurations istio-1.7
-generateEnvoySampleConfigurations
+generateEnvoySampleConfigurations envoy-1.16
 
 cleanUpKubernetes
 
-runEnvoyTests
+runEnvoyTests v1.16.0
 
 applyToCluster istio-samples
 runIstioTests
