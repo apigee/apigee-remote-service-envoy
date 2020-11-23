@@ -126,8 +126,7 @@ function undeployRemoteServiceProxies {
 # Clean up Apigee resources
 ################################################################################
 function cleanUpApigee {
-  echo -e "\nCleaning up resources applied to the Apigee CG SaaS..."
-  MGMT=api.enterprise.apigee.com
+  echo -e "\nCleaning up resources applied to the Apigee OPDK..."
 
   echo -e "\nDeleting Application httpbin-app..."
   STATUS_CODE=$(curl -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
