@@ -190,8 +190,9 @@ function runEnvoyTests {
     for i in {1..20}
     do
       JWT=$($CLI token create -c config.yaml -i $APIKEY -s $APISECRET)
+      sleep 5
       callTargetWithJWT $JWT
-      sleep 60
+      sleep 55
       if [[ $STATUS_CODE -eq 200 ]] ; then
         echo -e "\nServices are ready to be tested"
         break
