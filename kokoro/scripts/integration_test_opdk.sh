@@ -89,7 +89,6 @@ function provisionRemoteService {
 ################################################################################
 function deployRemoteServiceProxies {
   if [[ ! -z $1 ]] ; then
-    TOKEN=$(gcloud auth print-access-token)
     echo -e "\nDeploying revision $1 of API Proxies remote-service..."
     STATUS_CODE=$(docker run curlimages/curl:7.72.0 -X POST --silent -o /dev/stderr -w "%{http_code}" \
       ${MGMTURL}/v1/organizations/${ORG}/environments/${ENV}/apis/remote-service/revisions/$1/deployments \
@@ -104,7 +103,6 @@ function deployRemoteServiceProxies {
 # Undeploy remote-service API Proxies
 ################################################################################
 function undeployRemoteServiceProxies {
-  TOKEN=$(gcloud auth print-access-token)
   echo -e "\nGet deployed revision of API Proxies remote-service..."
   REV=$(docker run curlimages/curl:7.72.0 --silent \
     ${MGMTURL}/v1/organizations/${ORG}/apis/remote-service \
@@ -189,8 +187,8 @@ setEnvironmentVariables opdk-env
 
 provisionRemoteService
 
-generateEnvoySampleConfigurations envoy-1.15
+generateEnvoySampleConfigurations $OPDK_ENVOY_TEMPLATE
 
-runEnvoyTests v1.15.0
+runEnvoyTests $OPDK_ENVOY_TAG
 
 echo -e "\nFinished integration test of the Apigee Envoy Adapter with Apigee OPDK."

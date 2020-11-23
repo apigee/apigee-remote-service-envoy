@@ -87,7 +87,6 @@ function provisionRemoteService {
 # Undeploy remote-service API Proxies
 ################################################################################
 function undeployRemoteServiceProxies {
-  TOKEN=$(gcloud auth print-access-token)
   echo -e "\nGet deployed revision of API Proxies remote-service..."
   REV=$(docker run curlimages/curl:7.72.0 --silent \
     https://${MGMT}/v1/organizations/${ORG}/apis/remote-service \
@@ -110,7 +109,6 @@ function undeployRemoteServiceProxies {
 ################################################################################
 function deployRemoteServiceProxies {
   if [[ ! -z $1 ]] ; then
-    TOKEN=$(gcloud auth print-access-token)
     echo -e "\nDeploying revision $1 of API Proxies remote-service..."
     STATUS_CODE=$(docker run curlimages/curl:7.72.0 -X POST --silent -o /dev/stderr -w "%{http_code}" \
       https://${MGMT}/v1/organizations/${ORG}/environments/${ENV}/apis/remote-service/revisions/$1/deployments \
@@ -219,12 +217,12 @@ setEnvironmentVariables cgsaas-env
 
 provisionRemoteService
 
-generateIstioSampleConfigurations istio-1.7
-generateEnvoySampleConfigurations envoy-1.16
+generateIstioSampleConfigurations $CGSAAS_ISTIO_TEMPLATE
+generateEnvoySampleConfigurations $CGSAAS_ENVOY_TEMPLATE
 
 cleanUpKubernetes
 
-runEnvoyTests v1.16.0
+runEnvoyTests $CGSAAS_ENVOY_TAG
 
 applyToCluster istio-samples
 runIstioTests
