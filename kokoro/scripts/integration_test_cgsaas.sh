@@ -215,6 +215,7 @@ setEnvironmentVariables cgsaas-env
   echo -e "\n Apigee resources do not all exist."
 }
 
+pushDockerImages $ADAPTER_IMAGE_TAG
 provisionRemoteService
 
 generateIstioSampleConfigurations $CGSAAS_ISTIO_TEMPLATE

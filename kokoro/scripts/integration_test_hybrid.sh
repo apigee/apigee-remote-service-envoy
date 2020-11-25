@@ -230,7 +230,7 @@ setEnvironmentVariables hybrid-env
   echo -e "\n Apigee resources do not all exist."
 }
 
-buildDockerImages
+pushDockerImages $ADAPTER_IMAGE_TAG
 provisionRemoteService
 
 generateIstioSampleConfigurations $HYBRID_ISTIO_TEMPLATE

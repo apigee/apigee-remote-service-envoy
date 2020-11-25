@@ -53,7 +53,11 @@ function buildRemoteServiceCLI {
 function buildAdapterDocker {
   echo -e "\nBuilding local Docker image of apigee-remote-service-envoy..."
   cd ${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-envoy
-  docker build -t apigee-envoy-adapter:test .
+  docker build -t apigee-envoy-adapter:${ADAPTER_IMAGE_TAG} \
+    --build-arg CGO_ENABLED=${GCO_ENABLED} \
+    --build-arg RUN_CONTAINER=${RUN_CONTAINER} \
+    --build-arg BUILD_CONTAINER=${BUILD_CONTAINER} \
+    .
 }
 
 installPrerequisites

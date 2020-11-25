@@ -32,12 +32,15 @@ function setEnvironmentVariables {
 }
 
 ################################################################################
-# Building Docker images based on the latest source code
+# Pushing Docker images based on the latest source code
 ################################################################################
-function buildDockerImages {
-  echo -e "\nBuilding the Docker image to gcr.io..."
-  gcloud builds submit -t gcr.io/${PROJECT}/apigee-envoy-adapter:test ${REPO}
-  echo -e "\nDocker image built successfully."
+function pushDockerImages {
+  echo -e "\nTagging and pushing the Docker image to gcr.io..."
+  # gcloud builds submit -t gcr.io/${PROJECT}/apigee-envoy-adapter:test ${REPO}
+  gcloud auth configure-docker gcr.io
+  docker tag apigee-envoy-adapter:${1} gcr.io/${PROJECT}/apigee-envoy-adapter:${1}
+  docker push gcr.io/${PROJECT}/apigee-envoy-adapter:${1}
+  echo -e "\nDocker image pushed successfully."
 }
 
 ################################################################################
@@ -49,7 +52,7 @@ function generateIstioSampleConfigurations {
     rm -r istio-samples
   fi
   {
-    $CLI samples create -c config.yaml --out istio-samples --template $1 --tag test -f
+    $CLI samples create -c config.yaml --out istio-samples --template $1 --tag ${ADAPTER_IMAGE_TAG} -f
     sed -i -e "s/google/gcr.io\/${PROJECT}/g" istio-samples/apigee-envoy-adapter.yaml
     sed -i -e "s/IfNotPresent/Always/g" istio-samples/apigee-envoy-adapter.yaml
   } || { # exit directly if cli encounters any error
