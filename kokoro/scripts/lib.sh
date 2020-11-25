@@ -52,7 +52,7 @@ function generateIstioSampleConfigurations {
     rm -r istio-samples
   fi
   {
-    $CLI samples create -c config.yaml --out istio-samples --template $1 --tag ${ADAPTER_IMAGE_TAG} -f
+    $CLI samples create -c config.yaml --out istio-samples --template $1 --tag $2 -f
     sed -i -e "s/google/gcr.io\/${PROJECT}/g" istio-samples/apigee-envoy-adapter.yaml
     sed -i -e "s/IfNotPresent/Always/g" istio-samples/apigee-envoy-adapter.yaml
   } || { # exit directly if cli encounters any error

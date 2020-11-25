@@ -233,7 +233,7 @@ setEnvironmentVariables hybrid-env
 pushDockerImages $ADAPTER_IMAGE_TAG
 provisionRemoteService
 
-generateIstioSampleConfigurations $HYBRID_ISTIO_TEMPLATE
+generateIstioSampleConfigurations $HYBRID_ISTIO_TEMPLATE $ADAPTER_IMAGE_TAG
 
 cleanUpKubernetes
 

@@ -218,7 +218,7 @@ setEnvironmentVariables cgsaas-env
 pushDockerImages $ADAPTER_IMAGE_TAG
 provisionRemoteService
 
-generateIstioSampleConfigurations $CGSAAS_ISTIO_TEMPLATE
+generateIstioSampleConfigurations $CGSAAS_ISTIO_TEMPLATE $ADAPTER_IMAGE_TAG
 generateEnvoySampleConfigurations $CGSAAS_ENVOY_TEMPLATE
 
 cleanUpKubernetes
