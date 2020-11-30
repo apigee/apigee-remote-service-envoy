@@ -36,7 +36,6 @@ function setEnvironmentVariables {
 ################################################################################
 function pushDockerImages {
   echo -e "\nTagging and pushing the Docker image to gcr.io..."
-  # gcloud builds submit -t gcr.io/${PROJECT}/apigee-envoy-adapter:test ${REPO}
   gcloud auth configure-docker gcr.io
   docker tag apigee-envoy-adapter:${1} gcr.io/${PROJECT}/apigee-envoy-adapter:${1}
   docker push gcr.io/${PROJECT}/apigee-envoy-adapter:${1}
@@ -172,7 +171,7 @@ function runEnvoyTests {
     echo -e "\nStarting Adapter docker image..."
     docker run -v $PWD/config.yaml:/config.yaml \
       --name=adapter -p 5000:5000 --rm -d \
-      apigee-envoy-adapter:test -c /config.yaml -l DEBUG
+      apigee-envoy-adapter:${2} -c /config.yaml -l DEBUG
 
     for i in {1..20}
     do

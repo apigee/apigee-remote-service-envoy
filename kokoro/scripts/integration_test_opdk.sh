@@ -189,6 +189,6 @@ provisionRemoteService
 
 generateEnvoySampleConfigurations $OPDK_ENVOY_TEMPLATE
 
-runEnvoyTests $OPDK_ENVOY_TAG
+runEnvoyTests $OPDK_ENVOY_TAG $ADAPTER_IMAGE_TAG
 
 echo -e "\nFinished integration test of the Apigee Envoy Adapter with Apigee OPDK."

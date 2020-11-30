@@ -223,7 +223,7 @@ generateEnvoySampleConfigurations $CGSAAS_ENVOY_TEMPLATE
 
 cleanUpKubernetes
 
-runEnvoyTests $CGSAAS_ENVOY_TAG
+runEnvoyTests $CGSAAS_ENVOY_TAG $ADAPTER_IMAGE_TAG
 
 applyToCluster istio-samples
 runIstioTests
