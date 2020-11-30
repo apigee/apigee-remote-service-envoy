@@ -24,7 +24,7 @@ setEnvironmentVariables loadtest-env
 
 pushDockerImages $ADAPTER_IMAGE_TAG
 
-sed -i -e "s/google\/apigee-envoy-adapter/gcr.io\/${PROJECT}\/apigee-envoy-adapter/g" ${REPO}/loadtest/k8s-files/apigee-envoy-adapter.yaml
+sed -i -e "s/google\/apigee-envoy-adapter:test/gcr.io\/${PROJECT}\/apigee-envoy-adapter:${ADAPTER_IMAGE_TAG}/g" ${REPO}/loadtest/k8s-files/apigee-envoy-adapter.yaml
 
 kubectl apply -f ${REPO}/loadtest/k8s-files/apigee-envoy-adapter.yaml
 sleep 20
