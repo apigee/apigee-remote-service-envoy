@@ -22,7 +22,9 @@ set -e
 
 setEnvironmentVariables loadtest-env
 
-sed -i -e "s/google\/apigee-envoy-adapter/gcr.io\/${PROJECT}\/apigee-envoy-adapter/g" ${REPO}/loadtest/k8s-files/apigee-envoy-adapter.yaml
+pushDockerImages $ADAPTER_IMAGE_TAG
+
+sed -i -e "s/google\/apigee-envoy-adapter:test/gcr.io\/${PROJECT}\/apigee-envoy-adapter:${ADAPTER_IMAGE_TAG}/g" ${REPO}/loadtest/k8s-files/apigee-envoy-adapter.yaml
 
 kubectl apply -f ${REPO}/loadtest/k8s-files/apigee-envoy-adapter.yaml
 sleep 20
@@ -38,7 +40,7 @@ while IFS=, read -r dummy1 dummy2 total failure median avg dummy3
 do
     echo "total | failure | median (ms) | avgerage (ms)"
     echo "$total | $failure | $median | $avg"
-    CODE=$(python -c "print(10 if float($failure)/$total > 0.001 or $avg > 100 else 0)")
+    CODE=$(python -c "print(10 if float($failure)/$total > $LOADTEST_FAILURE_RATE or $avg > $LOADTEST_AVG_MAX else 0)")
 done < stats.csv
 
 kubectl delete -f ${REPO}/loadtest/k8s-files/apigee-envoy-adapter.yaml
