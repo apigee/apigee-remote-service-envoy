@@ -1,7 +1,6 @@
 {
   "name" : "httpbin-app",
   "apiProducts": [
-    "httpbin-product",
-    "remote-service"
+    "httpbin-product"
   ]
 }

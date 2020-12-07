@@ -1,0 +1,7 @@
+{
+  "name" : "cred-exp-app",
+  "apiProducts": [
+    "httpbin-product"
+  ],
+  "keyExpiresIn": 10
+}

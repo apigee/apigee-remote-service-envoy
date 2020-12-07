@@ -32,22 +32,33 @@ function provisionRemoteService {
   }
 
   echo -e "\nCreating API Product httpbin-product..."
-  STATUS_CODE=$(curl -X POST --silent -o /dev/stderr -w "%{http_code}"\
+  STATUS_CODE=$(curl -X POST --silent -o /dev/stderr -w "%{http_code}" \
     https://${MGMT}/v1/organizations/${ORG}/apiproducts \
     -H "Authorization: Bearer ${TOKEN}" \
     -H "Content-Type: application/json" \
-    -d @${REPO}/kokoro/scripts/httpbin_product.json)
+    -d @${REPO}/kokoro/payloads/httpbin_product.json)
   if [[ $STATUS_CODE -ge 299 ]] ; then
     echo -e "\nError creating API Product httpbin-product: $STATUS_CODE"
     exit 8
-  fi  
+  fi
+
+  echo -e "\nCreating API Product dummy-product..."
+  STATUS_CODE=$(curl -X POST --silent -o /dev/stderr -w "%{http_code}" \
+    https://${MGMT}/v1/organizations/${ORG}/apiproducts \
+    -H "Authorization: Bearer ${TOKEN}" \
+    -H "Content-Type: application/json" \
+    -d @${REPO}/kokoro/payloads/dummy_product.json)
+  if [[ $STATUS_CODE -ge 299 ]] ; then
+    echo -e "\nError creating API Product dummy-product: $STATUS_CODE"
+    exit 8
+  fi
 
   echo -e "\nCreating Application Developer integration@test.com..."
   STATUS_CODE=$(curl -X POST --silent -o /dev/stderr -w "%{http_code}" \
     https://${MGMT}/v1/organizations/${ORG}/developers \
     -H "Authorization: Bearer ${TOKEN}" \
     -H "Content-Type: application/json" \
-    -d @${REPO}/kokoro/scripts/developer.json)
+    -d @${REPO}/kokoro/payloads/developer.json)
   if [[ $STATUS_CODE -ge 299 ]] ; then
     echo -e "\nError creating Application Developer integration@test.com: $STATUS_CODE"
     exit 8
@@ -58,9 +69,53 @@ function provisionRemoteService {
     https://${MGMT}/v1/organizations/${ORG}/developers/integration@test.com/apps \
     -H "Authorization: Bearer ${TOKEN}" \
     -H "Content-Type: application/json" \
-    -d @${REPO}/kokoro/scripts/application.json)
+    -d @${REPO}/kokoro/payloads/application.json)
   if [[ $STATUS_CODE -ge 299 ]] ; then
     echo -e "\nError creating Application httpbin-app: $STATUS_CODE"
+    exit 8
+  fi
+
+  echo -e "\nCreating Application wrong-prod-app..."
+  STATUS_CODE=$(curl -X POST --silent -o /dev/stderr -w "%{http_code}" \
+    https://${MGMT}/v1/organizations/${ORG}/developers/integration@test.com/apps \
+    -H "Authorization: Bearer ${TOKEN}" \
+    -H "Content-Type: application/json" \
+    -d @${REPO}/kokoro/payloads/wrong-prod_app.json)
+  if [[ $STATUS_CODE -ge 299 ]] ; then
+    echo -e "\nError creating Application wrong-prod-app: $STATUS_CODE"
+    exit 8
+  fi
+
+  echo -e "\nCreating Application cred-exp-app..."
+  STATUS_CODE=$(curl -X POST --silent -o /dev/stderr -w "%{http_code}" \
+    https://${MGMT}/v1/organizations/${ORG}/developers/integration@test.com/apps \
+    -H "Authorization: Bearer ${TOKEN}" \
+    -H "Content-Type: application/json" \
+    -d @${REPO}/kokoro/payloads/cred-expired_app.json)
+  if [[ $STATUS_CODE -ge 299 ]] ; then
+    echo -e "\nError creating Application cred-exp-app: $STATUS_CODE"
+    exit 8
+  fi
+
+  echo -e "\nCreating Application unapproved-app..."
+  STATUS_CODE=$(curl -X POST --silent -o /dev/stderr -w "%{http_code}" \
+    https://${MGMT}/v1/organizations/${ORG}/developers/integration@test.com/apps \
+    -H "Authorization: Bearer ${TOKEN}" \
+    -H "Content-Type: application/json" \
+    -d @${REPO}/kokoro/payloads/unapproved_app.json)
+  if [[ $STATUS_CODE -ge 299 ]] ; then
+    echo -e "\nError creating Application unapproved-app: $STATUS_CODE"
+    exit 8
+  fi
+
+  echo -e "\nCreating Application prod-unapproved-app..."
+  STATUS_CODE=$(curl -X POST --silent -o /dev/stderr -w "%{http_code}" \
+    https://${MGMT}/v1/organizations/${ORG}/developers/integration@test.com/apps \
+    -H "Authorization: Bearer ${TOKEN}" \
+    -H "Content-Type: application/json" \
+    -d @${REPO}/kokoro/payloads/prod-unapproved_app.json)
+  if [[ $STATUS_CODE -ge 299 ]] ; then
+    echo -e "\nError creating Application prod-unapproved-app: $STATUS_CODE"
     exit 8
   fi
 
@@ -82,6 +137,87 @@ function provisionRemoteService {
     echo -e "\nError extracting credentials from Application httpbin-app: $STATUS_CODE"
     exit 8
   fi
+
+  echo -e "\nExtracting Application wrong-prod-app credentials..."
+  APP=$(curl --silent \
+    https://${MGMT}/v1/organizations/${ORG}/developers/integration@test.com/apps/wrong-prod-app \
+    -H "Authorization: Bearer ${TOKEN}" \
+    -H "Content-Type: application/json")
+  {
+    WRONG_APIKEY=$(echo $APP | jq -r ".credentials[0].consumerKey")
+    WRONG_APISECRET=$(echo $APP | jq -r ".credentials[0].consumerSecret")
+    echo -e "\nWRONG_APIKEY: $WRONG_APIKEY"
+    echo -e "\nWRONG_APISECRET: $WRONG_APISECRET"
+  } || {
+    echo -e "\nError extracting credentials from Application wrong-prod-app: $STATUS_CODE"
+    exit 8
+  }
+  if [[ -z $WRONG_APIKEY ]] || [[ -z $WRONG_APISECRET ]] ; then
+    echo -e "\nError extracting credentials from Application wrong-prod-app: $STATUS_CODE"
+    exit 8
+  fi
+
+  echo -e "\nExtracting Application cred-exp-app credentials..."
+  APP=$(curl --silent \
+    https://${MGMT}/v1/organizations/${ORG}/developers/integration@test.com/apps/cred-exp-app \
+    -H "Authorization: Bearer ${TOKEN}" \
+    -H "Content-Type: application/json")
+  {
+    EXPIRED_APIKEY=$(echo $APP | jq -r ".credentials[0].consumerKey")
+    EXPIRED_APISECRET=$(echo $APP | jq -r ".credentials[0].consumerSecret")
+    echo -e "\nEXPIRED_APIKEY: $EXPIRED_APIKEY"
+    echo -e "\nEXPIRED_APISECRET: $EXPIRED_APISECRET"
+  } || {
+    echo -e "\nError extracting credentials from Application cred-exp-app: $STATUS_CODE"
+    exit 8
+  }
+  if [[ -z $EXPIRED_APIKEY ]] || [[ -z $EXPIRED_APISECRET ]] ; then
+    echo -e "\nError extracting credentials from Application cred-exp-app: $STATUS_CODE"
+    exit 8
+  fi
+
+  echo -e "\nExtracting Application unapproved-app credentials..."
+  APP=$(curl --silent \
+    https://${MGMT}/v1/organizations/${ORG}/developers/integration@test.com/apps/unapproved-app \
+    -H "Authorization: Bearer ${TOKEN}" \
+    -H "Content-Type: application/json")
+  {
+    REVOKED_APIKEY=$(echo $APP | jq -r ".credentials[0].consumerKey")
+    REVOKED_APISECRET=$(echo $APP | jq -r ".credentials[0].consumerSecret")
+    echo -e "\nREVOKED_APIKEY: $REVOKED_APIKEY"
+    echo -e "\nREVOKED_APISECRET: $REVOKED_APISECRET"
+  } || {
+    echo -e "\nError extracting credentials from Application unapproved-app: $STATUS_CODE"
+    exit 8
+  }
+  if [[ -z $REVOKED_APIKEY ]] || [[ -z $REVOKED_APISECRET ]] ; then
+    echo -e "\nError extracting credentials from Application unapproved-app: $STATUS_CODE"
+    exit 8
+  fi
+
+  echo -e "\nExtracting Application prod-unapproved-app credentials..."
+  APP=$(curl --silent \
+    https://${MGMT}/v1/organizations/${ORG}/developers/integration@test.com/apps/prod-unapproved-app \
+    -H "Authorization: Bearer ${TOKEN}" \
+    -H "Content-Type: application/json")
+  {
+    PROD_REVOKED_APIKEY=$(echo $APP | jq -r ".credentials[0].consumerKey")
+    PROD_REVOKED_APISECRET=$(echo $APP | jq -r ".credentials[0].consumerSecret")
+    echo -e "\nPROD_REVOKED_APIKEY: $PROD_REVOKED_APIKEY"
+    echo -e "\nPROD_REVOKED_APISECRET: $PROD_REVOKED_APISECRET"
+  } || {
+    echo -e "\nError extracting credentials from Application prod-unapproved-app: $STATUS_CODE"
+    exit 8
+  }
+  if [[ -z $PROD_REVOKED_APIKEY ]] || [[ -z $PROD_REVOKED_APISECRET ]] ; then
+    echo -e "\nError extracting credentials from Application prod-unapproved-app: $STATUS_CODE"
+    exit 8
+  fi
+
+  echo -e "\nRevoking httpbin-product in prod-unapproved-app..."
+  curl -X POST --silent -o /dev/stderr -w "%{http_code}" \
+    "https://${MGMT}/v1/organizations/${ORG}/developers/integration@test.com/apps/prod-unapproved-app/keys/${PROD_REVOKED_APIKEY}/apiproducts/httpbin-product?action=revoke" \
+    -H "Authorization: Bearer ${TOKEN}"
 }
 
 ################################################################################
@@ -181,6 +317,38 @@ function cleanUpApigee {
     echo -e "\nError deleting Application httpbin-app: $STATUS_CODE"
   fi
 
+  echo -e "\nDeleting Application cred-exp-app..."
+  STATUS_CODE=$(curl -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
+    https://${MGMT}/v1/organizations/${ORG}/developers/integration@test.com/apps/cred-exp-app \
+    -H "Authorization: Bearer ${TOKEN}")
+  if [[ $STATUS_CODE -ge 299 ]] ; then
+    echo -e "\nError deleting Application cred-exp-app: $STATUS_CODE"
+  fi
+
+  echo -e "\nDeleting Application unapproved-app..."
+  STATUS_CODE=$(curl -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
+    https://${MGMT}/v1/organizations/${ORG}/developers/integration@test.com/apps/unapproved-app \
+    -H "Authorization: Bearer ${TOKEN}")
+  if [[ $STATUS_CODE -ge 299 ]] ; then
+    echo -e "\nError deleting Application unapproved-app: $STATUS_CODE"
+  fi
+
+  echo -e "\nDeleting Application prod-unapproved-app..."
+  STATUS_CODE=$(curl -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
+    https://${MGMT}/v1/organizations/${ORG}/developers/integration@test.com/apps/prod-unapproved-app \
+    -H "Authorization: Bearer ${TOKEN}")
+  if [[ $STATUS_CODE -ge 299 ]] ; then
+    echo -e "\nError deleting Application prod-unapproved-app: $STATUS_CODE"
+  fi
+
+  echo -e "\nDeleting Application wrong-prod-app..."
+  STATUS_CODE=$(curl -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
+    https://${MGMT}/v1/organizations/${ORG}/developers/integration@test.com/apps/wrong-prod-app \
+    -H "Authorization: Bearer ${TOKEN}")
+  if [[ $STATUS_CODE -ge 299 ]] ; then
+    echo -e "\nError deleting Application wrong-prod-app: $STATUS_CODE"
+  fi
+  
   echo -e "\nDeleting Application Developer integration@test.com..."
   STATUS_CODE=$(curl -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
     https://${MGMT}/v1/organizations/${ORG}/developers/integration@test.com \
@@ -197,12 +365,12 @@ function cleanUpApigee {
     echo -e "\nError deleting API Product httpbin-product: $STATUS_CODE"
   fi
 
-  echo -e "\nDeleting API Product remote-service..."
+  echo -e "\nDeleting API Product dummy-product..."
   STATUS_CODE=$(curl -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
-    https://${MGMT}/v1/organizations/${ORG}/apiproducts/remote-service \
+    https://${MGMT}/v1/organizations/${ORG}/apiproducts/dummy-product \
     -H "Authorization: Bearer ${TOKEN}")
   if [[ $STATUS_CODE -ge 299 ]] ; then
-    echo -e "\nError deleting API Product remote-service: $STATUS_CODE"
+    echo -e "\nError deleting API Product dummy-product: $STATUS_CODE"
   fi
 
   undeployRemoteServiceProxies

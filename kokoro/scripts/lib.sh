@@ -185,8 +185,46 @@ function runEnvoyTests {
       fi
     done
 
+    echo -e "\nCalling with a good key"
     callTargetWithAPIKey $APIKEY 200
+    echo -e "\nCalling with an bad string"
     callTargetWithAPIKey APIKEY 403
+    echo -e "\nCalling with an expired key"
+    callTargetWithAPIKey $EXPIRED_APIKEY 403
+    echo -e "\nCalling with a key with wrong API Product"
+    callTargetWithAPIKey $WRONG_APIKEY 403
+    echo -e "\nCalling with a key with revoked App"
+    callTargetWithAPIKey $REVOKED_APIKEY 403
+    echo -e "\nCalling with a key with revoked API Product"
+    callTargetWithAPIKey $PROD_REVOKED_APIKEY 403
+
+    JWT=$($CLI token create -c config.yaml -i $EXPIRED_APIKEY -s $EXPIRED_APISECRET)
+    if [[ ! -z $JWT ]] ; then
+      echo "\nShould NOT have got a JWT from expired key and secret"
+      exit 5
+    fi
+
+    JWT=$($CLI token create -c config.yaml -i $WRONG_APIKEY -s $WRONG_APISECRET)
+    if [[ -z $JWT ]] ; then
+      echo "\nShould have got a JWT from wrong key and secret"
+      exit 5
+    fi
+    sleep 5
+    echo -e "\nCalling with a JWT with wrong API Product"
+    callTargetWithJWT $JWT 403
+
+    JWT=$($CLI token create -c config.yaml -i $REVOKED_APIKEY -s $REVOKED_APISECRET)
+    if [[ ! -z $JWT ]] ; then
+      echo "\nShould NOT have got a JWT from key and secret of revoked App"
+      exit 5
+    fi
+
+    JWT=$($CLI token create -c config.yaml -i $PROD_REVOKED_APIKEY -s $PROD_REVOKED_APISECRET)
+    if [[ ! -z $JWT ]] ; then
+      echo "\nShould NOT have got a JWT from key and secret of App with revoked API Product"
+      exit 5
+    fi
+
     for i in {1..20}
     do
       callTargetWithAPIKey $APIKEY
@@ -261,8 +299,46 @@ EOF
       fi
     done
 
+    echo -e "\nCalling with a good key"
     callIstioTargetWithAPIKey $APIKEY 200
+    echo -e "\nCalling with an bad string"
     callIstioTargetWithAPIKey APIKEY 403
+    echo -e "\nCalling with an expired key"
+    callIstioTargetWithAPIKey $EXPIRED_APIKEY 403
+    echo -e "\nCalling with a key with wrong API Product"
+    callIstioTargetWithAPIKey $WRONG_APIKEY 403
+    echo -e "\nCalling with a key with revoked App"
+    callIstioTargetWithAPIKey $REVOKED_APIKEY 403
+    echo -e "\nCalling with a key with revoked API Product"
+    callIstioTargetWithAPIKey $PROD_REVOKED_APIKEY 403
+
+    JWT=$($CLI token create -c config.yaml -i $EXPIRED_APIKEY -s $EXPIRED_APISECRET)
+    if [[ ! -z $JWT ]] ; then
+      echo "\nShould NOT have got a JWT from expired key and secret"
+      exit 5
+    fi
+
+    JWT=$($CLI token create -c config.yaml -i $WRONG_APIKEY -s $WRONG_APISECRET)
+    if [[ -z $JWT ]] ; then
+      echo "\nShould have got a JWT from wrong key and secret"
+      exit 5
+    fi
+    sleep 5
+    echo -e "\nCalling with a JWT with wrong API Product"
+    callIstioTargetWithJWT $JWT 403
+
+    JWT=$($CLI token create -c config.yaml -i $REVOKED_APIKEY -s $REVOKED_APISECRET)
+    if [[ ! -z $JWT ]] ; then
+      echo "\nShould NOT have got a JWT from key and secret of revoked App"
+      exit 5
+    fi
+
+    JWT=$($CLI token create -c config.yaml -i $PROD_REVOKED_APIKEY -s $PROD_REVOKED_APISECRET)
+    if [[ ! -z $JWT ]] ; then
+      echo "\nShould NOT have got a JWT from key and secret of App with revoked API Product"
+      exit 5
+    fi
+    
     for i in {1..20}
     do
       callIstioTargetWithAPIKey $APIKEY
