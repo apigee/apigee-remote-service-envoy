@@ -1,0 +1,7 @@
+{
+  "name" : "unapproved-app",
+  "apiProducts": [
+    "httpbin-product"
+  ],
+  "status": "revoked"
+}

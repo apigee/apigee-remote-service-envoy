@@ -1,0 +1,6 @@
+{
+  "name" : "wrong-prod-app",
+  "apiProducts": [
+    "dummy-product"
+  ]
+}
