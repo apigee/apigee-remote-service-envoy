@@ -176,10 +176,11 @@ function runEnvoyTests {
     for i in {1..20}
     do
       JWT=$($CLI token create -c config.yaml -i $APIKEY -s $APISECRET)
-      sleep 5
+      sleep 30 # skew for JWT
       callTargetWithJWT $JWT
-      sleep 55
+      sleep 30 # best effort to restore the quota
       if [[ $STATUS_CODE -eq 200 ]] ; then
+        sleep 30 # best effort to restore the quota
         echo -e "\nServices are ready to be tested"
         break
       fi
@@ -209,7 +210,7 @@ function runEnvoyTests {
       echo "\nShould have got a JWT from wrong key and secret"
       exit 5
     fi
-    sleep 5
+    sleep 30 # skew for JWT
     echo -e "\nCalling with a JWT with wrong API Product"
     callTargetWithJWT $JWT 403
 
@@ -290,10 +291,11 @@ EOF
     for i in {1..20}
     do
       JWT=$($CLI token create -c config.yaml -i $APIKEY -s $APISECRET)
-      sleep 5
+      sleep 30 # skew for JWT
       callIstioTargetWithJWT $JWT
-      sleep 55
+      sleep 30 # best effort to restore the quota
       if [[ $STATUS_CODE -eq 200 ]] ; then
+        sleep 30 # best effort to restore the quota
         echo -e "\nServices are ready to be tested"
         break
       fi
@@ -323,7 +325,7 @@ EOF
       echo "\nShould have got a JWT from wrong key and secret"
       exit 5
     fi
-    sleep 5
+    sleep 30
     echo -e "\nCalling with a JWT with wrong API Product"
     callIstioTargetWithJWT $JWT 403
 

@@ -217,7 +217,7 @@ function provisionRemoteService {
   echo -e "\nRevoking httpbin-product in prod-unapproved-app..."
   curl -X POST --silent -o /dev/stderr -w "%{http_code}" \
     "https://${MGMT}/v1/organizations/${ORG}/developers/integration@test.com/apps/prod-unapproved-app/keys/${PROD_REVOKED_APIKEY}/apiproducts/httpbin-product?action=revoke" \
-    -H "Authorization: Bearer ${TOKEN}"
+    -d "" -H "Authorization: Bearer ${TOKEN}"
 }
 
 ################################################################################
