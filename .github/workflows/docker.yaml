@@ -28,11 +28,29 @@ jobs:
     name: Build Default Docker image
     runs-on: ubuntu-latest
     steps:
-      - run: echo "VERSION=$(echo ${GITHUB_REF//\//-} | cut -d'-' -f3-)" >> $GITHUB_ENV
-      - run: echo "DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_ENV
       - 
         name: Check out code
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2
+      -
+        name: Prepare
+        id: prep
+        run: |
+          DOCKER_IMAGE=google/apigee-envoy-adapter
+          VERSION=edge
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          elif [[ $GITHUB_REF == refs/heads/* ]]; then
+            VERSION=$(echo ${GITHUB_REF#refs/heads/} | sed -r 's#/+#-#g')
+          elif [[ $GITHUB_REF == refs/pull/* ]]; then
+            VERSION=pr-${{ github.event.number }}
+          fi
+          TAGS="${DOCKER_IMAGE}:${VERSION}"
+          if [ "${{ github.event_name }}" = "push" ]; then
+            TAGS="$TAGS,${DOCKER_IMAGE}:sha-${GITHUB_SHA::8}"
+          fi
+          echo ::set-output name=version::${VERSION}
+          echo ::set-output name=tags::${TAGS}
+          echo ::set-output name=created::$(date -u +'%Y-%m-%dT%H:%M:%SZ')
       -
         name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
@@ -48,18 +66,37 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
-          tags: google/apigee-envoy-adapter:${{ env.VERSION }}
-          build-args: LDFLAGS=-s -w -X main.version=${{ env.VERSION }} -X main.commit=${{ github.SHA }} -X main.date=${{ env.DATE }}
+          push: true
+          tags: ${{ steps.prep.outputs.tags }}
+          build-args: LDFLAGS=-s -w -X main.version=${{ steps.prep.outputs.version }} -X main.commit=${{ github.SHA }} -X main.date=${{ steps.prep.outputs.created }}
 
   ubuntu:
     name: Build Ubuntu Docker image
     runs-on: ubuntu-latest
     steps:
-      - run: echo "VERSION=$(echo ${GITHUB_REF//\//-} | cut -d'-' -f3-)" >> $GITHUB_ENV
-      - run: echo "DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_ENV
       - 
         name: Check out code
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2
+      -
+        name: Prepare
+        id: prep
+        run: |
+          DOCKER_IMAGE=google/apigee-envoy-adapter
+          VERSION=edge
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          elif [[ $GITHUB_REF == refs/heads/* ]]; then
+            VERSION=$(echo ${GITHUB_REF#refs/heads/} | sed -r 's#/+#-#g')
+          elif [[ $GITHUB_REF == refs/pull/* ]]; then
+            VERSION=pr-${{ github.event.number }}
+          fi
+          TAGS="${DOCKER_IMAGE}:${VERSION}"
+          if [ "${{ github.event_name }}" = "push" ]; then
+            TAGS="$TAGS,${DOCKER_IMAGE}:sha-${GITHUB_SHA::8}"
+          fi
+          echo ::set-output name=version::${VERSION}
+          echo ::set-output name=tags::${TAGS}
+          echo ::set-output name=created::$(date -u +'%Y-%m-%dT%H:%M:%SZ')
       -
         name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
@@ -75,20 +112,39 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
-          tags: google/apigee-envoy-adapter:${{ env.VERSION }}-ubuntu
+          push: true
+          tags: ${{ steps.prep.outputs.tags }}-ubuntu
           build-args: |
             RUN_CONTAINER=ubuntu:xenial
-            LDFLAGS=-X main.version=${{ env.VERSION }} -X main.commit=${{ github.SHA }} -X main.date=${{ env.DATE }}
+            LDFLAGS=-s -w -X main.version=${{ steps.prep.outputs.version }} -X main.commit=${{ github.SHA }} -X main.date=${{ steps.prep.outputs.created }}
 
   boring:
     name: Build Boring Crypto Docker image
     runs-on: ubuntu-latest
     steps:
-      - run: echo "VERSION=$(echo ${GITHUB_REF//\//-} | cut -d'-' -f3-)" >> $GITHUB_ENV
-      - run: echo "DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_ENV
       - 
         name: Check out code
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2
+      -
+        name: Prepare
+        id: prep
+        run: |
+          DOCKER_IMAGE=google/apigee-envoy-adapter
+          VERSION=edge
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          elif [[ $GITHUB_REF == refs/heads/* ]]; then
+            VERSION=$(echo ${GITHUB_REF#refs/heads/} | sed -r 's#/+#-#g')
+          elif [[ $GITHUB_REF == refs/pull/* ]]; then
+            VERSION=pr-${{ github.event.number }}
+          fi
+          TAGS="${DOCKER_IMAGE}:${VERSION}"
+          if [ "${{ github.event_name }}" = "push" ]; then
+            TAGS="$TAGS,${DOCKER_IMAGE}:sha-${GITHUB_SHA::8}"
+          fi
+          echo ::set-output name=version::${VERSION}
+          echo ::set-output name=tags::${TAGS}
+          echo ::set-output name=created::$(date -u +'%Y-%m-%dT%H:%M:%SZ')
       -
         name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
@@ -104,9 +160,10 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
-          tags: google/apigee-envoy-adapter:${{ env.VERSION }}-boring
+          push: true
+          tags: ${{ steps.prep.outputs.tags }}-boring
           build-args: |
             RUN_CONTAINER=ubuntu:xenial
             BUILD_CONTAINER=goboring/golang:1.15.5b5
             CGO_ENABLED=1
-            LDFLAGS=-X main.version=${{ env.VERSION }} -X main.commit=${{ github.SHA }} -X main.date=${{ env.DATE }}
+            LDFLAGS=-s -w -X main.version=${{ steps.prep.outputs.version }} -X main.commit=${{ github.SHA }} -X main.date=${{ steps.prep.outputs.created }}
