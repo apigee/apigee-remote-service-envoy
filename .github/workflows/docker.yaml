@@ -34,6 +34,9 @@ jobs:
         name: Check out code
         uses: actions/checkout@v1
       -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      -
         name: Login to DockerHub
         uses: docker/login-action@v1
         with:
@@ -47,10 +50,6 @@ jobs:
           file: ./Dockerfile
           tags: google/apigee-envoy-adapter:${{ env.VERSION }}
           build-args: LDFLAGS=-s -w -X main.version=${{ env.VERSION }} -X main.commit=${{ github.SHA }} -X main.date=${{ env.DATE }}
-          labels: |
-            org.opencontainers.image.source=${{ github.event.repository.html_url }}
-            org.opencontainers.image.created=${{ steps.prep.outputs.created }}
-            org.opencontainers.image.revision=${{ github.sha }}
 
   ubuntu:
     name: Build Ubuntu Docker image
@@ -61,6 +60,9 @@ jobs:
       - 
         name: Check out code
         uses: actions/checkout@v1
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
       -
         name: Login to DockerHub
         uses: docker/login-action@v1
@@ -77,10 +79,6 @@ jobs:
           build-args: |
             RUN_CONTAINER=ubuntu:xenial
             LDFLAGS=-X main.version=${{ env.VERSION }} -X main.commit=${{ github.SHA }} -X main.date=${{ env.DATE }}
-          labels: |
-            org.opencontainers.image.source=${{ github.event.repository.html_url }}
-            org.opencontainers.image.created=${{ steps.prep.outputs.created }}
-            org.opencontainers.image.revision=${{ github.sha }}
 
   boring:
     name: Build Boring Crypto Docker image
@@ -91,6 +89,9 @@ jobs:
       - 
         name: Check out code
         uses: actions/checkout@v1
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
       -
         name: Login to DockerHub
         uses: docker/login-action@v1
@@ -109,7 +110,3 @@ jobs:
             BUILD_CONTAINER=goboring/golang:1.15.5b5
             CGO_ENABLED=1
             LDFLAGS=-X main.version=${{ env.VERSION }} -X main.commit=${{ github.SHA }} -X main.date=${{ env.DATE }}
-          labels: |
-            org.opencontainers.image.source=${{ github.event.repository.html_url }}
-            org.opencontainers.image.created=${{ steps.prep.outputs.created }}
-            org.opencontainers.image.revision=${{ github.sha }}
