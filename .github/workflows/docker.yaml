@@ -106,7 +106,8 @@ jobs:
           tags: google/apigee-envoy-adapter:${{ env.VERSION }}-boring
           build-args: |
             RUN_CONTAINER=ubuntu:xenial
-            BUILD_CONTAINER=goboring/golang:1.15.5b5,CGO_ENABLED=1
+            BUILD_CONTAINER=goboring/golang:1.15.5b5
+            CGO_ENABLED=1
             LDFLAGS=-X main.version=${{ env.VERSION }} -X main.commit=${{ github.SHA }} -X main.date=${{ env.DATE }}
           labels: |
             org.opencontainers.image.source=${{ github.event.repository.html_url }}
