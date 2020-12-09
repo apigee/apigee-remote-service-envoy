@@ -124,7 +124,7 @@ func (a *JWTAuthManager) getToken() *jwt.Token {
 	return a.authToken
 }
 
-func loadPrivateKey(privateKeyBytes []byte, rsaPrivateKeyPassword string) (*rsa.PrivateKey, error) {
+func LoadPrivateKey(privateKeyBytes []byte, rsaPrivateKeyPassword string) (*rsa.PrivateKey, error) {
 
 	var err error
 	privPem, _ := pem.Decode(privateKeyBytes)
