@@ -235,7 +235,7 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string, 
 		jwks := &jwk.Set{}
 		if err = json.Unmarshal(jwksBytes, jwks); err == nil {
 			c.Tenant.JWKS = jwks
-			if c.Tenant.PrivateKey, err = loadPrivateKey(key, ""); err != nil {
+			if c.Tenant.PrivateKey, err = LoadPrivateKey(key, ""); err != nil {
 				return err
 			}
 		}
