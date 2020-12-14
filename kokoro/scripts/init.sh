@@ -31,8 +31,8 @@ function installPrerequisites {
   if [[ -d "/usr/local/go" ]] ; then 
     sudo rm -r /usr/local/go
   fi
-  curl -LO https://golang.org/dl/go1.15.2.linux-amd64.tar.gz
-  sudo tar -C /usr/local -xzf go1.15.2.linux-amd64.tar.gz
+  curl -LO https://golang.org/dl/go1.15.6.linux-amd64.tar.gz
+  sudo tar -C /usr/local -xzf go1.15.6.linux-amd64.tar.gz
   export PATH=$PATH:/usr/local/go/bin
   sudo chmod 777 /usr/local/go
 }

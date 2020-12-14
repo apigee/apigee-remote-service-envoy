@@ -362,7 +362,7 @@ func getHTTPLog() *als.StreamAccessLogsMessage {
 		LogEntries: &als.StreamAccessLogsMessage_HttpLogs{
 			HttpLogs: &als.StreamAccessLogsMessage_HTTPAccessLogEntries{
 				LogEntry: []*v2.HTTPAccessLogEntry{
-					&v2.HTTPAccessLogEntry{
+					{
 						Request: &v2.HTTPRequestProperties{
 							RequestHeaders: map[string]string{
 								":authority": "",

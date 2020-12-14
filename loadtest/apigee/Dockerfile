@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM golang:1.15.1-alpine AS build
+FROM golang:1.15.6-alpine AS build
 
 WORKDIR /src/
 COPY main.go go.* /src/

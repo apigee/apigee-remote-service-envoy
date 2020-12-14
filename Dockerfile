@@ -20,7 +20,7 @@
 
 # Use the following combination to build an image linked with Boring Crypto:
 # --build-arg CGO_ENABLED=1
-# --build-arg BUILD_CONTAINER=goboring/golang:1.14.6b4
+# --build-arg BUILD_CONTAINER=goboring/golang:1.15.6b5
 # --build-arg RUN_CONTAINER=ubuntu:xenial
 
 ARG BUILD_CONTAINER=golang:1.15
