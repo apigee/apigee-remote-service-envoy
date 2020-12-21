@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"github.com/apigee/apigee-remote-service-golib/auth"
-	core "github.com/envoyproxy/go-control-plane/envoy/api/v2/core"
+	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 )
 
 func TestMetadataHeaders(t *testing.T) {

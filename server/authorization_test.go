@@ -26,8 +26,8 @@ import (
 	apigeeContext "github.com/apigee/apigee-remote-service-golib/context"
 	"github.com/apigee/apigee-remote-service-golib/product"
 	"github.com/apigee/apigee-remote-service-golib/quota"
-	core "github.com/envoyproxy/go-control-plane/envoy/api/v2/core"
-	v2 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v2"
+	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
+	v3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	"github.com/gogo/googleapis/google/rpc"
 	pb "github.com/golang/protobuf/ptypes/struct"
 )
@@ -63,10 +63,10 @@ func TestCheck(t *testing.T) {
 	}
 
 	uri := "path?x-api-key=foo"
-	req := &v2.CheckRequest{
-		Attributes: &v2.AttributeContext{
-			Request: &v2.AttributeContext_Request{
-				Http: &v2.AttributeContext_HttpRequest{
+	req := &v3.CheckRequest{
+		Attributes: &v3.AttributeContext{
+			Request: &v3.AttributeContext_Request{
+				Http: &v3.AttributeContext_HttpRequest{
 					Path:    uri,
 					Headers: headers,
 				},
@@ -99,7 +99,7 @@ func TestCheck(t *testing.T) {
 	}
 
 	// no target header
-	var resp *v2.CheckResponse
+	var resp *v3.CheckResponse
 	var err error
 	if resp, err = server.Check(context.Background(), req); err != nil {
 		t.Errorf("should not get error. got: %s", err)
@@ -167,7 +167,7 @@ func TestCheck(t *testing.T) {
 	if resp.Status.Code != int32(rpc.RESOURCE_EXHAUSTED) {
 		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.RESOURCE_EXHAUSTED))
 	}
-	code := resp.HttpResponse.(*v2.CheckResponse_DeniedResponse).DeniedResponse.Status.Code
+	code := resp.HttpResponse.(*v3.CheckResponse_DeniedResponse).DeniedResponse.Status.Code
 	if code != http.StatusTooManyRequests {
 		t.Errorf("got: %d, want: %d", code, http.StatusTooManyRequests)
 	}
