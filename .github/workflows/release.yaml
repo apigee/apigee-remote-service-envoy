@@ -41,9 +41,7 @@ jobs:
           repository: build/goboring
           dockerfile: Dockerfile_releaser
           push: false
-          build_args: |
-            GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
-            VERSION=${{ steps.prep.outputs.version }}
+          build_args: GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }},VERSION=${{ steps.prep.outputs.version }}
           
       # local Goreleaser run would be per below
       # -
