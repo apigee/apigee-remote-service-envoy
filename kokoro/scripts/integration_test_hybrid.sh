@@ -26,7 +26,8 @@ function provisionRemoteService {
   MGMT=apigee.googleapis.com
 
   {
-    $CLI provision -o $ORG -e $ENV -t $TOKEN -r $RUNTIME -f -v > config.yaml
+    $CLI provision -o $ORG -e $ENV -t $TOKEN -r $RUNTIME -f -v > config1.yaml
+    $CLI provision -o $ORG -e $ENV2 -t $TOKEN -r $RUNTIME2 -v > config2.yaml
   } || { # exit directly if cli encounters any error
     exit 8
   }
@@ -36,9 +37,20 @@ function provisionRemoteService {
     https://${MGMT}/v1/organizations/${ORG}/apiproducts \
     -H "Authorization: Bearer ${TOKEN}" \
     -H "Content-Type: application/json" \
-    -d @${REPO}/kokoro/payloads/httpbin_product.json)
+    -d @${REPO}/kokoro/payloads/hybrid_product.json)
   if [[ $STATUS_CODE -ge 299 ]] ; then
     echo -e "\nError creating API Product httpbin-product: $STATUS_CODE"
+    exit 8
+  fi
+
+  echo -e "\nCreating API Product opgrp-product..."
+  STATUS_CODE=$(curl -X POST --silent -o /dev/stderr -w "%{http_code}" \
+    https://${MGMT}/v1/organizations/${ORG}/apiproducts \
+    -H "Authorization: Bearer ${TOKEN}" \
+    -H "Content-Type: application/json" \
+    -d @${REPO}/kokoro/payloads/opgrp_product.json)
+  if [[ $STATUS_CODE -ge 299 ]] ; then
+    echo -e "\nError creating API Product opgrp-product: $STATUS_CODE"
     exit 8
   fi
 
@@ -69,7 +81,7 @@ function provisionRemoteService {
     https://${MGMT}/v1/organizations/${ORG}/developers/integration@test.com/apps \
     -H "Authorization: Bearer ${TOKEN}" \
     -H "Content-Type: application/json" \
-    -d @${REPO}/kokoro/payloads/application.json)
+    -d @${REPO}/kokoro/payloads/hybrid_app.json)
   if [[ $STATUS_CODE -ge 299 ]] ; then
     echo -e "\nError creating Application httpbin-app: $STATUS_CODE"
     exit 8
@@ -224,17 +236,29 @@ function provisionRemoteService {
 # Undeploy remote-service API Proxies
 ################################################################################
 function undeployRemoteServiceProxies {
+  if [[ -z $1 ]] ; then
+    env=$ENV
+  else
+    env=$1
+  fi
+
+  if [[ -z $2 ]] ; then
+    runtime=$RUNTIME
+  else
+    runtime=$2
+  fi
+
   TOKEN=$(gcloud auth print-access-token)
   echo -e "\nGet deployed revision of API Proxies remote-service..."
   REV=$(docker run curlimages/curl:7.72.0 --silent \
     https://${MGMT}/v1/organizations/${ORG}/apis/remote-service/deployments \
-    -H "Authorization: Bearer ${TOKEN}" | jq -r ".deployments[0].revision")
+    -H "Authorization: Bearer ${TOKEN}" | jq -r --arg env "${env}" '.deployments[] | select(.environment==$env) | .revision')
   echo -e "\nGot deployed revision $REV"
 
   if [[ ! -z $REV ]] ; then
     echo -e "\nUndeploying revision $REV of API Proxies remote-service..."
     STATUS_CODE=$(docker run curlimages/curl:7.72.0 -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
-      https://${MGMT}/v1/organizations/${ORG}/environments/${ENV}/apis/remote-service/revisions/${REV}/deployments \
+      https://${MGMT}/v1/organizations/${ORG}/environments/${env}/apis/remote-service/revisions/${REV}/deployments \
       -H "Authorization: Bearer ${TOKEN}")
     if [[ $STATUS_CODE -ge 299 ]] ; then
       echo -e "\nError undeploying API Proxies remote-service: $STATUS_CODE"
@@ -244,7 +268,7 @@ function undeployRemoteServiceProxies {
   for i in {1..20}
   do
     STATUS_CODE=$(curl --silent -o /dev/stderr -w "%{http_code}" \
-     $RUNTIME/remote-service/version)
+     $runtime/remote-service/version)
     if [[ $STATUS_CODE -ne 200 ]] ; then
       echo -e "\nUndeployed remote-service API Proxies"
       break
@@ -257,11 +281,23 @@ function undeployRemoteServiceProxies {
 # Deploy remote-service API Proxies
 ################################################################################
 function deployRemoteServiceProxies {
+  if [[ -z $2 ]] ; then
+    env=$ENV
+  else
+    env=$2
+  fi
+
+  if [[ -z $3 ]] ; then
+    runtime=$RUNTIME
+  else
+    runtime=$3
+  fi
+
   if [[ ! -z $1 ]] ; then
     TOKEN=$(gcloud auth print-access-token)
     echo -e "\nDeploying revision $1 of API Proxies remote-service..."
     STATUS_CODE=$(docker run curlimages/curl:7.72.0 -X POST --silent -o /dev/stderr -w "%{http_code}" \
-      https://${MGMT}/v1/organizations/${ORG}/environments/${ENV}/apis/remote-service/revisions/$1/deployments \
+      https://${MGMT}/v1/organizations/${ORG}/environments/${env}/apis/remote-service/revisions/$1/deployments \
       -H "Authorization: Bearer ${TOKEN}")
     if [[ $STATUS_CODE -ge 299 ]] ; then
       echo -e "\nError undeploying API Proxies remote-service: $STATUS_CODE"
@@ -271,7 +307,7 @@ function deployRemoteServiceProxies {
   for i in {1..20}
   do
     STATUS_CODE=$(curl --silent -o /dev/stderr -w "%{http_code}" \
-     $RUNTIME/remote-service/version)
+     $runtime/remote-service/version)
     if [[ $STATUS_CODE -eq 200 ]] ; then
       echo -e "\nDeployed remote-service API Proxies"
       break
@@ -365,6 +401,14 @@ function cleanUpApigee {
     echo -e "\nError deleting API Product httpbin-product: $STATUS_CODE"
   fi
 
+  echo -e "\nDeleting API Product opgrp-product..."
+  STATUS_CODE=$(curl -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
+    https://${MGMT}/v1/organizations/${ORG}/apiproducts/opgrp-product \
+    -H "Authorization: Bearer ${TOKEN}")
+  if [[ $STATUS_CODE -ge 299 ]] ; then
+    echo -e "\nError deleting API Product opgrp-product: $STATUS_CODE"
+  fi
+
   echo -e "\nDeleting API Product dummy-product..."
   STATUS_CODE=$(curl -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
     https://${MGMT}/v1/organizations/${ORG}/apiproducts/dummy-product \
@@ -373,7 +417,8 @@ function cleanUpApigee {
     echo -e "\nError deleting API Product dummy-product: $STATUS_CODE"
   fi
 
-  undeployRemoteServiceProxies
+  undeployRemoteServiceProxies $ENV $RUNTIME
+  undeployRemoteServiceProxies $ENV2 $RUNTIME2
 
   echo -e "\nDeleting API Proxies remote-service..."
   STATUS_CODE=$(curl -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
@@ -388,7 +433,7 @@ function cleanUpApigee {
 echo -e "\nStarting integration test of the Apigee Envoy Adapter with Apigee Hybrid..."
 
 # load necessary function definitions
-. ${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-envoy/kokoro/scripts/lib.sh
+. ${BUILD_DIR}/scripts/lib.sh
 
 setEnvironmentVariables hybrid-env
 
@@ -400,6 +445,23 @@ setEnvironmentVariables hybrid-env
 
 pushDockerImages $ADAPTER_IMAGE_TAG
 provisionRemoteService
+
+echo -e "\nTesting Apigee Envrionment $ENV and Runtime $RUNTIME..."
+cp config1.yaml config.yaml
+
+generateIstioSampleConfigurations $HYBRID_ISTIO_TEMPLATE $ADAPTER_IMAGE_TAG
+
+cleanUpKubernetes
+
+applyToCluster istio-samples
+runIstioTests
+
+runAdditionalIstioTests
+
+ENV=$ENV2
+RUNTIME=$RUNTIME2
+echo -e "\nTesting Apigee Envrionment $ENV and Runtime $RUNTIME..."
+cp config2.yaml config.yaml
 
 generateIstioSampleConfigurations $HYBRID_ISTIO_TEMPLATE $ADAPTER_IMAGE_TAG
 

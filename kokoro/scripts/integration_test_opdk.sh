@@ -342,7 +342,7 @@ function cleanUpApigee {
 echo -e "\nStarting integration test of the Apigee Envoy Adapter with Apigee OPDK..."
 
 # load necessary function definitions
-. ${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-envoy/kokoro/scripts/lib.sh
+. ${BUILD_DIR}/scripts/lib.sh
 
 setEnvironmentVariables opdk-env
 

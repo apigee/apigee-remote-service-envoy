@@ -1,0 +1,52 @@
+{
+  "name": "opgrp-product",
+  "displayName": "opgrp product",
+  "approvalType": "auto",
+  "attributes": [
+    {
+      "name": "access",
+      "value": "private"
+    }
+  ],
+  "description": "httpbin product for test purpose",
+  "operationGroup": {
+    "operationConfigs": [
+      {
+        "apiSource": "httpbin.default.svc.cluster.local",
+        "operations": [
+          {
+            "resource": "/get",
+            "methods": [
+              "GET"
+            ]
+          }
+        ],
+        "quota": {
+          "limit": "5",
+          "interval": "1",
+          "timeUnit": "minute"
+        }
+      },
+      {
+        "apiSource": "httpbin.default.svc.cluster.local",
+        "operations": [
+          {
+            "resource": "/post",
+            "methods": [
+              "POST"
+            ]
+          }
+        ],
+        "quota": {
+          "limit": "5",
+          "interval": "1",
+          "timeUnit": "minute"
+        }
+      }
+    ],
+    "operationConfigType": "remoteservice"
+  },
+  "environments": [
+    "test"
+  ]
+}
