@@ -17,7 +17,8 @@
 # Fail on any error.
 set -e
 
-BUILD_DIR=${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-envoy/kokoro
+export REPOS_DIR=${KOKORO_ARTIFACTS_DIR}/github
+export BUILD_DIR=${REPOS_DIR}/apigee-remote-service-envoy/kokoro
 
 ${BUILD_DIR}/scripts/init.sh
 
