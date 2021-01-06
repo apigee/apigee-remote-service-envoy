@@ -536,8 +536,8 @@ function runAdditionalIstioTests {
       fi
       sleep 1
     done
-    # echo -e "\nTesting quota for /post which should be unaffected..."
-    # callIstioTargetWithAPIKey $APIKEY 200 httpbin.default.svc.cluster.local /post POST
+    echo -e "\nTesting quota for /post which should be unaffected..."
+    callIstioTargetWithAPIKey $APIKEY 200 httpbin.default.svc.cluster.local /post POST
   } || { # exit on failure
     exit 6
   }
