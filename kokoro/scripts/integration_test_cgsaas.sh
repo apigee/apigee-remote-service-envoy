@@ -266,26 +266,6 @@ function applyToCluster {
 }
 
 ################################################################################
-# Call Local Target With APIKey
-################################################################################
-function callTargetWithAPIKey {
-  STATUS_CODE=$(docker run --network=host curlimages/curl:7.72.0 --silent -o /dev/stderr -w "%{http_code}" \
-    localhost:8080/headers -Hhost:httpbin.org \
-    -Hx-api-key:$1)
-
-  if [[ ! -z $2 ]] ; then
-    if [[ $STATUS_CODE -ne $2 ]] ; then
-      echo -e "\nError calling local target with API key: expected status $2; got $STATUS_CODE"
-      exit 1
-    else 
-      echo -e "\nCalling local target with API key got $STATUS_CODE as expected"
-    fi
-  else
-    echo -e "\nCalling local target with API key got $STATUS_CODE"
-  fi
-}
-
-################################################################################
 # Clean up Apigee resources
 ################################################################################
 function cleanUpApigee {
@@ -371,7 +351,7 @@ function cleanUpApigee {
 echo -e "\nStarting integration test of the Apigee Envoy Adapter with Apigee SaaS..."
 
 # load necessary function definitions
-. ${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-envoy/kokoro/scripts/lib.sh
+. ${BUILD_DIR}/scripts/lib.sh
 
 setEnvironmentVariables cgsaas-env
 

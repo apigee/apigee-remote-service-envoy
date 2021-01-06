@@ -29,13 +29,19 @@ jobs:
         with:
           fetch-depth: 0
       -
+        name: Prepare
+        id: prep
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo ::set-output name=version::${VERSION}
+      -
         name: Run Goreleaser on Goboring docker image
         uses: docker/build-push-action@v1
         with:
           repository: build/goboring
           dockerfile: Dockerfile_releaser
           push: false
-          build_args: GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+          build_args: GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }},VERSION=${{ steps.prep.outputs.version }}
           
       # local Goreleaser run would be per below
       # -

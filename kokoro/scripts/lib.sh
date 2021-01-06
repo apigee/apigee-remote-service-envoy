@@ -18,14 +18,59 @@
 set -e
 
 ################################################################################
+# Build CLI from source code
+################################################################################
+function installPrerequisites {
+  echo -e "\nInstalling jq..."
+  sudo apt install jq -y
+
+  echo -e "\nUpdating gcloud SDK..."
+  gcloud components update --quiet
+
+  echo -e "\nInstalling go 1.15..."
+  if [[ -d "/usr/local/go" ]] ; then 
+    sudo rm -r /usr/local/go
+  fi
+  curl -LO https://golang.org/dl/go1.15.6.linux-amd64.tar.gz
+  sudo tar -C /usr/local -xzf go1.15.6.linux-amd64.tar.gz
+  export PATH=$PATH:/usr/local/go/bin
+  sudo chmod 777 /usr/local/go
+}
+
+################################################################################
+# Build CLI from source code
+################################################################################
+function buildRemoteServiceCLI {
+  echo -e "\nBuilding apigee-remote-service-cli..."
+  cd ${REPOS_DIR}/apigee-remote-service-cli
+  go mod download
+  CGO_ENABLED=0 go build -a -o apigee-remote-service-cli .
+  export CLI=${REPOS_DIR}/apigee-remote-service-cli/apigee-remote-service-cli
+  cd -
+}
+
+################################################################################
+# Build Adapter Docker Image from source code
+################################################################################
+function buildAdapterDocker {
+  echo -e "\nBuilding local Docker image of apigee-remote-service-envoy..."
+  cd ${REPOS_DIR}/apigee-remote-service-envoy
+  docker build -t apigee-envoy-adapter:${ADAPTER_IMAGE_TAG} \
+    --build-arg CGO_ENABLED=${GCO_ENABLED} \
+    --build-arg RUN_CONTAINER=${RUN_CONTAINER} \
+    --build-arg BUILD_CONTAINER=${BUILD_CONTAINER} \
+    .
+  cd -
+}
+
+################################################################################
 # Fetching environment variables from secrets in the GCP project
 ################################################################################
 function setEnvironmentVariables {
   echo -e "\nSetting up environment variables from the GCP secret ${1}..."
   gcloud secrets versions access 1 --secret="${1}" > ${1}
   source ./${1}
-  CLI=${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-cli/apigee-remote-service-cli
-  REPO=${KOKORO_ARTIFACTS_DIR}/github/apigee-remote-service-envoy
+  REPO=${REPOS_DIR}/apigee-remote-service-envoy
 
   echo -e "\nGetting Kubernetes cluster credentials and configuring kubectl..."
   gcloud container clusters get-credentials $CLUSTER --zone $ZONE --project $PROJECT
@@ -79,8 +124,27 @@ function generateEnvoySampleConfigurations {
 # Call Local Target With APIKey
 ################################################################################
 function callTargetWithAPIKey {
-  STATUS_CODE=$(docker run --network=host curlimages/curl:7.72.0 --silent -o /dev/stderr -w "%{http_code}" \
-    localhost:8080/headers -Hhost:httpbin.org \
+  if [[ -z $3 ]] ; then
+    HOST=httpbin.org
+  else
+    HOST=$3
+  fi
+
+  if [[ -z $4 ]] ; then
+    RESOURCE_PATH=/headers
+  else
+    RESOURCE_PATH=$4
+  fi
+
+  if [[ -z $5 ]] ; then
+    METHOD=GET
+  else
+    METHOD=$5
+  fi
+
+  STATUS_CODE=$(docker run --network=host curlimages/curl:7.72.0 -X $METHOD \
+    --silent -o /dev/stderr -w "%{http_code}" \
+    localhost:8080$RESOURCE_PATH -Hhost:$HOST \
     -Hx-api-key:$1)
 
   if [[ ! -z $2 ]] ; then
@@ -99,8 +163,27 @@ function callTargetWithAPIKey {
 # call Local Target With JWT
 ################################################################################
 function callTargetWithJWT {
-  STATUS_CODE=$(docker run --network=host curlimages/curl:7.72.0 --silent -o /dev/stderr -w "%{http_code}" \
-    localhost:8080/headers -Hhost:httpbin.org \
+  if [[ -z $3 ]] ; then
+    HOST=httpbin.org
+  else
+    HOST=$3
+  fi
+
+  if [[ -z $4 ]] ; then
+    RESOURCE_PATH=/headers
+  else
+    RESOURCE_PATH=$4
+  fi
+
+  if [[ -z $5 ]] ; then
+    METHOD=GET
+  else
+    METHOD=$5
+  fi
+
+  STATUS_CODE=$(docker run --network=host curlimages/curl:7.72.0 -X $METHOD \
+    --silent -o /dev/stderr -w "%{http_code}" \
+    localhost:8080$RESOURCE_PATH -Hhost:$HOST \
     -H "Authorization: Bearer $1")
 
   if [[ ! -z $2 ]] ; then
@@ -119,9 +202,27 @@ function callTargetWithJWT {
 # Call Target on Istio With APIKey
 ################################################################################
 function callIstioTargetWithAPIKey {
+  if [[ -z $3 ]] ; then
+    HOST=httpbin.default.svc.cluster.local
+  else
+    HOST=$3
+  fi
+
+  if [[ -z $4 ]] ; then
+    RESOURCE_PATH=/headers
+  else
+    RESOURCE_PATH=$4
+  fi
+
+  if [[ -z $5 ]] ; then
+    METHOD=GET
+  else
+    METHOD=$5
+  fi
+
   STATUS_CODE=$(kubectl exec curl -c curl -- \
-    curl --silent -o /dev/stderr -w "%{http_code}" \
-    httpbin.default.svc.cluster.local/headers \
+    curl -X $METHOD --silent -o /dev/stderr -w "%{http_code}" \
+    ${HOST}${RESOURCE_PATH} \
     -Hx-api-key:$1)
 
   if [[ ! -z $2 ]] ; then
@@ -140,9 +241,27 @@ function callIstioTargetWithAPIKey {
 # call Target on Istio With JWT
 ################################################################################
 function callIstioTargetWithJWT {
+  if [[ -z $3 ]] ; then
+    HOST=httpbin.default.svc.cluster.local
+  else
+    HOST=$3
+  fi
+
+  if [[ -z $4 ]] ; then
+    RESOURCE_PATH=/headers
+  else
+    RESOURCE_PATH=$4
+  fi
+
+  if [[ -z $5 ]] ; then
+    METHOD=GET
+  else
+    METHOD=$5
+  fi
+
   STATUS_CODE=$(kubectl exec curl -c curl -- \
-    curl --silent -o /dev/stderr -w "%{http_code}" \
-    httpbin.default.svc.cluster.local/headers \
+    curl -X $METHOD --silent -o /dev/stderr -w "%{http_code}" \
+    ${HOST}${RESOURCE_PATH} \
     -H "Authorization: Bearer $1")
 
   if [[ ! -z $2 ]] ; then
@@ -235,14 +354,17 @@ function runEnvoyTests {
       fi
       sleep 1
     done
-    callTargetWithAPIKey $APIKEY 403
+    if [[ $STATUS_CODE -ne 403 ]] ; then
+      echo -e "\nQuota was not exhausted"
+      exit 2
+    fi
     
     sleep 65
 
     echo -e "\nQuota should have restored"
     callTargetWithAPIKey $APIKEY 200
 
-    undeployRemoteServiceProxies
+    undeployRemoteServiceProxies $ENV $RUNTIME
 
     for i in {1..20}
     do
@@ -253,14 +375,17 @@ function runEnvoyTests {
       fi
       sleep 1
     done
-    callTargetWithAPIKey $APIKEY 403
+    if [[ $STATUS_CODE -ne 403 ]] ; then
+      echo -e "\nQuota was not exhausted"
+      exit 2
+    fi
     
     sleep 65
     
     echo -e "\nLocal quota should have restored"
     callTargetWithAPIKey $APIKEY 200
 
-    deployRemoteServiceProxies $REV
+    deployRemoteServiceProxies $REV $ENV $RUNTIME
   } || { # exit on failure
     exit 7
   }
@@ -350,14 +475,17 @@ EOF
       fi
       sleep 1
     done
-    callIstioTargetWithAPIKey $APIKEY 403
+    if [[ $STATUS_CODE -ne 403 ]] ; then
+      echo -e "\nQuota was not exhausted"
+      exit 4
+    fi
     
     sleep 65
 
     echo -e "\nQuota should have restored"
     callIstioTargetWithAPIKey $APIKEY 200
 
-    undeployRemoteServiceProxies
+    undeployRemoteServiceProxies $ENV $RUNTIME
 
     for i in {1..20}
     do
@@ -368,14 +496,48 @@ EOF
       fi
       sleep 1
     done
-    callIstioTargetWithAPIKey $APIKEY 403
+    if [[ $STATUS_CODE -ne 403 ]] ; then
+      echo -e "\nQuota was not exhausted"
+      exit 4
+    fi
     
     sleep 65
     
     echo -e "\nLocal quota should have restored"
     callIstioTargetWithAPIKey $APIKEY 200
 
-    deployRemoteServiceProxies $REV
+    deployRemoteServiceProxies $REV $ENV $RUNTIME
+  } || { # exit on failure
+    exit 6
+  }
+}
+
+################################################################################
+# Run additional tests regarding API Product Operation Group on Istio
+################################################################################
+function runAdditionalIstioTests {
+  echo -e "\nStarting to run tests on Istio..."
+  {
+    echo -e "\nCalling /get with GET"
+    callIstioTargetWithAPIKey $APIKEY 200 httpbin.default.svc.cluster.local /get GET
+    echo -e "\nCalling /post with POST"
+    callIstioTargetWithAPIKey $APIKEY 200 httpbin.default.svc.cluster.local /post POST
+    echo -e "\nCalling /get with POST"
+    callIstioTargetWithAPIKey $APIKEY 403 httpbin.default.svc.cluster.local /get POST
+    echo -e "\nCalling /post with GET"
+    callIstioTargetWithAPIKey $APIKEY 403 httpbin.default.svc.cluster.local /post GET
+    
+    for i in {1..20}
+    do
+      callIstioTargetWithAPIKey $APIKEY "" httpbin.default.svc.cluster.local /get GET
+      if [[ $STATUS_CODE -eq 403 ]] ; then
+        echo -e "\nQuota for /get depleted"
+        break
+      fi
+      sleep 1
+    done
+    echo -e "\nTesting quota for /post which should be unaffected..."
+    callIstioTargetWithAPIKey $APIKEY 200 httpbin.default.svc.cluster.local /post POST
   } || { # exit on failure
     exit 6
   }
