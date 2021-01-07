@@ -20,6 +20,6 @@ set -e
 export REPOS_DIR=${KOKORO_ARTIFACTS_DIR}/github
 export BUILD_DIR=${REPOS_DIR}/apigee-remote-service-envoy/kokoro
 
-${BUILD_DIR}/scripts/init.sh
+source ${BUILD_DIR}/scripts/init.sh
 
 ${BUILD_DIR}/scripts/integration_test_hybrid.sh
