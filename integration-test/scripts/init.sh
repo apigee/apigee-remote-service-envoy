@@ -20,6 +20,5 @@ set -e
 # load necessary function definitions
 . ${BUILD_DIR}/scripts/lib.sh
 
-installPrerequisites
 buildRemoteServiceCLI
 buildAdapterDocker
