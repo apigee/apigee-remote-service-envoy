@@ -37,7 +37,7 @@ function provisionRemoteService {
     https://${MGMT}/v1/organizations/${ORG}/apiproducts \
     -H "Authorization: Bearer ${TOKEN}" \
     -H "Content-Type: application/json" \
-    -d @${REPO}/kokoro/payloads/hybrid_product.json)
+    -d @${REPO}/integration-test/payloads/hybrid_product.json)
   if [[ $STATUS_CODE -ge 299 ]] ; then
     echo -e "\nError creating API Product httpbin-product: $STATUS_CODE"
     exit 8
@@ -48,7 +48,7 @@ function provisionRemoteService {
     https://${MGMT}/v1/organizations/${ORG}/apiproducts \
     -H "Authorization: Bearer ${TOKEN}" \
     -H "Content-Type: application/json" \
-    -d @${REPO}/kokoro/payloads/opgrp_product.json)
+    -d @${REPO}/integration-test/payloads/opgrp_product.json)
   if [[ $STATUS_CODE -ge 299 ]] ; then
     echo -e "\nError creating API Product opgrp-product: $STATUS_CODE"
     exit 8
@@ -59,7 +59,7 @@ function provisionRemoteService {
     https://${MGMT}/v1/organizations/${ORG}/apiproducts \
     -H "Authorization: Bearer ${TOKEN}" \
     -H "Content-Type: application/json" \
-    -d @${REPO}/kokoro/payloads/dummy_product.json)
+    -d @${REPO}/integration-test/payloads/dummy_product.json)
   if [[ $STATUS_CODE -ge 299 ]] ; then
     echo -e "\nError creating API Product dummy-product: $STATUS_CODE"
     exit 8
@@ -70,7 +70,7 @@ function provisionRemoteService {
     https://${MGMT}/v1/organizations/${ORG}/developers \
     -H "Authorization: Bearer ${TOKEN}" \
     -H "Content-Type: application/json" \
-    -d @${REPO}/kokoro/payloads/developer.json)
+    -d @${REPO}/integration-test/payloads/developer.json)
   if [[ $STATUS_CODE -ge 299 ]] ; then
     echo -e "\nError creating Application Developer integration@test.com: $STATUS_CODE"
     exit 8
@@ -81,7 +81,7 @@ function provisionRemoteService {
     https://${MGMT}/v1/organizations/${ORG}/developers/integration@test.com/apps \
     -H "Authorization: Bearer ${TOKEN}" \
     -H "Content-Type: application/json" \
-    -d @${REPO}/kokoro/payloads/hybrid_app.json)
+    -d @${REPO}/integration-test/payloads/hybrid_app.json)
   if [[ $STATUS_CODE -ge 299 ]] ; then
     echo -e "\nError creating Application httpbin-app: $STATUS_CODE"
     exit 8
@@ -92,7 +92,7 @@ function provisionRemoteService {
     https://${MGMT}/v1/organizations/${ORG}/developers/integration@test.com/apps \
     -H "Authorization: Bearer ${TOKEN}" \
     -H "Content-Type: application/json" \
-    -d @${REPO}/kokoro/payloads/wrong-prod_app.json)
+    -d @${REPO}/integration-test/payloads/wrong-prod_app.json)
   if [[ $STATUS_CODE -ge 299 ]] ; then
     echo -e "\nError creating Application wrong-prod-app: $STATUS_CODE"
     exit 8
@@ -103,7 +103,7 @@ function provisionRemoteService {
     https://${MGMT}/v1/organizations/${ORG}/developers/integration@test.com/apps \
     -H "Authorization: Bearer ${TOKEN}" \
     -H "Content-Type: application/json" \
-    -d @${REPO}/kokoro/payloads/cred-expired_app.json)
+    -d @${REPO}/integration-test/payloads/cred-expired_app.json)
   if [[ $STATUS_CODE -ge 299 ]] ; then
     echo -e "\nError creating Application cred-exp-app: $STATUS_CODE"
     exit 8
@@ -114,7 +114,7 @@ function provisionRemoteService {
     https://${MGMT}/v1/organizations/${ORG}/developers/integration@test.com/apps \
     -H "Authorization: Bearer ${TOKEN}" \
     -H "Content-Type: application/json" \
-    -d @${REPO}/kokoro/payloads/unapproved_app.json)
+    -d @${REPO}/integration-test/payloads/unapproved_app.json)
   if [[ $STATUS_CODE -ge 299 ]] ; then
     echo -e "\nError creating Application unapproved-app: $STATUS_CODE"
     exit 8
@@ -125,7 +125,7 @@ function provisionRemoteService {
     https://${MGMT}/v1/organizations/${ORG}/developers/integration@test.com/apps \
     -H "Authorization: Bearer ${TOKEN}" \
     -H "Content-Type: application/json" \
-    -d @${REPO}/kokoro/payloads/prod-unapproved_app.json)
+    -d @${REPO}/integration-test/payloads/prod-unapproved_app.json)
   if [[ $STATUS_CODE -ge 299 ]] ; then
     echo -e "\nError creating Application prod-unapproved-app: $STATUS_CODE"
     exit 8
