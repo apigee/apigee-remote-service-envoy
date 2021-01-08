@@ -56,10 +56,7 @@ export BUILD_CONTAINER=golang:1.15 # goboring/golang:1.15.6b5
 # export ADAPTER_IMAGE_TAG=opdk-test
 # export ADAPTER_IMAGE_TAG=cgsaas-test
 
-. ${BUILD_DIR}/scripts/lib.sh
-
-buildRemoteServiceCLI
-buildAdapterDocker
+. ${BUILD_DIR}/scripts/init.sh
 
 # uncomment one of the following command to test a specific Apigee platform
 # ${BUILD_DIR}/scripts/hybrid_test.sh
