@@ -1,4 +1,4 @@
-## Kokoro Build Configs
+## Integration test scripts
 
 ### Exit code definition
 
@@ -24,9 +24,11 @@
 
 ### Run the test locally
 
-*NOTE*: As of now, the test scripts do not create a sandbox environment. Instead they rely on existing Apigee platforms and credentials. Therefore, running the scripts locally still require permission to access those resources and they are not meant for general use. However, some functions defined in `scripts/lib.sh` might appear to be useful.
+*NOTE*: The test scripts serve the Kokoro builds internally. As of now they do not create a sandbox environment. Instead they rely on existing Apigee platforms and credentials. Therefore, running the scripts locally still require permission to access those resources and they are not meant for general use. However, some functions defined in `scripts/lib.sh` might appear to be useful.
 
-Given proper access to the credentials, the script below can be used to simulate the Kokoro build locally.
+Given proper access to the credentials, the script below can be used to simulate the Kokoro builds locally.
+
+GCloud SDK command-line tool, Go 1.15+ and jq are required.
 
 ```
 #!/bin/bash
@@ -35,7 +37,7 @@ Given proper access to the credentials, the script below can be used to simulate
 set -e
 
 export REPOS_DIR=${path to your apigee-remote-service-envoy and apigee-remote-service-cli repos}
-export BUILD_DIR=${REPOS_DIR}/apigee-remote-service-envoy/kokoro
+export BUILD_DIR=${REPOS_DIR}/apigee-remote-service-envoy/integration-test
 
 export CGSAAS_ISTIO_TEMPLATE=istio-1.7
 export CGSAAS_ENVOY_TEMPLATE=envoy-1.16
@@ -60,7 +62,7 @@ buildRemoteServiceCLI
 buildAdapterDocker
 
 # uncomment one of the following command to test a specific Apigee platform
-# ${BUILD_DIR}/scripts/integration_test_hybrid.sh
-# ${BUILD_DIR}/scripts/integration_test_opdk.sh
-# ${BUILD_DIR}/scripts/integration_test_cgsaas.sh
+# ${BUILD_DIR}/scripts/hybrid_test.sh
+# ${BUILD_DIR}/scripts/opdk_test.sh
+# ${BUILD_DIR}/scripts/cgsaas_test.sh
 ```
