@@ -17,9 +17,8 @@
 # Fail on any error.
 set -e
 
-export REPOS_DIR=${KOKORO_ARTIFACTS_DIR}/github
-export BUILD_DIR=${REPOS_DIR}/apigee-remote-service-envoy/kokoro
+# load necessary function definitions
+. ${BUILD_DIR}/scripts/lib.sh
 
-${BUILD_DIR}/scripts/init.sh
-
-${BUILD_DIR}/scripts/load_test.sh
+buildRemoteServiceCLI
+buildAdapterDocker

@@ -20,26 +20,6 @@ set -e
 ################################################################################
 # Build CLI from source code
 ################################################################################
-function installPrerequisites {
-  echo -e "\nInstalling jq..."
-  sudo apt install jq -y
-
-  echo -e "\nUpdating gcloud SDK..."
-  gcloud components update --quiet
-
-  echo -e "\nInstalling go 1.15..."
-  if [[ -d "/usr/local/go" ]] ; then 
-    sudo rm -r /usr/local/go
-  fi
-  curl -LO https://golang.org/dl/go1.15.6.linux-amd64.tar.gz
-  sudo tar -C /usr/local -xzf go1.15.6.linux-amd64.tar.gz
-  export PATH=$PATH:/usr/local/go/bin
-  sudo chmod 777 /usr/local/go
-}
-
-################################################################################
-# Build CLI from source code
-################################################################################
 function buildRemoteServiceCLI {
   echo -e "\nBuilding apigee-remote-service-cli..."
   cd ${REPOS_DIR}/apigee-remote-service-cli
