@@ -21,7 +21,7 @@ import (
 
 	"github.com/apigee/apigee-remote-service-golib/analytics"
 	"github.com/apigee/apigee-remote-service-golib/log"
-	als "github.com/envoyproxy/go-control-plane/envoy/service/accesslog/v2"
+	als "github.com/envoyproxy/go-control-plane/envoy/service/accesslog/v3"
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/duration"
 	"github.com/golang/protobuf/ptypes/timestamp"

@@ -30,9 +30,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/test/bufconn"
 
-	core "github.com/envoyproxy/go-control-plane/envoy/api/v2/core"
-	v2 "github.com/envoyproxy/go-control-plane/envoy/data/accesslog/v2"
-	als "github.com/envoyproxy/go-control-plane/envoy/service/accesslog/v2"
+	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
+	v3 "github.com/envoyproxy/go-control-plane/envoy/data/accesslog/v3"
+	als "github.com/envoyproxy/go-control-plane/envoy/service/accesslog/v3"
 	wrappers "github.com/golang/protobuf/ptypes/wrappers"
 )
 
@@ -65,9 +65,9 @@ func TestHandleHTTPAccessLogs(t *testing.T) {
 	uri := "path?x=foo"
 	userAgent := "some agent"
 	clientIP := "client ip"
-	var entries []*v2.HTTPAccessLogEntry
-	entries = append(entries, &v2.HTTPAccessLogEntry{
-		CommonProperties: &v2.AccessLogCommon{
+	var entries []*v3.HTTPAccessLogEntry
+	entries = append(entries, &v3.HTTPAccessLogEntry{
+		CommonProperties: &v3.AccessLogCommon{
 			StartTime:                   nowProto,
 			TimeToLastRxByte:            durProto,
 			TimeToFirstUpstreamTxByte:   durProto,
@@ -77,14 +77,14 @@ func TestHandleHTTPAccessLogs(t *testing.T) {
 			TimeToFirstDownstreamTxByte: durProto,
 			TimeToLastDownstreamTxByte:  durProto,
 		},
-		Request: &v2.HTTPRequestProperties{
+		Request: &v3.HTTPRequestProperties{
 			Path:           uri,
 			RequestMethod:  core.RequestMethod_GET,
 			UserAgent:      userAgent,
 			ForwardedFor:   clientIP,
 			RequestHeaders: headers,
 		},
-		Response: &v2.HTTPResponseProperties{
+		Response: &v3.HTTPResponseProperties{
 			ResponseCode: &wrappers.UInt32Value{
 				Value: 200,
 			},
@@ -361,14 +361,14 @@ func getHTTPLog() *als.StreamAccessLogsMessage {
 	return &als.StreamAccessLogsMessage{
 		LogEntries: &als.StreamAccessLogsMessage_HttpLogs{
 			HttpLogs: &als.StreamAccessLogsMessage_HTTPAccessLogEntries{
-				LogEntry: []*v2.HTTPAccessLogEntry{
+				LogEntry: []*v3.HTTPAccessLogEntry{
 					{
-						Request: &v2.HTTPRequestProperties{
+						Request: &v3.HTTPRequestProperties{
 							RequestHeaders: map[string]string{
 								":authority": "",
 							},
 						},
-						Response: &v2.HTTPResponseProperties{},
+						Response: &v3.HTTPResponseProperties{},
 					},
 				},
 			},
