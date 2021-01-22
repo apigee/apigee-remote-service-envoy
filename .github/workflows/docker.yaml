@@ -61,7 +61,9 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: ${{ steps.prep.outputs.tags }}
-          build-args: LDFLAGS=-s -w -X main.version=${{ steps.prep.outputs.version }} -X main.commit=${{ github.SHA }} -X main.date=${{ steps.prep.outputs.created }}
+          build-args: |
+            RUN_CONTAINER=gcr.io/distroless/static
+            LDFLAGS=-s -w -X main.version=${{ steps.prep.outputs.version }} -X main.commit=${{ github.SHA }} -X main.date=${{ steps.prep.outputs.created }}
 
   ubuntu:
     name: Build Ubuntu Docker image
@@ -150,7 +152,7 @@ jobs:
           push: true
           tags: ${{ steps.prep.outputs.tags }}
           build-args: |
-            RUN_CONTAINER=ubuntu:xenial
             BUILD_CONTAINER=goboring/golang:1.15.6b5
+            RUN_CONTAINER=gcr.io/distroless/static
             CGO_ENABLED=1
             LDFLAGS=-s -w -X main.version=${{ steps.prep.outputs.version }} -X main.commit=${{ github.SHA }} -X main.date=${{ steps.prep.outputs.created }}
