@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	"github.com/apigee/apigee-remote-service-golib/auth"
+	"github.com/apigee/apigee-remote-service-golib/context"
 	"github.com/apigee/apigee-remote-service-golib/log"
 	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 )
@@ -72,9 +73,16 @@ func (h *Handler) decodeMetadataHeaders(headers map[string]string) (string, *aut
 		}
 	}
 
-	// org and env already set
+	var rootContext context.Context = h
+	if h.isMultitenant {
+		if headers[headerEnvironment] == "" {
+			log.Warnf("Multitenant mode but %s header not found. Check Envoy config.", headerEnvironment)
+		}
+		rootContext = &multitenantContext{h, headers[headerEnvironment]}
+	}
+
 	return api, &auth.Context{
-		Context:        h,
+		Context:        rootContext,
 		AccessToken:    headers[headerAccessToken],
 		APIProducts:    strings.Split(headers[headerAPIProducts], ","),
 		Application:    headers[headerApplication],

@@ -46,6 +46,7 @@ type Handler struct {
 	targetHeader       string
 	rejectUnauthorized bool
 	jwtProviderKey     string
+	isMultitenant      bool
 
 	productMan   product.Manager
 	authMan      auth.Manager
@@ -86,7 +87,7 @@ func (h *Handler) Organization() string {
 	return h.orgName
 }
 
-// Environment is the tenant environment
+// Environment is the tenant environment (or "*" for multitenant)
 func (h *Handler) Environment() string {
 	return h.envName
 }
@@ -144,7 +145,6 @@ func NewHandler(config *Config) (*Handler, error) {
 		Client:              instrumentedClientFor(config, "auth", tr),
 		APIKeyCacheDuration: config.Auth.APIKeyCacheDuration,
 		Org:                 config.Tenant.OrgName,
-		Env:                 config.Tenant.EnvName,
 	})
 	if err != nil {
 		return nil, err
@@ -154,7 +154,6 @@ func NewHandler(config *Config) (*Handler, error) {
 		BaseURL: remoteServiceAPI,
 		Client:  instrumentedClientFor(config, "quotas", tr),
 		Org:     config.Tenant.OrgName,
-		Env:     config.Tenant.EnvName,
 	})
 	if err != nil {
 		return nil, err
@@ -210,6 +209,7 @@ func NewHandler(config *Config) (*Handler, error) {
 		targetHeader:       config.Auth.TargetHeader,
 		rejectUnauthorized: config.Auth.RejectUnauthorized,
 		jwtProviderKey:     config.Auth.JWTProviderKey,
+		isMultitenant:      config.Tenant.IsMultitenant(),
 	}
 
 	return h, nil

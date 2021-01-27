@@ -26,9 +26,13 @@ import (
 
 func TestMetadataHeaders(t *testing.T) {
 	var opts []*core.HeaderValueOption
-	h := &Handler{
-		orgName: "org",
-		envName: "env",
+	h := &multitenantContext{
+		&Handler{
+			orgName:       "org",
+			envName:       "*",
+			isMultitenant: true,
+		},
+		"env",
 	}
 	authContext := &auth.Context{
 		Context:        h,
@@ -79,11 +83,15 @@ func TestMetadataHeadersExceptions(t *testing.T) {
 	}
 
 	h := &Handler{
-		orgName: "org",
-		envName: "env",
+		orgName:       "org",
+		envName:       "*",
+		isMultitenant: true,
 	}
 	h.targetHeader = "target"
-	header := map[string]string{"target": "target"}
+	header := map[string]string{
+		"target":          "target",
+		headerEnvironment: "test",
+	}
 	api, ac := h.decodeMetadataHeaders(header)
 	if api != "target" {
 		t.Errorf("got: %s, want: %s", api, "target")
@@ -91,8 +99,8 @@ func TestMetadataHeadersExceptions(t *testing.T) {
 	if ac.Organization() != h.orgName {
 		t.Errorf("got: %s, want: %s", ac.Organization(), h.orgName)
 	}
-	if ac.Environment() != h.envName {
-		t.Errorf("got: %s, want: %s", ac.Environment(), h.envName)
+	if ac.Environment() != "test" {
+		t.Errorf("got: %s, want: %s", ac.Environment(), "test")
 	}
 
 	h.targetHeader = "missing"

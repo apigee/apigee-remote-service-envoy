@@ -66,7 +66,7 @@ func (a *AccessLogServer) StreamAccessLogs(srv als.AccessLogService_StreamAccess
 			if err := a.handleHTTPLogs(msg); err != nil {
 				status = "error"
 			}
-			prometheusAnalyticsRequests.WithLabelValues(a.handler.orgName, a.handler.envName, status).Inc()
+			prometheusAnalyticsRequests.WithLabelValues(a.handler.orgName, status).Inc()
 			if err != nil {
 				return err
 			}
@@ -159,5 +159,5 @@ var (
 		Subsystem: "analytics",
 		Name:      "analytics_requests_count",
 		Help:      "Total number of analytics streaming requests received",
-	}, []string{"org", "env", "status"})
+	}, []string{"org", "status"})
 )

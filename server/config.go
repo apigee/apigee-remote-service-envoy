@@ -27,10 +27,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/apigee/apigee-remote-service-golib/log"
 	"github.com/hashicorp/go-multierror"
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/pkg/errors"
-	"github.com/prometheus/common/log"
 	"golang.org/x/oauth2/google"
 	"gopkg.in/yaml.v3"
 )
@@ -130,6 +130,10 @@ type TenantConfig struct {
 	JWKS                   *jwk.Set        `yaml:"-" json:"-"`
 	InternalJWTDuration    time.Duration   `yaml:"-" json:"-"`
 	InternalJWTRefresh     time.Duration   `yaml:"-" json:"-"`
+}
+
+func (t *TenantConfig) IsMultitenant() bool {
+	return t.EnvName == "*"
 }
 
 // ProductsConfig is products-related config
