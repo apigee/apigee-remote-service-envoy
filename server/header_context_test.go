@@ -83,16 +83,22 @@ func TestMetadataHeadersExceptions(t *testing.T) {
 	}
 
 	h := &Handler{
-		orgName:       "org",
-		envName:       "*",
-		isMultitenant: true,
+		orgName: "org",
+		envName: "*",
 	}
 	h.targetHeader = "target"
 	header := map[string]string{
 		"target":          "target",
 		headerEnvironment: "test",
 	}
+
 	api, ac := h.decodeMetadataHeaders(header)
+	if ac.Environment() != "*" {
+		t.Errorf("got: %s, want: %s", ac.Environment(), "*")
+	}
+
+	h.isMultitenant = true
+	api, ac = h.decodeMetadataHeaders(header)
 	if api != "target" {
 		t.Errorf("got: %s, want: %s", api, "target")
 	}
