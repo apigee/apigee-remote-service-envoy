@@ -96,6 +96,9 @@ func TestMetadataHeadersExceptions(t *testing.T) {
 	if ac.Environment() != "*" {
 		t.Errorf("got: %s, want: %s", ac.Environment(), "*")
 	}
+	if api != "target" {
+		t.Errorf("got: %s, want: %s", api, "target")
+	}
 
 	h.isMultitenant = true
 	api, ac = h.decodeMetadataHeaders(header)
