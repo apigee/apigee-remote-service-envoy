@@ -5,7 +5,7 @@ go 1.15
 // replace github.com/apigee/apigee-remote-service-golib => ../apigee-remote-service-golib
 
 require (
-	github.com/apigee/apigee-remote-service-golib v1.4.1-0.20210106205343-952d410b2165
+	github.com/apigee/apigee-remote-service-golib v1.4.1-0.20210127172319-6ac528b724ab
 	github.com/envoyproxy/go-control-plane v0.9.7
 	github.com/gogo/googleapis v1.4.0
 	github.com/golang/protobuf v1.4.3
@@ -15,7 +15,6 @@ require (
 	github.com/lestrrat-go/jwx v1.0.5
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.8.0
-	github.com/prometheus/common v0.15.0
 	github.com/spf13/cobra v1.1.1
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.16.0

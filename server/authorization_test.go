@@ -30,7 +30,20 @@ import (
 	v3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	"github.com/gogo/googleapis/google/rpc"
 	pb "github.com/golang/protobuf/ptypes/struct"
+	"google.golang.org/grpc"
 )
+
+func TestRegister(t *testing.T) {
+	opts := []grpc.ServerOption{}
+	grpcServer := grpc.NewServer(opts...)
+	server := AuthorizationServer{}
+	h := &Handler{}
+	server.Register(grpcServer, h)
+	if h != server.handler {
+		t.Errorf("want: %v, got: %v", h, server.handler)
+	}
+	grpcServer.Stop()
+}
 
 func TestCheck(t *testing.T) {
 
@@ -78,9 +91,10 @@ func TestCheck(t *testing.T) {
 			},
 		},
 	}
-	req.Attributes.GetMetadataContext()
 
-	testAuthMan := &testAuthMan{}
+	testAuthMan := &testAuthMan{
+		apiProducts: []string{"product 1"},
+	}
 	testProductMan := &testProductMan{
 		resolve: true,
 	}
@@ -157,6 +171,17 @@ func TestCheck(t *testing.T) {
 		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.PERMISSION_DENIED))
 	}
 	testProductMan.resolve = true
+
+	// no products authenticated
+	oldProducts := testAuthMan.apiProducts
+	testAuthMan.apiProducts = []string{}
+	if resp, err = server.Check(context.Background(), req); err != nil {
+		t.Errorf("should not get error. got: %s", err)
+	}
+	if resp.Status.Code != int32(rpc.PERMISSION_DENIED) {
+		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.PERMISSION_DENIED))
+	}
+	testAuthMan.apiProducts = oldProducts
 
 	// quota exceeded
 	products["product1"].QuotaLimitInt = 2
@@ -237,10 +262,30 @@ func TestCheck(t *testing.T) {
 	if resp.Status.Code != int32(rpc.OK) {
 		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.OK))
 	}
+
+	// multitenant missing context
+	server.handler.isMultitenant = true
+	if resp, err = server.Check(context.Background(), req); err != nil {
+		t.Errorf("should not get error. got: %s", err)
+	}
+	if resp.Status.Code != int32(rpc.INTERNAL) {
+		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.OK))
+	}
+
+	// multitenant receives context
+	req.Attributes.ContextExtensions = map[string]string{}
+	req.Attributes.ContextExtensions[envContextKey] = "test"
+	if resp, err = server.Check(context.Background(), req); err != nil {
+		t.Errorf("should not get error. got: %s", err)
+	}
+	if resp.Status.Code != int32(rpc.OK) {
+		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.OK))
+	}
 }
 
 type testAuthMan struct {
 	sendError      error
+	apiProducts    []string
 	ctx            apigeeContext.Context
 	apiKey         string
 	claims         map[string]interface{}
@@ -261,7 +306,7 @@ func (a *testAuthMan) Authenticate(ctx apigeeContext.Context, apiKey string, cla
 
 	authContext := &auth.Context{
 		Context:     ctx,
-		APIProducts: []string{"product 1"},
+		APIProducts: a.apiProducts,
 	}
 	return authContext, nil
 }

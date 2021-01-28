@@ -36,7 +36,7 @@ func TestNewHandler(t *testing.T) {
 		InternalAPI:            "http://localhost/remote-service",
 		RemoteServiceAPI:       "http://localhost/remote-service",
 		OrgName:                "org",
-		EnvName:                "env",
+		EnvName:                "*",
 		AllowUnverifiedSSLCert: true,
 		PrivateKeyID:           kid,
 		PrivateKey:             privateKey,
