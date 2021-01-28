@@ -30,7 +30,20 @@ import (
 	v3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	"github.com/gogo/googleapis/google/rpc"
 	pb "github.com/golang/protobuf/ptypes/struct"
+	"google.golang.org/grpc"
 )
+
+func TestRegister(t *testing.T) {
+	opts := []grpc.ServerOption{}
+	grpcServer := grpc.NewServer(opts...)
+	server := AuthorizationServer{}
+	h := &Handler{}
+	server.Register(grpcServer, h)
+	if h != server.handler {
+		t.Errorf("want: %v, got: %v", h, server.handler)
+	}
+	grpcServer.Stop()
+}
 
 func TestCheck(t *testing.T) {
 
@@ -252,8 +265,11 @@ func TestCheck(t *testing.T) {
 
 	// multitenant missing context
 	server.handler.isMultitenant = true
-	if resp, err = server.Check(context.Background(), req); err == nil {
-		t.Errorf("should get error.")
+	if resp, err = server.Check(context.Background(), req); err != nil {
+		t.Errorf("should not get error. got: %s", err)
+	}
+	if resp.Status.Code != int32(rpc.INTERNAL) {
+		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.OK))
 	}
 
 	// multitenant receives context

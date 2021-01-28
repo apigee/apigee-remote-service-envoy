@@ -62,9 +62,10 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.Check
 				env,
 			}
 		} else {
+			tracker := prometheusRequestTracker(rootContext)
+			defer tracker.record()
 			err := fmt.Errorf("Envoy must be configured to send Apigee env in ContextExtensions[%s] in multitenant mode.", envContextKey)
-			log.Errorf(err.Error())
-			return nil, err
+			return a.internalError(tracker, err), nil
 		}
 	}
 
