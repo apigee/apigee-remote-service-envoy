@@ -1,0 +1,23 @@
+{
+  "name": "httpbin-product-prod",
+  "displayName": "httpbin product prod",
+  "approvalType": "auto",
+  "attributes": [
+    {
+      "name": "access",
+      "value": "private"
+    },
+    {
+      "name": "apigee-remote-service-targets",
+      "value": "httpbin.org,httpbin.default.svc.cluster.local"
+    }
+  ],
+  "description": "httpbin product prod for test mutli-env purpose",
+  "apiResources": [
+    "/httpbin/headers",
+    "/headers"
+  ],
+  "environments": [
+    "prod"
+  ]
+}

@@ -18,7 +18,7 @@
 set -e
 
 # load necessary function definitions
-. ${BUILD_DIR}/scripts/lib.sh
+. ${BUILD_DIR}/scripts/util_lib.sh
 
 buildRemoteServiceCLI
 buildAdapterDocker

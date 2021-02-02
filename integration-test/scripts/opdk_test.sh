@@ -17,6 +17,9 @@
 # Fail on any error.
 set -e
 
+# Display commands
+set -x
+
 ################################################################################
 # Provisioning remote-service
 ################################################################################
@@ -31,189 +34,36 @@ function provisionRemoteService {
     exit 9
   }
 
-  echo -e "\nCreating API Product httpbin-product..."
-  STATUS_CODE=$(curl -X POST --silent -o /dev/stderr -w "%{http_code}"\
-    ${MGMTURL}/v1/organizations/${ORG}/apiproducts \
-    -u $USER:$PASSWORD \
-    -H "Content-Type: application/json" \
-    -d @${REPO}/integration-test/payloads/httpbin_product.json)
-  if [[ $STATUS_CODE -ge 299 ]] ; then
-    echo -e "\nError creating API Product httpbin-product: $STATUS_CODE"
-    exit 9
-  fi
+  createAPIProduct httpbin-product httpbin_product
+  createAPIProduct dummy-product dummy_product
 
-  echo -e "\nCreating API Product dummy-product..."
-  STATUS_CODE=$(curl -X POST --silent -o /dev/stderr -w "%{http_code}"\
-    ${MGMTURL}/v1/organizations/${ORG}/apiproducts \
-    -u $USER:$PASSWORD \
-    -H "Content-Type: application/json" \
-    -d @${REPO}/integration-test/payloads/dummy_product.json)
-  if [[ $STATUS_CODE -ge 299 ]] ; then
-    echo -e "\nError creating API Product dummy-product: $STATUS_CODE"
-    exit 9
-  fi
+  createDeveloper integration@test.com developer
 
+  createApplication httpbin-app application
+  createApplication wrong-prod-app wrong-prod_app
+  createApplication cred-exp-app cred-expired_app
+  createApplication unapproved-app unapproved_app
+  createApplication prod-unapproved-app prod-unapproved_app
 
-  echo -e "\nCreating Application Developer integration@test.com..."
-  STATUS_CODE=$(curl -X POST --silent -o /dev/stderr -w "%{http_code}" \
-    ${MGMTURL}/v1/organizations/${ORG}/developers \
-    -u $USER:$PASSWORD \
-    -H "Content-Type: application/json" \
-    -d @${REPO}/integration-test/payloads/developer.json)
-  if [[ $STATUS_CODE -ge 299 ]] ; then
-    echo -e "\nError creating Application Developer integration@test.com: $STATUS_CODE"
-    exit 9
-  fi
+  fetchAppCredentials httpbin-app integration@test.com
+  APIKEY=$KEY
+  APISECRET=$SECRET
 
-  echo -e "\nCreating Application httpbin-app..."
-  STATUS_CODE=$(curl -X POST --silent -o /dev/stderr -w "%{http_code}" \
-    ${MGMTURL}/v1/organizations/${ORG}/developers/integration@test.com/apps \
-    -u $USER:$PASSWORD \
-    -H "Content-Type: application/json" \
-    -d @${REPO}/integration-test/payloads/application.json)
-  if [[ $STATUS_CODE -ge 299 ]] ; then
-    echo -e "\nError creating Application httpbin-app: $STATUS_CODE"
-    exit 9
-  fi
+  fetchAppCredentials wrong-prod-app integration@test.com
+  WRONG_APIKEY=$KEY
+  WRONG_APISECRET=$SECRET
 
-  echo -e "\nCreating Application wrong-prod-app..."
-  STATUS_CODE=$(curl -X POST --silent -o /dev/stderr -w "%{http_code}" \
-    ${MGMTURL}/v1/organizations/${ORG}/developers/integration@test.com/apps \
-    -u $USER:$PASSWORD \
-    -H "Content-Type: application/json" \
-    -d @${REPO}/integration-test/payloads/wrong-prod_app.json)
-  if [[ $STATUS_CODE -ge 299 ]] ; then
-    echo -e "\nError creating Application wrong-prod-app: $STATUS_CODE"
-    exit 8
-  fi
+  fetchAppCredentials cred-exp-app integration@test.com
+  EXPIRED_APIKEY=$KEY
+  EXPIRED_APISECRET=$SECRET
 
-  echo -e "\nCreating Application cred-exp-app..."
-  STATUS_CODE=$(curl -X POST --silent -o /dev/stderr -w "%{http_code}" \
-    ${MGMTURL}/v1/organizations/${ORG}/developers/integration@test.com/apps \
-    -u $USER:$PASSWORD \
-    -H "Content-Type: application/json" \
-    -d @${REPO}/integration-test/payloads/cred-expired_app.json)
-  if [[ $STATUS_CODE -ge 299 ]] ; then
-    echo -e "\nError creating Application cred-exp-app: $STATUS_CODE"
-    exit 8
-  fi
+  fetchAppCredentials unapproved-app integration@test.com
+  REVOKED_APIKEY=$KEY
+  REVOKED_APISECRET=$SECRET
 
-  echo -e "\nCreating Application unapproved-app..."
-  STATUS_CODE=$(curl -X POST --silent -o /dev/stderr -w "%{http_code}" \
-    ${MGMTURL}/v1/organizations/${ORG}/developers/integration@test.com/apps \
-    -u $USER:$PASSWORD \
-    -H "Content-Type: application/json" \
-    -d @${REPO}/integration-test/payloads/unapproved_app.json)
-  if [[ $STATUS_CODE -ge 299 ]] ; then
-    echo -e "\nError creating Application unapproved-app: $STATUS_CODE"
-    exit 8
-  fi
-
-  echo -e "\nCreating Application prod-unapproved-app..."
-  STATUS_CODE=$(curl -X POST --silent -o /dev/stderr -w "%{http_code}" \
-    ${MGMTURL}/v1/organizations/${ORG}/developers/integration@test.com/apps \
-    -u $USER:$PASSWORD \
-    -H "Content-Type: application/json" \
-    -d @${REPO}/integration-test/payloads/prod-unapproved_app.json)
-  if [[ $STATUS_CODE -ge 299 ]] ; then
-    echo -e "\nError creating Application prod-unapproved-app: $STATUS_CODE"
-    exit 8
-  fi
-
-  echo -e "\nExtracting Application httpbin-app credentials..."
-  APP=$(curl --silent \
-    ${MGMTURL}/v1/organizations/${ORG}/developers/integration@test.com/apps/httpbin-app \
-    -u $USER:$PASSWORD \
-    -H "Content-Type: application/json")
-  {
-    APIKEY=$(echo $APP | jq -r ".credentials[0].consumerKey")
-    APISECRET=$(echo $APP | jq -r ".credentials[0].consumerSecret")
-    echo -e "\nAPIKEY: $APIKEY"
-    echo -e "\nAPISECRET: $APISECRET"
-  } || {
-    echo -e "\nError extracting credentials from Application httpbin-app: $STATUS_CODE"
-    exit 9
-  }
-  if [[ -z $APIKEY ]] || [[ -z $APISECRET ]] ; then
-    echo -e "\nError extracting credentials from Application httpbin-app: $STATUS_CODE"
-    exit 9
-  fi
-
-  echo -e "\nExtracting Application wrong-prod-app credentials..."
-  APP=$(curl --silent \
-    ${MGMTURL}/v1/organizations/${ORG}/developers/integration@test.com/apps/wrong-prod-app \
-    -u $USER:$PASSWORD \
-    -H "Content-Type: application/json")
-  {
-    WRONG_APIKEY=$(echo $APP | jq -r ".credentials[0].consumerKey")
-    WRONG_APISECRET=$(echo $APP | jq -r ".credentials[0].consumerSecret")
-    echo -e "\nWRONG_APIKEY: $WRONG_APIKEY"
-    echo -e "\nWRONG_APISECRET: $WRONG_APISECRET"
-  } || {
-    echo -e "\nError extracting credentials from Application wrong-prod-app: $STATUS_CODE"
-    exit 8
-  }
-  if [[ -z $WRONG_APIKEY ]] || [[ -z $WRONG_APISECRET ]] ; then
-    echo -e "\nError extracting credentials from Application wrong-prod-app: $STATUS_CODE"
-    exit 8
-  fi
-
-  echo -e "\nExtracting Application cred-exp-app credentials..."
-  APP=$(curl --silent \
-    ${MGMTURL}/v1/organizations/${ORG}/developers/integration@test.com/apps/cred-exp-app \
-    -u $USER:$PASSWORD \
-    -H "Content-Type: application/json")
-  {
-    EXPIRED_APIKEY=$(echo $APP | jq -r ".credentials[0].consumerKey")
-    EXPIRED_APISECRET=$(echo $APP | jq -r ".credentials[0].consumerSecret")
-    echo -e "\nEXPIRED_APIKEY: $EXPIRED_APIKEY"
-    echo -e "\nEXPIRED_APISECRET: $EXPIRED_APISECRET"
-  } || {
-    echo -e "\nError extracting credentials from Application cred-exp-app: $STATUS_CODE"
-    exit 8
-  }
-  if [[ -z $EXPIRED_APIKEY ]] || [[ -z $EXPIRED_APISECRET ]] ; then
-    echo -e "\nError extracting credentials from Application cred-exp-app: $STATUS_CODE"
-    exit 8
-  fi
-
-  echo -e "\nExtracting Application unapproved-app credentials..."
-  APP=$(curl --silent \
-    ${MGMTURL}/v1/organizations/${ORG}/developers/integration@test.com/apps/unapproved-app \
-    -u $USER:$PASSWORD \
-    -H "Content-Type: application/json")
-  {
-    REVOKED_APIKEY=$(echo $APP | jq -r ".credentials[0].consumerKey")
-    REVOKED_APISECRET=$(echo $APP | jq -r ".credentials[0].consumerSecret")
-    echo -e "\nREVOKED_APIKEY: $REVOKED_APIKEY"
-    echo -e "\nREVOKED_APISECRET: $REVOKED_APISECRET"
-  } || {
-    echo -e "\nError extracting credentials from Application unapproved-app: $STATUS_CODE"
-    exit 8
-  }
-  if [[ -z $REVOKED_APIKEY ]] || [[ -z $REVOKED_APISECRET ]] ; then
-    echo -e "\nError extracting credentials from Application unapproved-app: $STATUS_CODE"
-    exit 8
-  fi
-
-  echo -e "\nExtracting Application prod-unapproved-app credentials..."
-  APP=$(curl --silent \
-    ${MGMTURL}/v1/organizations/${ORG}/developers/integration@test.com/apps/prod-unapproved-app \
-    -u $USER:$PASSWORD \
-    -H "Content-Type: application/json")
-  {
-    PROD_REVOKED_APIKEY=$(echo $APP | jq -r ".credentials[0].consumerKey")
-    PROD_REVOKED_APISECRET=$(echo $APP | jq -r ".credentials[0].consumerSecret")
-    echo -e "\nPROD_REVOKED_APIKEY: $PROD_REVOKED_APIKEY"
-    echo -e "\nPROD_REVOKED_APISECRET: $PROD_REVOKED_APISECRET"
-  } || {
-    echo -e "\nError extracting credentials from Application prod-unapproved-app: $STATUS_CODE"
-    exit 8
-  }
-  if [[ -z $PROD_REVOKED_APIKEY ]] || [[ -z $PROD_REVOKED_APISECRET ]] ; then
-    echo -e "\nError extracting credentials from Application prod-unapproved-app: $STATUS_CODE"
-    exit 8
-  fi
+  fetchAppCredentials prod-unapproved-app integration@test.com
+  PROD_REVOKED_APIKEY=$KEY
+  PROD_REVOKED_APISECRET=$SECRET
 
   echo -e "\nRevoking httpbin-product in prod-unapproved-app..."
   curl -X POST --silent -o /dev/stderr -w "%{http_code}" \
@@ -222,127 +72,35 @@ function provisionRemoteService {
 }
 
 ################################################################################
-# Deploy remote-service API Proxies
-################################################################################
-function deployRemoteServiceProxies {
-  if [[ ! -z $1 ]] ; then
-    echo -e "\nDeploying revision $1 of API Proxies remote-service..."
-    STATUS_CODE=$(docker run curlimages/curl:7.72.0 -X POST --silent -o /dev/stderr -w "%{http_code}" \
-      ${MGMTURL}/v1/organizations/${ORG}/environments/${ENV}/apis/remote-service/revisions/$1/deployments \
-      -u $USER:$PASSWORD)
-    if [[ $STATUS_CODE -ge 299 ]] ; then
-      echo -e "\nError undeploying API Proxies remote-service: $STATUS_CODE"
-    fi
-  fi
-}
-
-################################################################################
-# Undeploy remote-service API Proxies
-################################################################################
-function undeployRemoteServiceProxies {
-  echo -e "\nGet deployed revision of API Proxies remote-service..."
-  REV=$(docker run curlimages/curl:7.72.0 --silent \
-    ${MGMTURL}/v1/organizations/${ORG}/apis/remote-service \
-    -u $USER:$PASSWORD | jq -r ".revision | max")
-  echo -e "\nGot deployed revision $REV"
-
-  if [[ ! -z $REV ]] ; then
-    echo -e "\nUndeploying revision $REV of API Proxies remote-service..."
-    STATUS_CODE=$(docker run curlimages/curl:7.72.0 -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
-      ${MGMTURL}/v1/organizations/${ORG}/environments/${ENV}/apis/remote-service/revisions/${REV}/deployments \
-      -u $USER:$PASSWORD)
-    if [[ $STATUS_CODE -ge 299 ]] ; then
-      echo -e "\nError undeploying API Proxies remote-service: $STATUS_CODE"
-    fi
-  fi
-}
-
-################################################################################
 # Clean up Apigee resources
 ################################################################################
 function cleanUpApigee {
   echo -e "\nCleaning up resources applied to the Apigee OPDK..."
 
-  echo -e "\nDeleting Application httpbin-app..."
-  STATUS_CODE=$(curl -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
-    ${MGMTURL}/v1/organizations/${ORG}/developers/integration@test.com/apps/httpbin-app \
-    -u $USER:$PASSWORD)
-  if [[ $STATUS_CODE -ge 299 ]] ; then
-    echo -e "\nError deleting Application httpbin-app: $STATUS_CODE"
-  fi
+  deleteApplication httpbin-app integration@test.com
+  deleteApplication cred-exp-app integration@test.com
+  deleteApplication unapproved-app integration@test.com
+  deleteApplication prod-unapproved-app integration@test.com
+  deleteApplication wrong-prod-app integration@test.com
 
-  echo -e "\nDeleting Application cred-exp-app..."
-  STATUS_CODE=$(curl -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
-    ${MGMTURL}/v1/organizations/${ORG}/developers/integration@test.com/apps/cred-exp-app \
-    -u $USER:$PASSWORD)
-  if [[ $STATUS_CODE -ge 299 ]] ; then
-    echo -e "\nError deleting Application cred-exp-app: $STATUS_CODE"
-  fi
+  deleteDeveloper integration@test.com
 
-  echo -e "\nDeleting Application unapproved-app..."
-  STATUS_CODE=$(curl -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
-    ${MGMTURL}/v1/organizations/${ORG}/developers/integration@test.com/apps/unapproved-app \
-    -u $USER:$PASSWORD)
-  if [[ $STATUS_CODE -ge 299 ]] ; then
-    echo -e "\nError deleting Application unapproved-app: $STATUS_CODE"
-  fi
-
-  echo -e "\nDeleting Application prod-unapproved-app..."
-  STATUS_CODE=$(curl -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
-    ${MGMTURL}/v1/organizations/${ORG}/developers/integration@test.com/apps/prod-unapproved-app \
-    -u $USER:$PASSWORD)
-  if [[ $STATUS_CODE -ge 299 ]] ; then
-    echo -e "\nError deleting Application prod-unapproved-app: $STATUS_CODE"
-  fi
-
-  echo -e "\nDeleting Application wrong-prod-app..."
-  STATUS_CODE=$(curl -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
-    ${MGMTURL}/v1/organizations/${ORG}/developers/integration@test.com/apps/wrong-prod-app \
-    -u $USER:$PASSWORD)
-  if [[ $STATUS_CODE -ge 299 ]] ; then
-    echo -e "\nError deleting Application wrong-prod-app: $STATUS_CODE"
-  fi
-
-  echo -e "\nDeleting Application Developer integration@test.com..."
-  STATUS_CODE=$(curl -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
-    ${MGMTURL}/v1/organizations/${ORG}/developers/integration@test.com \
-    -u $USER:$PASSWORD)
-  if [[ $STATUS_CODE -ge 299 ]] ; then
-    echo -e "\nError deleting Application Developer integration@test.com: $STATUS_CODE"
-  fi
-
-  echo -e "\nDeleting API Product httpbin-product..."
-  STATUS_CODE=$(curl -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
-    ${MGMTURL}/v1/organizations/${ORG}/apiproducts/httpbin-product \
-    -u $USER:$PASSWORD)
-  if [[ $STATUS_CODE -ge 299 ]] ; then
-    echo -e "\nError deleting API Product httpbin-product: $STATUS_CODE"
-  fi
-
-  echo -e "\nDeleting API Product dummy-product..."
-  STATUS_CODE=$(curl -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
-    ${MGMTURL}/v1/organizations/${ORG}/apiproducts/dummy-product \
-    -u $USER:$PASSWORD)
-  if [[ $STATUS_CODE -ge 299 ]] ; then
-    echo -e "\nError deleting API Product dummy-product: $STATUS_CODE"
-  fi
+  deleteAPIProduct httpbin-product
+  deleteAPIProduct dummy-product
 
   undeployRemoteServiceProxies
+  undeployAPIProxies edgemicro-internal
 
-  echo -e "\nDeleting API Proxies remote-service..."
-  STATUS_CODE=$(curl -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
-    ${MGMTURL}/v1/organizations/${ORG}/apis/remote-service \
-    -u $USER:$PASSWORD)
-  if [[ $STATUS_CODE -ge 299 ]] ; then
-    echo -e "\nError deleting API Proxies remote-service: $STATUS_CODE"
-  fi
-
+  deleteAPIProxy remote-service
+  deleteAPIProxy edgemicro-internal
 }
 
 echo -e "\nStarting integration test of the Apigee Envoy Adapter with Apigee OPDK..."
 
 # load necessary function definitions
-. ${BUILD_DIR}/scripts/lib.sh
+. ${BUILD_DIR}/scripts/test_lib.sh
+. ${BUILD_DIR}/scripts/util_lib.sh
+. ${BUILD_DIR}/scripts/legacy_lib.sh
 
 setEnvironmentVariables opdk-env
 

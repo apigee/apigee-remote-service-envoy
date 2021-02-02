@@ -18,56 +18,6 @@
 set -e
 
 ################################################################################
-# Build CLI from source code
-################################################################################
-function buildRemoteServiceCLI {
-  echo -e "\nBuilding apigee-remote-service-cli..."
-  cd ${REPOS_DIR}/apigee-remote-service-cli
-  go mod download
-  CGO_ENABLED=0 go build -a -o apigee-remote-service-cli .
-  export CLI=${REPOS_DIR}/apigee-remote-service-cli/apigee-remote-service-cli
-  cd -
-}
-
-################################################################################
-# Build Adapter Docker Image from source code
-################################################################################
-function buildAdapterDocker {
-  echo -e "\nBuilding local Docker image of apigee-remote-service-envoy..."
-  cd ${REPOS_DIR}/apigee-remote-service-envoy
-  docker build -t apigee-envoy-adapter:${ADAPTER_IMAGE_TAG} \
-    --build-arg CGO_ENABLED=${GCO_ENABLED} \
-    --build-arg RUN_CONTAINER=${RUN_CONTAINER} \
-    --build-arg BUILD_CONTAINER=${BUILD_CONTAINER} \
-    .
-  cd -
-}
-
-################################################################################
-# Fetching environment variables from secrets in the GCP project
-################################################################################
-function setEnvironmentVariables {
-  echo -e "\nSetting up environment variables from the GCP secret ${1}..."
-  gcloud secrets versions access 1 --secret="${1}" > ${1}
-  source ./${1}
-  REPO=${REPOS_DIR}/apigee-remote-service-envoy
-
-  echo -e "\nGetting Kubernetes cluster credentials and configuring kubectl..."
-  gcloud container clusters get-credentials $CLUSTER --zone $ZONE --project $PROJECT
-}
-
-################################################################################
-# Pushing Docker images based on the latest source code
-################################################################################
-function pushDockerImages {
-  echo -e "\nTagging and pushing the Docker image to gcr.io..."
-  gcloud auth configure-docker gcr.io
-  docker tag apigee-envoy-adapter:${1} gcr.io/${PROJECT}/apigee-envoy-adapter:${1}
-  docker push gcr.io/${PROJECT}/apigee-envoy-adapter:${1}
-  echo -e "\nDocker image pushed successfully."
-}
-
-################################################################################
 # Generating sample configurations for Istio
 ################################################################################
 function generateIstioSampleConfigurations {
@@ -93,7 +43,8 @@ function generateEnvoySampleConfigurations {
     rm -r native-samples
   fi
   {
-    $CLI samples create -c config.yaml --out native-samples --template ${1} -f
+    $CLI samples create -c config.yaml --out native-samples \
+      --template ${1} --adapter-host adapter -f
     chmod 644 native-samples/envoy-config.yaml
   } || { # exit directly if cli encounters any error
     exit 1
@@ -257,20 +208,31 @@ function callIstioTargetWithJWT {
 }
 
 ################################################################################
+# Start Envoy and Adapter docker containers
+################################################################################
+function startDockerContainer {
+    docker network create apigee || echo "apigee net already exists."
+
+    echo -e "\nStarting Envoy docker container..."
+    docker run -v $PWD/native-samples/envoy-config.yaml:/envoy.yaml \
+      --name=envoy --network=apigee \
+      -p 8080:8080 --rm -d \
+      docker.io/envoyproxy/envoy:${1} -c /envoy.yaml -l debug
+
+    echo -e "\nStarting Adapter docker container..."
+    docker run -v $PWD/config.yaml:/config.yaml \
+      --name=adapter --network=apigee \
+      -p 5000:5000 -p 5001:5001 --rm -d \
+      apigee-envoy-adapter:${2} -c /config.yaml -l DEBUG
+}
+
+################################################################################
 # Run actual tests with native Envoy
 ################################################################################
 function runEnvoyTests {
   echo -e "\nStarting to run tests with native Envoy..."
   {
-    echo -e "\nStarting Envoy docker image..."
-    docker run -v $PWD/native-samples/envoy-config.yaml:/envoy.yaml \
-      --name=envoy --network=host --rm -d \
-      docker.io/envoyproxy/envoy:${1} -c /envoy.yaml -l debug
-
-    echo -e "\nStarting Adapter docker image..."
-    docker run -v $PWD/config.yaml:/config.yaml \
-      --name=adapter -p 5000:5000 --rm -d \
-      apigee-envoy-adapter:${2} -c /config.yaml -l DEBUG
+    startDockerContainer ${1} ${2}
 
     for i in {1..20}
     do
@@ -366,6 +328,62 @@ function runEnvoyTests {
     callTargetWithAPIKey $APIKEY 200
 
     deployRemoteServiceProxies $REV $ENV $RUNTIME
+  } || { # exit on failure
+    exit 7
+  }
+}
+
+################################################################################
+# Run Multi-env Test with Local Envoy
+################################################################################
+function runEnvoyMultiEnvTest {
+  {
+    sed -i -e "s/env_name: test/env_name: \"*\"/g" config.yaml
+
+    cp native-samples/envoy-config.yaml native-samples/envoy-config.yaml.bak
+    match="cluster: httpbin"
+    insert="\n                typed_per_filter_config:\n                  envoy.filters.http.ext_authz:\n                    \"@type\": type.googleapis.com\/envoy.extensions.filters.http.ext_authz.v3.ExtAuthzPerRoute\n                    check_settings:\n                        context_extensions:\n                          apigee_environment: test"
+    sed -i -e "s/${match}/${match}${insert}/g" native-samples/envoy-config.yaml
+
+    startDockerContainer ${1} ${2}
+
+    for i in {1..20}
+    do
+      JWT=$($CLI token create -c config.yaml -i $APIKEY -s $APISECRET)
+      sleep 30 # skew for JWT
+      callTargetWithJWT $JWT
+      if [[ $STATUS_CODE -eq 200 ]] ; then
+        echo -e "\nServices are ready to be tested"
+        break
+      fi
+    done
+
+    callTargetWithAPIKey $PROD_APIKEY 403
+    callTargetWithAPIKey $APIKEY 200
+
+    docker stop adapter
+    docker stop envoy
+
+    cp native-samples/envoy-config.yaml.bak native-samples/envoy-config.yaml
+    match="domains: \"\*\""
+    insert="\n              typed_per_filter_config:\n                envoy.filters.http.ext_authz:\n                  \"@type\": type.googleapis.com\/envoy.extensions.filters.http.ext_authz.v3.ExtAuthzPerRoute\n                  check_settings:\n                    context_extensions:\n                      apigee_environment: test"
+    sed -i -e "s/${match}/${match}${insert}/g" native-samples/envoy-config.yaml
+
+    startDockerContainer ${1} ${2}
+
+    for i in {1..20}
+    do
+      JWT=$($CLI token create -c config.yaml -i $APIKEY -s $APISECRET)
+      sleep 30 # skew for JWT
+      callTargetWithJWT $JWT
+      if [[ $STATUS_CODE -eq 200 ]] ; then
+        echo -e "\nServices are ready to be tested"
+        break
+      fi
+    done
+    callTargetWithAPIKey $PROD_APIKEY 403
+    callTargetWithAPIKey $APIKEY 200
+
   } || { # exit on failure
     exit 7
   }

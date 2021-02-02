@@ -1,0 +1,6 @@
+{
+  "name" : "httpbin-app-prod",
+  "apiProducts": [
+    "httpbin-product-prod"
+  ]
+}
