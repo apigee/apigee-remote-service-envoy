@@ -89,9 +89,11 @@ function cleanUpApigee {
   deleteAPIProduct dummy-product
 
   undeployRemoteServiceProxies
+  undeployAPIProxies remote-token
   undeployAPIProxies edgemicro-internal
 
   deleteAPIProxy remote-service
+  deleteAPIProxy remote-token
   deleteAPIProxy edgemicro-internal
 }
 
