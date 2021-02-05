@@ -107,8 +107,10 @@ function cleanUpApigee {
   deleteAPIProduct httpbin-product-prod
 
   undeployRemoteServiceProxies
+  undeployAPIProxies remote-token
 
   deleteAPIProxy remote-service
+  deleteAPIProxy remote-token
 }
 
 echo -e "\nStarting integration test of the Apigee Envoy Adapter with Apigee SaaS..."

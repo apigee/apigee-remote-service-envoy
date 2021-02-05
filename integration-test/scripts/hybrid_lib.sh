@@ -173,6 +173,51 @@ function undeployRemoteServiceProxies {
 }
 
 ################################################################################
+# Undeploy API Proxies
+################################################################################
+function undeployAPIProxies {
+  if [[ -z $1 ]] ; then
+    env=$ENV
+  else
+    env=$1
+  fi
+
+  if [[ -z $2 ]] ; then
+    runtime=$RUNTIME
+  else
+    runtime=$2
+  fi
+
+  TOKEN=$(gcloud auth print-access-token)
+  echo -e "\nGet deployed revision of API Proxies ${3}..."
+  REV=$(docker run curlimages/curl:7.72.0 --silent \
+    ${MGMTURL}/v1/organizations/${ORG}/apis/${3}/deployments \
+    -H "Authorization: Bearer ${TOKEN}" | jq -r --arg env "${env}" '.deployments[] | select(.environment==$env) | .revision')
+  echo -e "\nGot deployed revision $REV"
+
+  if [[ ! -z $REV ]] ; then
+    echo -e "\nUndeploying revision $REV of API Proxies ${3}..."
+    STATUS_CODE=$(docker run curlimages/curl:7.72.0 -X DELETE --silent -o /dev/stderr -w "%{http_code}" \
+      ${MGMTURL}/v1/organizations/${ORG}/environments/${env}/apis/${3}/revisions/${REV}/deployments \
+      -H "Authorization: Bearer ${TOKEN}")
+    if [[ $STATUS_CODE -ge 299 ]] ; then
+      echo -e "\nError undeploying API Proxies ${3}: $STATUS_CODE"
+    fi
+  fi
+
+  for i in {1..20}
+  do
+    STATUS_CODE=$(curl --silent -o /dev/stderr -w "%{http_code}" \
+     $runtime/${3}/${4})
+    if [[ $STATUS_CODE -ne 200 ]] ; then
+      echo -e "\nUndeployed ${3} API Proxies"
+      break
+    fi
+    sleep 10
+  done
+}
+
+################################################################################
 # Delete Application
 ################################################################################
 function deleteApplication {
