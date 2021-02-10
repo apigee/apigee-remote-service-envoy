@@ -111,7 +111,7 @@ func TestHandleHTTPAccessLogs(t *testing.T) {
 
 	recs := testAnalyticsMan.records
 	if len(recs) != len(entries) {
-		t.Errorf("got: %d, want: %d", len(recs), len(entries))
+		t.Fatalf("got: %d, want: %d", len(recs), len(entries))
 	}
 
 	rec := recs[0]

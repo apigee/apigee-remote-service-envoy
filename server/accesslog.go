@@ -86,7 +86,26 @@ func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLo
 
 	for _, v := range msg.HttpLogs.LogEntry {
 		req := v.Request
-		api, authContext := a.handler.decodeMetadataHeaders(req.RequestHeaders)
+
+		props := v.GetCommonProperties()
+		if props == nil {
+			log.Debugf("No common properties, skipped accesslog: %#v", v.Request)
+			continue
+		}
+
+		metadata := props.GetMetadata()
+		if metadata == nil {
+			log.Debugf("No metadata, skipped accesslog: %#v", v.Request)
+			continue
+		}
+
+		extAuthzMetadata, ok := metadata.GetFilterMetadata()[extAuthzFilterNamespace]
+		if !ok {
+			log.Debugf("Ext_authz filter has no metadata, skipped accesslog: %#v", v.Request)
+			continue
+		}
+
+		api, authContext := a.handler.decodeExtAuthzMetadata(extAuthzMetadata.GetFields())
 		if api == "" {
 			log.Debugf("Unknown target, skipped accesslog: %#v", v.Request)
 			continue

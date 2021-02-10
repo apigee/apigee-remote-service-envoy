@@ -29,8 +29,8 @@ import (
 	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	v3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	"github.com/gogo/googleapis/google/rpc"
-	pb "github.com/golang/protobuf/ptypes/struct"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 func TestRegister(t *testing.T) {
@@ -47,14 +47,14 @@ func TestRegister(t *testing.T) {
 
 func TestCheck(t *testing.T) {
 
-	jwtClaims := &pb.Struct{
-		Fields: map[string]*pb.Value{
+	jwtClaims := &structpb.Struct{
+		Fields: map[string]*structpb.Value{
 			"apigee": {
-				Kind: &pb.Value_StructValue{
-					StructValue: &pb.Struct{
-						Fields: map[string]*pb.Value{
+				Kind: &structpb.Value_StructValue{
+					StructValue: &structpb.Struct{
+						Fields: map[string]*structpb.Value{
 							"api_product_list": {
-								Kind: &pb.Value_StringValue{
+								Kind: &structpb.Value_StringValue{
 									StringValue: "product1,product2",
 								},
 							},
@@ -85,7 +85,7 @@ func TestCheck(t *testing.T) {
 				},
 			},
 			MetadataContext: &core.Metadata{
-				FilterMetadata: map[string]*pb.Struct{
+				FilterMetadata: map[string]*structpb.Struct{
 					jwtFilterMetadataKey: jwtClaims,
 				},
 			},

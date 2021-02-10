@@ -25,7 +25,6 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/context"
 	"github.com/apigee/apigee-remote-service-golib/log"
 	"github.com/apigee/apigee-remote-service-golib/quota"
-	envoy_core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoy_auth "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	envoy_type "github.com/envoyproxy/go-control-plane/envoy/type/v3"
 	"github.com/gogo/googleapis/google/rpc"
@@ -162,13 +161,13 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.Check
 
 func (a *AuthorizationServer) authOK(tracker *prometheusRequestMetricTracker, authContext *auth.Context, target string) *envoy_auth.CheckResponse {
 
-	headers := makeMetadataHeaders(target, authContext)
-	headers = append(headers, &envoy_core.HeaderValueOption{
-		Header: &envoy_core.HeaderValue{
-			Key:   headerAuthorized,
-			Value: "true",
-		},
-	})
+	// headers := makeMetadataHeaders(target, authContext)
+	// headers = append(headers, &envoy_core.HeaderValueOption{
+	// 	Header: &envoy_core.HeaderValue{
+	// 		Key:   headerAuthorized,
+	// 		Value: "true",
+	// 	},
+	// })
 
 	tracker.statusCode = envoy_type.StatusCode_OK
 	return &envoy_auth.CheckResponse{
@@ -176,10 +175,9 @@ func (a *AuthorizationServer) authOK(tracker *prometheusRequestMetricTracker, au
 			Code: int32(rpc.OK),
 		},
 		HttpResponse: &envoy_auth.CheckResponse_OkResponse{
-			OkResponse: &envoy_auth.OkHttpResponse{
-				Headers: headers,
-			},
+			OkResponse: &envoy_auth.OkHttpResponse{},
 		},
+		DynamicMetadata: encodeExtAuthzMetadata(target, authContext, true),
 	}
 }
 
@@ -247,10 +245,9 @@ func (a *AuthorizationServer) createDenyResponse(tracker *prometheusRequestMetri
 			Code: int32(rpc.OK),
 		},
 		HttpResponse: &envoy_auth.CheckResponse_OkResponse{
-			OkResponse: &envoy_auth.OkHttpResponse{
-				Headers: makeMetadataHeaders(target, authContext),
-			},
+			OkResponse: &envoy_auth.OkHttpResponse{},
 		},
+		DynamicMetadata: encodeExtAuthzMetadata(target, authContext, false),
 	}
 }
 
