@@ -155,13 +155,14 @@ type AnalyticsConfig struct {
 
 // AuthConfig is auth-related config
 type AuthConfig struct {
-	APIKeyClaim         string        `yaml:"api_key_claim,omitempty" json:"api_key_claim,omitempty"`
-	APIKeyCacheDuration time.Duration `yaml:"api_key_cache_duration,omitempty" json:"api_key_cache_duration,omitempty"`
-	JWKSPollInterval    time.Duration `yaml:"jwks_poll_interval,omitempty" json:"jwks_poll_interval,omitempty"`
-	APIKeyHeader        string        `yaml:"api_key_header,omitempty" json:"api_key_header,omitempty"`
-	TargetHeader        string        `yaml:"target_header,omitempty" json:"target_header,omitempty"`
-	RejectUnauthorized  bool          `yaml:"reject_unauthorized,omitempty" json:"reject_unauthorized,omitempty"`
-	JWTProviderKey      string        `yaml:"jwt_provider_key,omitempty" json:"jwt_provider_key,omitempty"`
+	APIKeyClaim           string        `yaml:"api_key_claim,omitempty" json:"api_key_claim,omitempty"`
+	APIKeyCacheDuration   time.Duration `yaml:"api_key_cache_duration,omitempty" json:"api_key_cache_duration,omitempty"`
+	JWKSPollInterval      time.Duration `yaml:"jwks_poll_interval,omitempty" json:"jwks_poll_interval,omitempty"`
+	APIKeyHeader          string        `yaml:"api_key_header,omitempty" json:"api_key_header,omitempty"`
+	TargetHeader          string        `yaml:"target_header,omitempty" json:"target_header,omitempty"`
+	RejectUnauthorized    bool          `yaml:"reject_unauthorized,omitempty" json:"reject_unauthorized,omitempty"`
+	JWTProviderKey        string        `yaml:"jwt_provider_key,omitempty" json:"jwt_provider_key,omitempty"`
+	AppendMetadataHeaders bool          `yaml:"append_metadata_headers,omitempty" json:"append_metadata_headers,omitempty"`
 }
 
 // Load config

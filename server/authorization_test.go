@@ -101,14 +101,15 @@ func TestCheck(t *testing.T) {
 	testQuotaMan := &testQuotaMan{}
 	server := AuthorizationServer{
 		handler: &Handler{
-			rejectUnauthorized: true,
-			apiKeyClaim:        headerClientID,
-			targetHeader:       headerAPI,
-			apiKeyHeader:       "x-api-key",
-			authMan:            testAuthMan,
-			productMan:         testProductMan,
-			quotaMan:           testQuotaMan,
-			jwtProviderKey:     "apigee",
+			rejectUnauthorized:    true,
+			apiKeyClaim:           headerClientID,
+			targetHeader:          headerAPI,
+			apiKeyHeader:          "x-api-key",
+			authMan:               testAuthMan,
+			productMan:            testProductMan,
+			quotaMan:              testQuotaMan,
+			jwtProviderKey:        "apigee",
+			appendMetadataHeaders: true,
 		},
 	}
 

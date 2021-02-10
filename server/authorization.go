@@ -161,13 +161,12 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.Check
 
 func (a *AuthorizationServer) authOK(tracker *prometheusRequestMetricTracker, authContext *auth.Context, target string) *envoy_auth.CheckResponse {
 
-	// headers := makeMetadataHeaders(target, authContext)
-	// headers = append(headers, &envoy_core.HeaderValueOption{
-	// 	Header: &envoy_core.HeaderValue{
-	// 		Key:   headerAuthorized,
-	// 		Value: "true",
-	// 	},
-	// })
+	okResponse := &envoy_auth.OkHttpResponse{}
+
+	if a.handler.appendMetadataHeaders {
+		headers := makeMetadataHeaders(target, authContext, true)
+		okResponse.Headers = headers
+	}
 
 	tracker.statusCode = envoy_type.StatusCode_OK
 	return &envoy_auth.CheckResponse{
@@ -175,7 +174,7 @@ func (a *AuthorizationServer) authOK(tracker *prometheusRequestMetricTracker, au
 			Code: int32(rpc.OK),
 		},
 		HttpResponse: &envoy_auth.CheckResponse_OkResponse{
-			OkResponse: &envoy_auth.OkHttpResponse{},
+			OkResponse: okResponse,
 		},
 		DynamicMetadata: encodeExtAuthzMetadata(target, authContext, true),
 	}
@@ -222,6 +221,7 @@ func (a *AuthorizationServer) createDenyResponse(tracker *prometheusRequestMetri
 			Status: &rpcstatus.Status{
 				Code: int32(code),
 			},
+			DynamicMetadata: encodeExtAuthzMetadata(target, authContext, false),
 		}
 
 		// Envoy doesn't automatically map this code, force it
@@ -238,6 +238,13 @@ func (a *AuthorizationServer) createDenyResponse(tracker *prometheusRequestMetri
 		return response
 	}
 
+	okResponse := &envoy_auth.OkHttpResponse{}
+
+	if a.handler.appendMetadataHeaders {
+		headers := makeMetadataHeaders(target, authContext, false)
+		okResponse.Headers = headers
+	}
+
 	// allow request to continue upstream
 	log.Debugf("sending ok (actual: %s)", code.String())
 	return &envoy_auth.CheckResponse{
@@ -245,7 +252,7 @@ func (a *AuthorizationServer) createDenyResponse(tracker *prometheusRequestMetri
 			Code: int32(rpc.OK),
 		},
 		HttpResponse: &envoy_auth.CheckResponse_OkResponse{
-			OkResponse: &envoy_auth.OkHttpResponse{},
+			OkResponse: okResponse,
 		},
 		DynamicMetadata: encodeExtAuthzMetadata(target, authContext, false),
 	}

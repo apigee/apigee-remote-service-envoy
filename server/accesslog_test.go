@@ -314,9 +314,10 @@ func (tals *testAccessLogService) startAccessLogServer(t *testing.T) *grpc.Serve
 
 	testAnalyticsMan := &testAnalyticsMan{}
 	h := &Handler{
-		orgName:      "hi",
-		envName:      "test",
-		analyticsMan: testAnalyticsMan,
+		orgName:               "hi",
+		envName:               "test",
+		analyticsMan:          testAnalyticsMan,
+		appendMetadataHeaders: true,
 	}
 	server := AccessLogServer{}
 

@@ -37,16 +37,17 @@ import (
 
 // A Handler is the main entry
 type Handler struct {
-	internalAPI        *url.URL
-	remoteServiceAPI   *url.URL
-	orgName            string
-	envName            string
-	apiKeyClaim        string
-	apiKeyHeader       string
-	targetHeader       string
-	rejectUnauthorized bool
-	jwtProviderKey     string
-	isMultitenant      bool
+	internalAPI           *url.URL
+	remoteServiceAPI      *url.URL
+	orgName               string
+	envName               string
+	apiKeyClaim           string
+	apiKeyHeader          string
+	targetHeader          string
+	rejectUnauthorized    bool
+	appendMetadataHeaders bool
+	jwtProviderKey        string
+	isMultitenant         bool
 
 	productMan   product.Manager
 	authMan      auth.Manager
@@ -196,20 +197,21 @@ func NewHandler(config *Config) (*Handler, error) {
 	}
 
 	h := &Handler{
-		remoteServiceAPI:   remoteServiceAPI,
-		internalAPI:        internalAPI,
-		orgName:            config.Tenant.OrgName,
-		envName:            config.Tenant.EnvName,
-		productMan:         productMan,
-		authMan:            authMan,
-		analyticsMan:       analyticsMan,
-		quotaMan:           quotaMan,
-		apiKeyClaim:        config.Auth.APIKeyClaim,
-		apiKeyHeader:       config.Auth.APIKeyHeader,
-		targetHeader:       config.Auth.TargetHeader,
-		rejectUnauthorized: config.Auth.RejectUnauthorized,
-		jwtProviderKey:     config.Auth.JWTProviderKey,
-		isMultitenant:      config.Tenant.IsMultitenant(),
+		remoteServiceAPI:      remoteServiceAPI,
+		internalAPI:           internalAPI,
+		orgName:               config.Tenant.OrgName,
+		envName:               config.Tenant.EnvName,
+		productMan:            productMan,
+		authMan:               authMan,
+		analyticsMan:          analyticsMan,
+		quotaMan:              quotaMan,
+		apiKeyClaim:           config.Auth.APIKeyClaim,
+		apiKeyHeader:          config.Auth.APIKeyHeader,
+		targetHeader:          config.Auth.TargetHeader,
+		rejectUnauthorized:    config.Auth.RejectUnauthorized,
+		jwtProviderKey:        config.Auth.JWTProviderKey,
+		appendMetadataHeaders: !config.Auth.AppendMetadataHeaders,
+		isMultitenant:         config.Tenant.IsMultitenant(),
 	}
 
 	return h, nil

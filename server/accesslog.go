@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/apigee/apigee-remote-service-golib/analytics"
+	"github.com/apigee/apigee-remote-service-golib/auth"
 	"github.com/apigee/apigee-remote-service-golib/log"
 	als "github.com/envoyproxy/go-control-plane/envoy/service/accesslog/v3"
 	"github.com/golang/protobuf/ptypes"
@@ -28,6 +29,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 const gatewaySource = "envoy"
@@ -87,25 +89,34 @@ func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLo
 	for _, v := range msg.HttpLogs.LogEntry {
 		req := v.Request
 
-		props := v.GetCommonProperties()
-		if props == nil {
-			log.Debugf("No common properties, skipped accesslog: %#v", v.Request)
+		getExtAuthzMetadata := func() *structpb.Struct {
+			props := v.GetCommonProperties()
+			if props == nil {
+				return nil
+			}
+
+			metadata := props.GetMetadata()
+			if metadata == nil {
+				return nil
+			}
+
+			return metadata.GetFilterMetadata()[extAuthzFilterNamespace]
+		}
+
+		var api string
+		var authContext *auth.Context
+
+		extAuthzMetadata := getExtAuthzMetadata()
+		if extAuthzMetadata != nil {
+			api, authContext = a.handler.decodeExtAuthzMetadata(extAuthzMetadata.GetFields())
+		} else if a.handler.appendMetadataHeaders { // only check headers if knowing it may exist
+			log.Debugf("No dynamic metadata for ext_authz filter, falling back to headers")
+			api, authContext = a.handler.decodeMetadataHeaders(req.GetRequestHeaders())
+		} else {
+			log.Debugf("No dynamic metadata for ext_authz filter, skipped accesslog: %#v", v.Request)
 			continue
 		}
 
-		metadata := props.GetMetadata()
-		if metadata == nil {
-			log.Debugf("No metadata, skipped accesslog: %#v", v.Request)
-			continue
-		}
-
-		extAuthzMetadata, ok := metadata.GetFilterMetadata()[extAuthzFilterNamespace]
-		if !ok {
-			log.Debugf("Ext_authz filter has no metadata, skipped accesslog: %#v", v.Request)
-			continue
-		}
-
-		api, authContext := a.handler.decodeExtAuthzMetadata(extAuthzMetadata.GetFields())
 		if api == "" {
 			log.Debugf("Unknown target, skipped accesslog: %#v", v.Request)
 			continue

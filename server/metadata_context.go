@@ -81,13 +81,8 @@ func (h *Handler) decodeExtAuthzMetadata(fields map[string]*structpb.Value) (str
 
 	api := fields[headerAPI].GetStringValue()
 	if api == "" {
-		api = fields[h.targetHeader].GetStringValue()
-		if api != "" {
-			log.Debugf("No context header %s, using target header: %s", headerAPI, h.targetHeader)
-		} else {
-			log.Debugf("No context header %s or target header: %s", headerAPI, h.targetHeader)
-			return "", nil
-		}
+		log.Debugf("No context header: %s", headerAPI)
+		return "", nil
 	}
 
 	var rootContext context.Context = h
