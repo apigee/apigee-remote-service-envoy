@@ -210,7 +210,7 @@ func NewHandler(config *Config) (*Handler, error) {
 		targetHeader:          config.Auth.TargetHeader,
 		rejectUnauthorized:    config.Auth.RejectUnauthorized,
 		jwtProviderKey:        config.Auth.JWTProviderKey,
-		appendMetadataHeaders: !config.Auth.AppendMetadataHeaders,
+		appendMetadataHeaders: config.Auth.AppendMetadataHeaders,
 		isMultitenant:         config.Tenant.IsMultitenant(),
 	}
 
