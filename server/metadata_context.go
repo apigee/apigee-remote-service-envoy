@@ -75,25 +75,14 @@ func stringValueFrom(v string) *structpb.Value {
 	}
 }
 
-// stringValueFrom returns a *structpb.Value and status
-func stringFrom(sv *structpb.Value) (string, bool) {
-	if sv == nil {
-		return "", false
-	}
-	v, ok := sv.GetKind().(*structpb.Value_StringValue)
-	if !ok {
-		return "", false
-	}
-	return v.StringValue, true
-}
-
 // decodeExtAuthzMetadata decodes the Envoy ext_authz's filter's metadata
 // fields into target (api) and auth context
 func (h *Handler) decodeExtAuthzMetadata(fields map[string]*structpb.Value) (string, *auth.Context) {
 
-	api, ok := stringFrom(fields[headerAPI])
-	if !ok {
-		if api, ok = stringFrom(fields[headerAPI]); ok {
+	api := fields[headerAPI].GetStringValue()
+	if api == "" {
+		api = fields[h.targetHeader].GetStringValue()
+		if api != "" {
 			log.Debugf("No context header %s, using target header: %s", headerAPI, h.targetHeader)
 		} else {
 			log.Debugf("No context header %s or target header: %s", headerAPI, h.targetHeader)
@@ -103,32 +92,20 @@ func (h *Handler) decodeExtAuthzMetadata(fields map[string]*structpb.Value) (str
 
 	var rootContext context.Context = h
 	if h.isMultitenant {
-		env, ok := stringFrom(fields[headerEnvironment])
-		if !ok {
+		env := fields[headerEnvironment].GetStringValue()
+		if env == "" {
 			log.Warnf("Multitenant mode but %s header not found. Check Envoy config.", headerEnvironment)
 		}
 		rootContext = &multitenantContext{h, env}
 	}
 
-	ctx := &auth.Context{Context: rootContext}
-	if token, ok := stringFrom(fields[headerAccessToken]); ok {
-		ctx.AccessToken = token
+	return api, &auth.Context{
+		Context:        rootContext,
+		AccessToken:    fields[headerAccessToken].GetStringValue(),
+		APIProducts:    strings.Split(fields[headerAPIProducts].GetStringValue(), ","),
+		Application:    fields[headerApplication].GetStringValue(),
+		ClientID:       fields[headerClientID].GetStringValue(),
+		DeveloperEmail: fields[headerDeveloperEmail].GetStringValue(),
+		Scopes:         strings.Split(fields[headerScope].GetStringValue(), " "),
 	}
-	if products, ok := stringFrom(fields[headerAPIProducts]); ok {
-		ctx.APIProducts = strings.Split(products, ",")
-	}
-	if app, ok := stringFrom(fields[headerApplication]); ok {
-		ctx.Application = app
-	}
-	if clientID, ok := stringFrom(fields[headerClientID]); ok {
-		ctx.ClientID = clientID
-	}
-	if developerEmail, ok := stringFrom(fields[headerDeveloperEmail]); ok {
-		ctx.DeveloperEmail = developerEmail
-	}
-	if scopes, ok := stringFrom(fields[headerScope]); ok {
-		ctx.Scopes = strings.Split(scopes, " ")
-	}
-
-	return api, ctx
 }

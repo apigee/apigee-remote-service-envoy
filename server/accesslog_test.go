@@ -29,12 +29,27 @@ import (
 	"github.com/golang/protobuf/ptypes"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/test/bufconn"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	v3 "github.com/envoyproxy/go-control-plane/envoy/data/accesslog/v3"
 	als "github.com/envoyproxy/go-control-plane/envoy/service/accesslog/v3"
 	wrappers "github.com/golang/protobuf/ptypes/wrappers"
 )
+
+func makeFields() map[string]*structpb.Value {
+	return map[string]*structpb.Value{
+		headerAPI:            stringValueFrom("api"),
+		headerAPIProducts:    stringValueFrom("product1,product2"),
+		headerAccessToken:    stringValueFrom("token"),
+		headerApplication:    stringValueFrom("app"),
+		headerClientID:       stringValueFrom("clientID"),
+		headerDeveloperEmail: stringValueFrom("email@google.com"),
+		headerEnvironment:    stringValueFrom("env"),
+		headerOrganization:   stringValueFrom("org"),
+		headerScope:          stringValueFrom("scope1 scope2"),
+	}
+}
 
 func TestHandleHTTPAccessLogs(t *testing.T) {
 
@@ -49,17 +64,7 @@ func TestHandleHTTPAccessLogs(t *testing.T) {
 	thenUnix := now.Add(dur).UnixNano() / 1000000
 	durProto := ptypes.DurationProto(dur)
 
-	headers := map[string]string{
-		headerAPI:            "api",
-		headerAPIProducts:    "product1,product2",
-		headerAccessToken:    "token",
-		headerApplication:    "app",
-		headerClientID:       "clientID",
-		headerDeveloperEmail: "email@google.com",
-		headerEnvironment:    "env",
-		headerOrganization:   "org",
-		headerScope:          "scope1 scope2",
-	}
+	fields := makeFields()
 
 	path := "path"
 	uri := "path?x=foo"
@@ -76,13 +81,20 @@ func TestHandleHTTPAccessLogs(t *testing.T) {
 			TimeToLastUpstreamRxByte:    durProto,
 			TimeToFirstDownstreamTxByte: durProto,
 			TimeToLastDownstreamTxByte:  durProto,
+			Metadata: &core.Metadata{
+				FilterMetadata: map[string]*structpb.Struct{
+					extAuthzFilterNamespace: {
+						Fields: fields,
+					},
+				},
+			},
 		},
 		Request: &v3.HTTPRequestProperties{
-			Path:           uri,
-			RequestMethod:  core.RequestMethod_GET,
-			UserAgent:      userAgent,
-			ForwardedFor:   clientIP,
-			RequestHeaders: headers,
+			Path:          uri,
+			RequestMethod: core.RequestMethod_GET,
+			UserAgent:     userAgent,
+			ForwardedFor:  clientIP,
+			// RequestHeaders: headers,
 		},
 		Response: &v3.HTTPResponseProperties{
 			ResponseCode: &wrappers.UInt32Value{
@@ -100,8 +112,8 @@ func TestHandleHTTPAccessLogs(t *testing.T) {
 	testAnalyticsMan := &testAnalyticsMan{}
 	server := AccessLogServer{
 		handler: &Handler{
-			orgName:      headers[headerOrganization],
-			envName:      headers[headerEnvironment],
+			orgName:      fields[headerOrganization].GetStringValue(),
+			envName:      fields[headerEnvironment].GetStringValue(),
 			analyticsMan: testAnalyticsMan,
 		},
 	}
@@ -115,8 +127,8 @@ func TestHandleHTTPAccessLogs(t *testing.T) {
 	}
 
 	rec := recs[0]
-	if rec.APIProxy != headers[headerAPI] {
-		t.Errorf("got: %s, want: %s", rec.APIProxy, headers[headerAPI])
+	if rec.APIProxy != fields[headerAPI].GetStringValue() {
+		t.Errorf("got: %s, want: %s", rec.APIProxy, fields[headerAPI].GetStringValue())
 	}
 	if rec.ClientIP != clientIP {
 		t.Errorf("got: %s, want: %s", rec.ClientIP, clientIP)
@@ -133,38 +145,6 @@ func TestHandleHTTPAccessLogs(t *testing.T) {
 	if rec.ClientSentStartTimestamp != thenUnix {
 		t.Errorf("got: %d, want: %d", rec.ClientSentStartTimestamp, thenUnix)
 	}
-
-	// the following are handled in golib by record.ensureFields()
-	// so we're skipping validation of them...
-
-	// rec.RecordType skipped
-	// product := strings.Split(headers[headerAPIProducts], ",")[0]
-	// if rec.APIProduct != product {
-	// 	t.Errorf("got: %s, want: %s", rec.APIProduct, product)
-	// }
-	// rec.APIProxyRevision skipped
-	// if rec.AccessToken != headers[headerAccessToken] {
-	// 	t.Errorf("got: %s, want: %s", rec.AccessToken, headers[headerAccessToken])
-	// }
-	// if rec.ClientID != headers[headerClientID] {
-	// 	t.Errorf("got: %s, want: %s", rec.ClientID, headers[headerClientID])
-	// }
-	// if rec.DeveloperApp != headers[headerApplication] {
-	// 	t.Errorf("got: %s, want: %s", rec.DeveloperApp, headers[headerApplication])
-	// }
-	// if rec.DeveloperEmail != headers[headerDeveloperEmail] {
-	// 	t.Errorf("got: %s, want: %s", rec.DeveloperEmail, headers[headerDeveloperEmail])
-	// }
-	// if rec.Environment != headers[headerEnvironment] {
-	// 	t.Errorf("got: %s, want: %s", rec.Environment, headers[headerEnvironment])
-	// }
-	// if rec.GatewayFlowID != flowID {
-	// 	t.Errorf("got: %s, want: %s", rec.GatewayFlowID, flowID)
-	// }
-	// rec.GatewaySource skipped
-	// if rec.Organization != headers[headerOrganization] {
-	// 	t.Errorf("got: %s, want: %s", rec.Organization, headers[headerOrganization])
-	// }
 
 	if rec.RequestPath != path {
 		t.Errorf("got: %s, want: %s", rec.RequestPath, path)
@@ -292,20 +272,20 @@ func TestStreamAccessLogs(t *testing.T) {
 		t.Fatalf("failed to open client stream: %v", err)
 	}
 
-	httpLog := getHTTPLog()
-
-	if err := stream.Send(httpLog); err != nil {
-		t.Error(err)
+	logMsgs := []*als.StreamAccessLogsMessage{
+		makeValidHTTPLog(),
+		makeHTTPLogWithoutCommonProperties(),
+		makeHTTPLogWithoutMetadata(),
+		makeHTTPLogWithoutExtAuthFilterMetadata(),
+		makeHTTPLogWithUnknownTarget(),
+		makeTCPLog(),
+		{}, // empty one,
 	}
 
-	tcpLog := getTCPLog()
-
-	if err := stream.Send(tcpLog); err != nil {
-		t.Error(err)
-	}
-
-	if err := stream.Send(&als.StreamAccessLogsMessage{}); err != nil {
-		t.Error(err)
+	for _, v := range logMsgs {
+		if err := stream.Send(v); err != nil {
+			t.Error(err)
+		}
 	}
 
 	if _, err := stream.CloseAndRecv(); err != nil && err != io.EOF {
@@ -357,7 +337,35 @@ func (tals *testAccessLogService) getBufDialer() func(context.Context, string) (
 	}
 }
 
-func getHTTPLog() *als.StreamAccessLogsMessage {
+func makeValidHTTPLog() *als.StreamAccessLogsMessage {
+	return &als.StreamAccessLogsMessage{
+		LogEntries: &als.StreamAccessLogsMessage_HttpLogs{
+			HttpLogs: &als.StreamAccessLogsMessage_HTTPAccessLogEntries{
+				LogEntry: []*v3.HTTPAccessLogEntry{
+					{
+						Request: &v3.HTTPRequestProperties{
+							RequestHeaders: map[string]string{
+								":authority": "api",
+							},
+						},
+						Response: &v3.HTTPResponseProperties{},
+						CommonProperties: &v3.AccessLogCommon{
+							Metadata: &core.Metadata{
+								FilterMetadata: map[string]*structpb.Struct{
+									extAuthzFilterNamespace: {
+										Fields: makeFields(),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func makeHTTPLogWithUnknownTarget() *als.StreamAccessLogsMessage {
 	return &als.StreamAccessLogsMessage{
 		LogEntries: &als.StreamAccessLogsMessage_HttpLogs{
 			HttpLogs: &als.StreamAccessLogsMessage_HTTPAccessLogEntries{
@@ -369,6 +377,13 @@ func getHTTPLog() *als.StreamAccessLogsMessage {
 							},
 						},
 						Response: &v3.HTTPResponseProperties{},
+						CommonProperties: &v3.AccessLogCommon{
+							Metadata: &core.Metadata{
+								FilterMetadata: map[string]*structpb.Struct{
+									extAuthzFilterNamespace: {},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -376,7 +391,70 @@ func getHTTPLog() *als.StreamAccessLogsMessage {
 	}
 }
 
-func getTCPLog() *als.StreamAccessLogsMessage {
+func makeHTTPLogWithoutCommonProperties() *als.StreamAccessLogsMessage {
+	return &als.StreamAccessLogsMessage{
+		LogEntries: &als.StreamAccessLogsMessage_HttpLogs{
+			HttpLogs: &als.StreamAccessLogsMessage_HTTPAccessLogEntries{
+				LogEntry: []*v3.HTTPAccessLogEntry{
+					{
+						Request: &v3.HTTPRequestProperties{
+							RequestHeaders: map[string]string{
+								":authority": "api",
+							},
+						},
+						Response: &v3.HTTPResponseProperties{},
+					},
+				},
+			},
+		},
+	}
+}
+
+func makeHTTPLogWithoutMetadata() *als.StreamAccessLogsMessage {
+	return &als.StreamAccessLogsMessage{
+		LogEntries: &als.StreamAccessLogsMessage_HttpLogs{
+			HttpLogs: &als.StreamAccessLogsMessage_HTTPAccessLogEntries{
+				LogEntry: []*v3.HTTPAccessLogEntry{
+					{
+						Request: &v3.HTTPRequestProperties{
+							RequestHeaders: map[string]string{
+								":authority": "api",
+							},
+						},
+						Response:         &v3.HTTPResponseProperties{},
+						CommonProperties: &v3.AccessLogCommon{},
+					},
+				},
+			},
+		},
+	}
+}
+
+func makeHTTPLogWithoutExtAuthFilterMetadata() *als.StreamAccessLogsMessage {
+	return &als.StreamAccessLogsMessage{
+		LogEntries: &als.StreamAccessLogsMessage_HttpLogs{
+			HttpLogs: &als.StreamAccessLogsMessage_HTTPAccessLogEntries{
+				LogEntry: []*v3.HTTPAccessLogEntry{
+					{
+						Request: &v3.HTTPRequestProperties{
+							RequestHeaders: map[string]string{
+								":authority": "api",
+							},
+						},
+						Response: &v3.HTTPResponseProperties{},
+						CommonProperties: &v3.AccessLogCommon{
+							Metadata: &core.Metadata{
+								FilterMetadata: map[string]*structpb.Struct{},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func makeTCPLog() *als.StreamAccessLogsMessage {
 	return &als.StreamAccessLogsMessage{
 		LogEntries: &als.StreamAccessLogsMessage_TcpLogs{
 			TcpLogs: &als.StreamAccessLogsMessage_TCPAccessLogEntries{},
