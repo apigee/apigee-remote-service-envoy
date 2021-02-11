@@ -23,23 +23,12 @@ import (
 	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 )
 
-const headerAuthorized = "x-apigee-authorized"
-const headerAccessToken = "x-apigee-accesstoken"
-const headerAPI = "x-apigee-api"
-const headerAPIProducts = "x-apigee-apiproducts"
-const headerApplication = "x-apigee-application"
-const headerClientID = "x-apigee-clientid"
-const headerDeveloperEmail = "x-apigee-developeremail"
-const headerEnvironment = "x-apigee-environment"
-const headerOrganization = "x-apigee-organization"
-const headerScope = "x-apigee-scope"
-
-func makeMetadataHeaders(api string, ac *auth.Context) []*core.HeaderValueOption {
+func makeMetadataHeaders(api string, ac *auth.Context, authorized bool) []*core.HeaderValueOption {
 	if ac == nil {
 		return nil
 	}
 
-	return []*core.HeaderValueOption{
+	headers := []*core.HeaderValueOption{
 		header(headerAccessToken, ac.AccessToken),
 		header(headerAPI, api),
 		header(headerAPIProducts, strings.Join(ac.APIProducts, ",")),
@@ -50,6 +39,12 @@ func makeMetadataHeaders(api string, ac *auth.Context) []*core.HeaderValueOption
 		header(headerOrganization, ac.Organization()),
 		header(headerScope, strings.Join(ac.Scopes, " ")),
 	}
+
+	if authorized {
+		headers = append(headers, header(headerAuthorized, "true"))
+	}
+
+	return headers
 }
 
 func header(key, value string) *core.HeaderValueOption {

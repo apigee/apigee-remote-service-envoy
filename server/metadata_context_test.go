@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2021 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,11 +20,10 @@ import (
 	"testing"
 
 	"github.com/apigee/apigee-remote-service-golib/auth"
-	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
-func TestMetadataHeaders(t *testing.T) {
-	var opts []*core.HeaderValueOption
+func TestEncodeMetadata(t *testing.T) {
 	h := &multitenantContext{
 		&Handler{
 			orgName:       "org",
@@ -43,10 +42,10 @@ func TestMetadataHeaders(t *testing.T) {
 		Scopes:         []string{"scope1", "scope2"},
 	}
 	api := "api"
-	opts = makeMetadataHeaders(api, authContext, true)
+	metadata := encodeExtAuthzMetadata(api, authContext, true)
 	headers := map[string]string{}
-	for _, o := range opts {
-		headers[o.Header.Key] = o.Header.Value
+	for k, v := range metadata.GetFields() {
+		headers[k] = v.GetStringValue()
 	}
 
 	equal := func(key, want string) {
@@ -65,7 +64,7 @@ func TestMetadataHeaders(t *testing.T) {
 	equal(headerOrganization, authContext.Organization())
 	equal(headerScope, strings.Join(authContext.Scopes, " "))
 
-	api2, ac2 := h.decodeMetadataHeaders(headers)
+	api2, ac2 := h.decodeExtAuthzMetadata(metadata.GetFields())
 	if api != api2 {
 		t.Errorf("got: '%s', want: '%s'", api2, api)
 	}
@@ -75,23 +74,56 @@ func TestMetadataHeaders(t *testing.T) {
 	}
 }
 
-func TestMetadataHeadersExceptions(t *testing.T) {
-	opts := makeMetadataHeaders("api", nil, true)
-	if opts != nil {
+func TestEncodeMetadataNilCheck(t *testing.T) {
+	if encodeExtAuthzMetadata("api", nil, true) != nil {
 		t.Errorf("should return nil if no context")
 	}
+}
 
+func TestEncodeMetadataAuthorizedField(t *testing.T) {
+	h := &Handler{
+		orgName: "org",
+		envName: "env",
+	}
+	authContext := &auth.Context{
+		Context:        h,
+		ClientID:       "clientid",
+		AccessToken:    "accesstoken",
+		Application:    "application",
+		APIProducts:    []string{"prod1", "prod2"},
+		DeveloperEmail: "dev@google.com",
+		Scopes:         []string{"scope1", "scope2"},
+	}
+
+	metadata := encodeExtAuthzMetadata("api", authContext, true)
+	value, ok := metadata.GetFields()[headerAuthorized]
+	if !ok {
+		t.Fatalf("'x-apigee-authorized' field not found in metadata")
+	}
+	if value.GetStringValue() != "true" {
+		t.Errorf("'x-apigee-authorized' should be true, got %s", value.GetStringValue())
+	}
+
+	metadata = encodeExtAuthzMetadata("api", authContext, false)
+	_, ok = metadata.GetFields()[headerAuthorized]
+	if ok {
+		t.Fatalf("should not have 'x-apigee-authorized' field in metadata")
+	}
+}
+
+func TestEncodeMetadataHeadersExceptions(t *testing.T) {
 	h := &Handler{
 		orgName: "org",
 		envName: "*",
 	}
 	h.targetHeader = "target"
-	header := map[string]string{
-		"target":          "target",
-		headerEnvironment: "test",
+	metadata := &structpb.Struct{
+		Fields: map[string]*structpb.Value{
+			headerAPI: stringValueFrom("target"),
+		},
 	}
 
-	api, ac := h.decodeMetadataHeaders(header)
+	api, ac := h.decodeExtAuthzMetadata(metadata.GetFields())
 	if ac.Environment() != "*" {
 		t.Errorf("got: %s, want: %s", ac.Environment(), "*")
 	}
@@ -100,7 +132,19 @@ func TestMetadataHeadersExceptions(t *testing.T) {
 	}
 
 	h.isMultitenant = true
-	api, ac = h.decodeMetadataHeaders(header)
+	api, ac = h.decodeExtAuthzMetadata(metadata.GetFields())
+	if api != "target" {
+		t.Errorf("got: %s, want: %s", api, "target")
+	}
+	if ac.Organization() != h.orgName {
+		t.Errorf("got: %s, want: %s", ac.Organization(), h.orgName)
+	}
+	if ac.Environment() != "" {
+		t.Errorf("got: %s, want empty string", ac.Environment())
+	}
+
+	metadata.Fields[headerEnvironment] = stringValueFrom("test")
+	api, ac = h.decodeExtAuthzMetadata(metadata.GetFields())
 	if api != "target" {
 		t.Errorf("got: %s, want: %s", api, "target")
 	}
@@ -109,22 +153,5 @@ func TestMetadataHeadersExceptions(t *testing.T) {
 	}
 	if ac.Environment() != "test" {
 		t.Errorf("got: %s, want: %s", ac.Environment(), "test")
-	}
-
-	h.targetHeader = "missing"
-	api, ac = h.decodeMetadataHeaders(header)
-	if api != "" {
-		t.Errorf("api should be empty")
-	}
-	if ac != nil {
-		t.Errorf("authContext should be nil")
-	}
-
-}
-
-func TestMetadataHeadersNilCheck(t *testing.T) {
-	opts := makeMetadataHeaders("api", nil, true)
-	if opts != nil {
-		t.Errorf("should return nil if no context")
 	}
 }
