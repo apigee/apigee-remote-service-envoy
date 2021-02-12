@@ -290,13 +290,13 @@ function runEnvoyTests {
     for i in {1..20}
     do
       callTargetWithAPIKey $APIKEY
-      if [[ $STATUS_CODE -eq 403 ]] ; then
+      if [[ $STATUS_CODE -eq 429 ]] ; then
         echo -e "\nQuota depleted"
         break
       fi
       sleep 1
     done
-    if [[ $STATUS_CODE -ne 403 ]] ; then
+    if [[ $STATUS_CODE -ne 429 ]] ; then
       echo -e "\nQuota was not exhausted"
       exit 2
     fi
@@ -311,13 +311,13 @@ function runEnvoyTests {
     for i in {1..20}
     do
       callTargetWithAPIKey $APIKEY
-      if [[ $STATUS_CODE -eq 403 ]] ; then
+      if [[ $STATUS_CODE -eq 429 ]] ; then
         echo -e "\nLocal quota depleted"
         break
       fi
       sleep 1
     done
-    if [[ $STATUS_CODE -ne 403 ]] ; then
+    if [[ $STATUS_CODE -ne 429 ]] ; then
       echo -e "\nQuota was not exhausted"
       exit 2
     fi
@@ -467,13 +467,13 @@ EOF
     for i in {1..20}
     do
       callIstioTargetWithAPIKey $APIKEY
-      if [[ $STATUS_CODE -eq 403 ]] ; then
+      if [[ $STATUS_CODE -eq 429 ]] ; then
         echo -e "\nQuota depleted"
         break
       fi
       sleep 1
     done
-    if [[ $STATUS_CODE -ne 403 ]] ; then
+    if [[ $STATUS_CODE -ne 429 ]] ; then
       echo -e "\nQuota was not exhausted"
       exit 4
     fi
@@ -488,13 +488,13 @@ EOF
     for i in {1..20}
     do
       callIstioTargetWithAPIKey $APIKEY
-      if [[ $STATUS_CODE -eq 403 ]] ; then
+      if [[ $STATUS_CODE -eq 429 ]] ; then
         echo -e "\nLocal quota depleted"
         break
       fi
       sleep 1
     done
-    if [[ $STATUS_CODE -ne 403 ]] ; then
+    if [[ $STATUS_CODE -ne 429 ]] ; then
       echo -e "\nQuota was not exhausted"
       exit 4
     fi
@@ -528,7 +528,7 @@ function runAdditionalIstioTests {
     for i in {1..20}
     do
       callIstioTargetWithAPIKey $APIKEY "" httpbin.default.svc.cluster.local /get GET
-      if [[ $STATUS_CODE -eq 403 ]] ; then
+      if [[ $STATUS_CODE -eq 429 ]] ; then
         echo -e "\nQuota for /get depleted"
         break
       fi
