@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/apigee/apigee-remote-service-golib/analytics"
 	"github.com/apigee/apigee-remote-service-golib/auth"
 	"github.com/apigee/apigee-remote-service-golib/context"
 	"github.com/apigee/apigee-remote-service-golib/log"
@@ -64,7 +65,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.Check
 			tracker := prometheusRequestTracker(rootContext)
 			defer tracker.record()
 			err := fmt.Errorf("Envoy must be configured to send Apigee env in ContextExtensions[%s] in multitenant mode.", envContextKey)
-			return a.internalError(tracker, err), nil
+			return a.internalError(req, tracker, err), nil
 		}
 	}
 
@@ -74,7 +75,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.Check
 	target, ok := req.Attributes.Request.Http.Headers[a.handler.targetHeader]
 	if !ok {
 		log.Debugf("missing target header %s", a.handler.targetHeader)
-		return a.unauthorized(tracker), nil
+		return a.unauthorized(req, tracker), nil
 	}
 
 	// check for JWT from Envoy filter
@@ -115,22 +116,22 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.Check
 	authContext, err := a.handler.authMan.Authenticate(rootContext, apiKey, claims, a.handler.apiKeyClaim)
 	switch err {
 	case auth.ErrNoAuth:
-		return a.unauthorized(tracker), nil
+		return a.unauthorized(req, tracker), nil
 	case auth.ErrBadAuth:
-		return a.denied(tracker, authContext, target), nil
+		return a.denied(req, tracker, authContext, target), nil
 	case auth.ErrInternalError:
-		return a.internalError(tracker, err), nil
+		return a.internalError(req, tracker, err), nil
 	}
 
 	if len(authContext.APIProducts) == 0 {
-		return a.denied(tracker, authContext, target), nil
+		return a.denied(req, tracker, authContext, target), nil
 	}
 
 	// authorize against products
 	method := req.Attributes.Request.Http.Method
 	authorizedOps := a.handler.productMan.Authorize(authContext, target, path, method)
 	if len(authorizedOps) == 0 {
-		return a.denied(tracker, authContext, target), nil
+		return a.denied(req, tracker, authContext, target), nil
 	}
 
 	// apply quotas to matched operations
@@ -150,10 +151,10 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.Check
 		}
 	}
 	if anyError != nil {
-		return a.internalError(tracker, anyError), nil
+		return a.internalError(req, tracker, anyError), nil
 	}
 	if exceeded {
-		return a.quotaExceeded(tracker, authContext, target), nil
+		return a.quotaExceeded(req, tracker, authContext, target), nil
 	}
 
 	return a.authOK(tracker, authContext, target), nil
@@ -180,24 +181,24 @@ func (a *AuthorizationServer) authOK(tracker *prometheusRequestMetricTracker, au
 	}
 }
 
-func (a *AuthorizationServer) unauthorized(tracker *prometheusRequestMetricTracker) *envoy_auth.CheckResponse {
-	return a.createDenyResponse(tracker, nil, "", rpc.UNAUTHENTICATED)
+func (a *AuthorizationServer) unauthorized(req *envoy_auth.CheckRequest, tracker *prometheusRequestMetricTracker) *envoy_auth.CheckResponse {
+	return a.createDenyResponse(req, tracker, nil, "", rpc.UNAUTHENTICATED)
 }
 
-func (a *AuthorizationServer) internalError(tracker *prometheusRequestMetricTracker, err error) *envoy_auth.CheckResponse {
+func (a *AuthorizationServer) internalError(req *envoy_auth.CheckRequest, tracker *prometheusRequestMetricTracker, err error) *envoy_auth.CheckResponse {
 	log.Errorf("sending internal error: %v", err)
-	return a.createDenyResponse(tracker, nil, "", rpc.INTERNAL)
+	return a.createDenyResponse(req, tracker, nil, "", rpc.INTERNAL)
 }
 
-func (a *AuthorizationServer) denied(tracker *prometheusRequestMetricTracker, authContext *auth.Context, target string) *envoy_auth.CheckResponse {
-	return a.createDenyResponse(tracker, authContext, target, rpc.PERMISSION_DENIED)
+func (a *AuthorizationServer) denied(req *envoy_auth.CheckRequest, tracker *prometheusRequestMetricTracker, authContext *auth.Context, target string) *envoy_auth.CheckResponse {
+	return a.createDenyResponse(req, tracker, authContext, target, rpc.PERMISSION_DENIED)
 }
 
-func (a *AuthorizationServer) quotaExceeded(tracker *prometheusRequestMetricTracker, authContext *auth.Context, target string) *envoy_auth.CheckResponse {
-	return a.createDenyResponse(tracker, authContext, target, rpc.RESOURCE_EXHAUSTED)
+func (a *AuthorizationServer) quotaExceeded(req *envoy_auth.CheckRequest, tracker *prometheusRequestMetricTracker, authContext *auth.Context, target string) *envoy_auth.CheckResponse {
+	return a.createDenyResponse(req, tracker, authContext, target, rpc.RESOURCE_EXHAUSTED)
 }
 
-func (a *AuthorizationServer) createDenyResponse(tracker *prometheusRequestMetricTracker, authContext *auth.Context, target string, code rpc.Code) *envoy_auth.CheckResponse {
+func (a *AuthorizationServer) createDenyResponse(req *envoy_auth.CheckRequest, tracker *prometheusRequestMetricTracker, authContext *auth.Context, target string, code rpc.Code) *envoy_auth.CheckResponse {
 
 	// use intended code, not OK
 	switch code {
@@ -210,7 +211,7 @@ func (a *AuthorizationServer) createDenyResponse(tracker *prometheusRequestMetri
 	case rpc.PERMISSION_DENIED:
 		tracker.statusCode = envoy_type.StatusCode_Forbidden
 
-	case rpc.RESOURCE_EXHAUSTED: // Envoy doesn't automatically map this code, force it
+	case rpc.RESOURCE_EXHAUSTED:
 		tracker.statusCode = envoy_type.StatusCode_TooManyRequests
 	}
 
@@ -221,10 +222,12 @@ func (a *AuthorizationServer) createDenyResponse(tracker *prometheusRequestMetri
 			Status: &rpcstatus.Status{
 				Code: int32(code),
 			},
-			DynamicMetadata: encodeExtAuthzMetadata(target, authContext, false),
+			// Envoy won't deliver this, so commenting it out for now. See below.
+			// DynamicMetadata: encodeExtAuthzMetadata(target, authContext, false),
 		}
 
-		// Envoy doesn't automatically map this code, force it
+		// Envoy automatically maps the other response status codes,
+		// but not the RESOURCE_EXHAUSTED status, so we force it.
 		if code == rpc.RESOURCE_EXHAUSTED {
 			response.HttpResponse = &envoy_auth.CheckResponse_DeniedResponse{
 				DeniedResponse: &envoy_auth.DeniedHttpResponse{
@@ -232,6 +235,41 @@ func (a *AuthorizationServer) createDenyResponse(tracker *prometheusRequestMetri
 						Code: tracker.statusCode,
 					},
 				},
+			}
+		}
+
+		// Envoy does not send metadata to ALS on a reject, so we create the
+		// analytics record here and the ALS handler can ignore the metadataless record.
+		if target != "" && authContext != nil {
+			start := req.Attributes.Request.Time.AsTime().Unix()
+			duration := time.Now().Unix() - tracker.startTime.Unix()
+			sent := start + duration                                                   // use Envoy's start time to calculate
+			requestPath := strings.SplitN(req.Attributes.Request.Http.Path, "?", 2)[0] // Apigee doesn't want query params in requestPath
+			record := analytics.Record{
+				ClientReceivedStartTimestamp: start,
+				ClientReceivedEndTimestamp:   start,
+				TargetSentStartTimestamp:     0,
+				TargetSentEndTimestamp:       0,
+				TargetReceivedStartTimestamp: 0,
+				TargetReceivedEndTimestamp:   0,
+				ClientSentStartTimestamp:     sent,
+				ClientSentEndTimestamp:       sent,
+				APIProxy:                     target,
+				RequestURI:                   req.Attributes.Request.Http.Path,
+				RequestPath:                  requestPath,
+				RequestVerb:                  req.Attributes.Request.Http.Method,
+				UserAgent:                    req.Attributes.Request.Http.Headers["User-Agent"],
+				ResponseStatusCode:           int(code),
+				GatewaySource:                gatewaySource,
+				ClientIP:                     req.Attributes.Request.Http.Headers["X-Forwarded-For"],
+			}
+
+			// this may be more efficient to batch, but changing the golib impl would require
+			// a rewrite as it assumes the same authContext for all records
+			records := []analytics.Record{record}
+			err := a.handler.analyticsMan.SendRecords(authContext, records)
+			if err != nil {
+				log.Warnf("Unable to send ax: %v", err)
 			}
 		}
 
