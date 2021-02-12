@@ -101,7 +101,6 @@ func TestCheck(t *testing.T) {
 	testAnalyticsMan := &testAnalyticsMan{}
 	server := AuthorizationServer{
 		handler: &Handler{
-			rejectUnauthorized:    true,
 			apiKeyClaim:           headerClientID,
 			targetHeader:          headerAPI,
 			apiKeyHeader:          "x-api-key",
@@ -263,8 +262,8 @@ func TestCheck(t *testing.T) {
 		t.Errorf("got: %d, want: claims length to be 1", len(testAuthMan.claims))
 	}
 
-	// check deny when rejectUnauthorized = false
-	server.handler.rejectUnauthorized = false
+	// check deny when allowUnauthorized = true
+	server.handler.allowUnauthorized = true
 	testProductMan.resolve = false
 	if resp, err = server.Check(context.Background(), req); err != nil {
 		t.Errorf("should not get error. got: %s", err)
@@ -349,7 +348,6 @@ func TestImmediateAnalytics(t *testing.T) {
 		handler: &Handler{
 			orgName:               "org",
 			envName:               "env",
-			rejectUnauthorized:    true,
 			apiKeyClaim:           headerClientID,
 			targetHeader:          headerAPI,
 			apiKeyHeader:          "x-api-key",
