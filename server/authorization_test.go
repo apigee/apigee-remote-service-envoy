@@ -20,7 +20,9 @@ import (
 	"errors"
 	"net/http"
 	"testing"
+	"time"
 
+	"github.com/apigee/apigee-remote-service-golib/analytics"
 	"github.com/apigee/apigee-remote-service-golib/auth"
 	libAuth "github.com/apigee/apigee-remote-service-golib/auth"
 	apigeeContext "github.com/apigee/apigee-remote-service-golib/context"
@@ -29,6 +31,7 @@ import (
 	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	v3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	"github.com/gogo/googleapis/google/rpc"
+	"github.com/golang/protobuf/ptypes"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -65,9 +68,7 @@ func TestCheck(t *testing.T) {
 		},
 	}
 
-	headers := map[string]string{
-		headerClientID: "clientID",
-	}
+	headers := map[string]string{}
 
 	products := product.ProductsNameMap{
 		"product1": &product.APIProduct{
@@ -92,13 +93,12 @@ func TestCheck(t *testing.T) {
 		},
 	}
 
-	testAuthMan := &testAuthMan{
-		apiProducts: []string{"product 1"},
-	}
+	testAuthMan := &testAuthMan{}
 	testProductMan := &testProductMan{
 		resolve: true,
 	}
 	testQuotaMan := &testQuotaMan{}
+	testAnalyticsMan := &testAnalyticsMan{}
 	server := AuthorizationServer{
 		handler: &Handler{
 			rejectUnauthorized:    true,
@@ -110,6 +110,7 @@ func TestCheck(t *testing.T) {
 			quotaMan:              testQuotaMan,
 			jwtProviderKey:        "apigee",
 			appendMetadataHeaders: true,
+			analyticsMan:          testAnalyticsMan,
 		},
 	}
 
@@ -125,7 +126,7 @@ func TestCheck(t *testing.T) {
 	headers[headerAPI] = "api"
 
 	// ErrNoAuth
-	testAuthMan.sendError = libAuth.ErrNoAuth
+	testAuthMan.sendAuth(nil, libAuth.ErrNoAuth)
 	if resp, err = server.Check(context.Background(), req); err != nil {
 		t.Errorf("should not get error. got: %s", err)
 	}
@@ -134,7 +135,7 @@ func TestCheck(t *testing.T) {
 	}
 
 	// ErrBadAuth
-	testAuthMan.sendError = libAuth.ErrBadAuth
+	testAuthMan.sendAuth(nil, libAuth.ErrBadAuth)
 	if resp, err = server.Check(context.Background(), req); err != nil {
 		t.Errorf("should not get error. got: %s", err)
 	}
@@ -143,7 +144,7 @@ func TestCheck(t *testing.T) {
 	}
 
 	// ErrInternalError
-	testAuthMan.sendError = libAuth.ErrInternalError
+	testAuthMan.sendAuth(nil, libAuth.ErrInternalError)
 	if resp, err = server.Check(context.Background(), req); err != nil {
 		t.Errorf("should not get error. got: %s", err)
 	}
@@ -152,7 +153,7 @@ func TestCheck(t *testing.T) {
 	}
 
 	// reset auth error
-	testAuthMan.sendError = nil
+	testAuthMan.sendAuth(nil, nil)
 
 	// no products
 	if resp, err = server.Check(context.Background(), req); err != nil {
@@ -163,6 +164,9 @@ func TestCheck(t *testing.T) {
 	}
 
 	// no matched products
+	testAuthMan.sendAuth(&auth.Context{
+		APIProducts: []string{"no match"},
+	}, nil)
 	testProductMan.products = products
 	testProductMan.resolve = false
 	if resp, err = server.Check(context.Background(), req); err != nil {
@@ -174,15 +178,20 @@ func TestCheck(t *testing.T) {
 	testProductMan.resolve = true
 
 	// no products authenticated
-	oldProducts := testAuthMan.apiProducts
-	testAuthMan.apiProducts = []string{}
+	testAuthMan.sendAuth(&auth.Context{
+		APIProducts: []string{},
+	}, nil)
 	if resp, err = server.Check(context.Background(), req); err != nil {
 		t.Errorf("should not get error. got: %s", err)
 	}
 	if resp.Status.Code != int32(rpc.PERMISSION_DENIED) {
 		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.PERMISSION_DENIED))
 	}
-	testAuthMan.apiProducts = oldProducts
+
+	// valid auth
+	testAuthMan.sendAuth(&auth.Context{
+		APIProducts: []string{"product1"},
+	}, nil)
 
 	// quota exceeded
 	products["product1"].QuotaLimitInt = 2
@@ -284,13 +293,139 @@ func TestCheck(t *testing.T) {
 	}
 }
 
+func TestImmediateAnalytics(t *testing.T) {
+
+	jwtClaims := &structpb.Struct{}
+
+	headers := map[string]string{
+		"User-Agent":      "User-Agent",
+		"X-Forwarded-For": "X-Forwarded-For",
+		headerAPI:         "api",
+	}
+
+	requestPath := "path"
+	uri := requestPath + "?x-api-key=foo"
+	requestTime := time.Now()
+	nowProto, err := ptypes.TimestampProto(requestTime)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req := &v3.CheckRequest{
+		Attributes: &v3.AttributeContext{
+			Request: &v3.AttributeContext_Request{
+				Http: &v3.AttributeContext_HttpRequest{
+					Path:    uri,
+					Headers: headers,
+					Method:  http.MethodGet,
+				},
+				Time: nowProto,
+			},
+			MetadataContext: &core.Metadata{
+				FilterMetadata: map[string]*structpb.Struct{
+					jwtFilterMetadataKey: jwtClaims,
+				},
+			},
+		},
+	}
+
+	testAuthMan := &testAuthMan{}
+	ac := &auth.Context{
+		ClientID:       "client id",
+		AccessToken:    "token",
+		Application:    "app",
+		APIProducts:    []string{"product1"},
+		Expires:        time.Now(),
+		DeveloperEmail: "email",
+		Scopes:         []string{"scope"},
+		APIKey:         "apikey",
+	}
+	testAuthMan.sendAuth(ac, auth.ErrBadAuth)
+
+	testProductMan := &testProductMan{resolve: true}
+	testQuotaMan := &testQuotaMan{}
+	testAnalyticsMan := &testAnalyticsMan{}
+	server := AuthorizationServer{
+		handler: &Handler{
+			orgName:               "org",
+			envName:               "env",
+			rejectUnauthorized:    true,
+			apiKeyClaim:           headerClientID,
+			targetHeader:          headerAPI,
+			apiKeyHeader:          "x-api-key",
+			authMan:               testAuthMan,
+			productMan:            testProductMan,
+			quotaMan:              testQuotaMan,
+			analyticsMan:          testAnalyticsMan,
+			jwtProviderKey:        "apigee",
+			appendMetadataHeaders: true,
+		},
+	}
+
+	var resp *v3.CheckResponse
+	if resp, err = server.Check(context.Background(), req); err != nil {
+		t.Errorf("should not get error. got: %s", err)
+	}
+	if resp.Status.Code != int32(rpc.PERMISSION_DENIED) {
+		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.PERMISSION_DENIED))
+	}
+
+	if len(testAnalyticsMan.records) != 1 {
+		t.Fatalf("got: %d, want: %d", len(testAnalyticsMan.records), 1)
+	}
+
+	got := testAnalyticsMan.records[0]
+	want := analytics.Record{
+		ClientReceivedStartTimestamp: requestTime.Unix(),
+		ClientReceivedEndTimestamp:   requestTime.Unix(),
+		TargetSentStartTimestamp:     0,
+		TargetSentEndTimestamp:       0,
+		TargetReceivedStartTimestamp: 0,
+		TargetReceivedEndTimestamp:   0,
+		RecordType:                   "APIAnalytics",
+		APIProxy:                     headers[headerAPI],
+		RequestURI:                   uri,
+		RequestPath:                  requestPath,
+		RequestVerb:                  http.MethodGet,
+		ClientIP:                     headers["X-Forwarded-For"],
+		UserAgent:                    headers["User-Agent"],
+		APIProxyRevision:             0,
+		ResponseStatusCode:           int(rpc.PERMISSION_DENIED),
+		DeveloperEmail:               ac.DeveloperEmail,
+		DeveloperApp:                 ac.Application,
+		AccessToken:                  ac.AccessToken,
+		ClientID:                     ac.ClientID,
+		APIProduct:                   ac.APIProducts[0],
+		Organization:                 server.handler.orgName,
+		Environment:                  server.handler.envName,
+		GatewaySource:                gatewaySource,
+		// the following fields vary, ignore them
+		ClientSentStartTimestamp: got.ClientSentStartTimestamp,
+		ClientSentEndTimestamp:   got.ClientSentEndTimestamp,
+		GatewayFlowID:            got.GatewayFlowID,
+	}
+
+	if got.ClientSentStartTimestamp < requestTime.Unix() {
+		t.Errorf("got: %d, want >=: %d", got.ClientSentStartTimestamp, requestTime.Unix())
+	}
+	if got.ClientSentEndTimestamp < got.ClientSentStartTimestamp {
+		t.Errorf("got: %d, want >=: %d", got.ClientSentEndTimestamp, got.ClientSentStartTimestamp)
+	}
+	if got.GatewayFlowID == "" {
+		t.Errorf("GatewayFlowID should not be empty")
+	}
+
+	if got != want {
+		t.Errorf("got: %#v, want: %#v", got, want)
+	}
+}
+
 type testAuthMan struct {
-	sendError      error
-	apiProducts    []string
-	ctx            apigeeContext.Context
-	apiKey         string
-	claims         map[string]interface{}
-	apiKeyClaimKey string
+	ctx             apigeeContext.Context
+	apiKey          string
+	claims          map[string]interface{}
+	apiKeyClaimKey  string
+	makeContextFunc func(ctx apigeeContext.Context) (*auth.Context, error)
 }
 
 func (a *testAuthMan) Close() {}
@@ -301,15 +436,17 @@ func (a *testAuthMan) Authenticate(ctx apigeeContext.Context, apiKey string, cla
 	a.claims = claims
 	a.apiKeyClaimKey = apiKeyClaimKey
 
-	if a.sendError != nil {
-		return nil, a.sendError
-	}
+	return a.makeContextFunc(ctx)
+}
 
-	authContext := &auth.Context{
-		Context:     ctx,
-		APIProducts: a.apiProducts,
+func (a *testAuthMan) sendAuth(ac *auth.Context, err error) {
+	if ac == nil {
+		ac = &auth.Context{}
 	}
-	return authContext, nil
+	a.makeContextFunc = func(ctx apigeeContext.Context) (*auth.Context, error) {
+		ac.Context = ctx
+		return ac, err
+	}
 }
 
 type testProductMan struct {

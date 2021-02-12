@@ -245,7 +245,11 @@ func (a *testAnalyticsMan) Start() {
 func (a *testAnalyticsMan) Close() {}
 func (a *testAnalyticsMan) SendRecords(authContext *auth.Context, records []analytics.Record) error {
 
-	a.records = append(a.records, records...)
+	for _, rec := range records {
+		rec = rec.EnsureFields(authContext)
+		a.records = append(a.records, rec)
+	}
+
 	return nil
 }
 
