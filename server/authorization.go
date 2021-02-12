@@ -215,7 +215,7 @@ func (a *AuthorizationServer) createDenyResponse(req *envoy_auth.CheckRequest, t
 		tracker.statusCode = envoy_type.StatusCode_TooManyRequests
 	}
 
-	if a.handler.rejectUnauthorized || authContext == nil { // send reject to client
+	if authContext == nil || !a.handler.allowUnauthorized { // send reject to client
 		log.Debugf("sending denied: %s", code.String())
 
 		response := &envoy_auth.CheckResponse{

@@ -77,7 +77,6 @@ func DefaultConfig() *Config {
 			APIKeyCacheDuration: 30 * time.Minute,
 			APIKeyHeader:        "x-api-key",
 			TargetHeader:        ":authority",
-			RejectUnauthorized:  false,
 		},
 	}
 }
@@ -160,7 +159,7 @@ type AuthConfig struct {
 	JWKSPollInterval      time.Duration `yaml:"jwks_poll_interval,omitempty" json:"jwks_poll_interval,omitempty"`
 	APIKeyHeader          string        `yaml:"api_key_header,omitempty" json:"api_key_header,omitempty"`
 	TargetHeader          string        `yaml:"target_header,omitempty" json:"target_header,omitempty"`
-	RejectUnauthorized    bool          `yaml:"reject_unauthorized,omitempty" json:"reject_unauthorized,omitempty"`
+	AllowUnauthorized     bool          `yaml:"allow_unauthorized,omitempty" json:"allow_unauthorized,omitempty"`
 	JWTProviderKey        string        `yaml:"jwt_provider_key,omitempty" json:"jwt_provider_key,omitempty"`
 	AppendMetadataHeaders bool          `yaml:"append_metadata_headers,omitempty" json:"append_metadata_headers,omitempty"`
 }

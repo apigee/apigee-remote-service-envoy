@@ -42,10 +42,9 @@ func TestNewHandler(t *testing.T) {
 		PrivateKey:             privateKey,
 	}
 	config.Auth = AuthConfig{
-		APIKeyClaim:        "claim",
-		APIKeyHeader:       "header",
-		TargetHeader:       "target",
-		RejectUnauthorized: false,
+		APIKeyClaim:  "claim",
+		APIKeyHeader: "header",
+		TargetHeader: "target",
 	}
 
 	h, err := NewHandler(config)
@@ -88,8 +87,8 @@ func TestNewHandler(t *testing.T) {
 	if h.targetHeader != config.Auth.TargetHeader {
 		t.Errorf("got: %s, want: %s", h.targetHeader, config.Auth.TargetHeader)
 	}
-	if h.rejectUnauthorized != config.Auth.RejectUnauthorized {
-		t.Errorf("got: %t, want: %t", h.rejectUnauthorized, config.Auth.RejectUnauthorized)
+	if h.allowUnauthorized != config.Auth.AllowUnauthorized {
+		t.Errorf("got: %t, want: %t", h.allowUnauthorized, config.Auth.AllowUnauthorized)
 	}
 
 	config.Tenant.InternalAPI = "not an url"

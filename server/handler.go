@@ -44,7 +44,7 @@ type Handler struct {
 	apiKeyClaim           string
 	apiKeyHeader          string
 	targetHeader          string
-	rejectUnauthorized    bool
+	allowUnauthorized     bool
 	appendMetadataHeaders bool
 	jwtProviderKey        string
 	isMultitenant         bool
@@ -208,7 +208,7 @@ func NewHandler(config *Config) (*Handler, error) {
 		apiKeyClaim:           config.Auth.APIKeyClaim,
 		apiKeyHeader:          config.Auth.APIKeyHeader,
 		targetHeader:          config.Auth.TargetHeader,
-		rejectUnauthorized:    config.Auth.RejectUnauthorized,
+		allowUnauthorized:     config.Auth.AllowUnauthorized,
 		jwtProviderKey:        config.Auth.JWTProviderKey,
 		appendMetadataHeaders: config.Auth.AppendMetadataHeaders,
 		isMultitenant:         config.Tenant.IsMultitenant(),
