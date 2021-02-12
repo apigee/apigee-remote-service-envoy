@@ -241,7 +241,7 @@ func (a *AuthorizationServer) createDenyResponse(req *envoy_auth.CheckRequest, t
 		// Envoy does not send metadata to ALS on a reject, so we create the
 		// analytics record here and the ALS handler can ignore the metadataless record.
 		if target != "" && authContext != nil {
-			start := req.Attributes.Request.Time.AsTime().Unix()
+			start := req.Attributes.Request.Time.AsTime().UnixNano() / 1000000
 			duration := time.Now().Unix() - tracker.startTime.Unix()
 			sent := start + duration                                                   // use Envoy's start time to calculate
 			requestPath := strings.SplitN(req.Attributes.Request.Http.Path, "?", 2)[0] // Apigee doesn't want query params in requestPath
