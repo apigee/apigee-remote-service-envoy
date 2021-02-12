@@ -374,8 +374,8 @@ func TestImmediateAnalytics(t *testing.T) {
 
 	got := testAnalyticsMan.records[0]
 	want := analytics.Record{
-		ClientReceivedStartTimestamp: requestTime.Unix(),
-		ClientReceivedEndTimestamp:   requestTime.Unix(),
+		ClientReceivedStartTimestamp: requestTime.UnixNano() / 1000000,
+		ClientReceivedEndTimestamp:   requestTime.UnixNano() / 1000000,
 		TargetSentStartTimestamp:     0,
 		TargetSentEndTimestamp:       0,
 		TargetReceivedStartTimestamp: 0,
