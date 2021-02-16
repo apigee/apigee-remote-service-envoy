@@ -66,10 +66,10 @@ auth:
   api_key_cache_duration: 30m
   api_key_header: x-api-key
   target_header: :authority
-  reject_unauthorized: true
+  allow_unauthorized: false
   jwks_poll_interval: 0s
   jwt_provider_key: apigee
-  emit_metadata_headers: true`
+  append_metadata_headers: true`
 
 	configMapConfigKey = "config.yaml"
 )

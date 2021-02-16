@@ -88,7 +88,7 @@ static_resources:
               metadata_context_namespaces:
               - envoy.filters.http.jwt_authn
   
-          # evaluate RBAC (necessary for Apigee config: reject_unauthorized == false)
+          # evaluate RBAC (necessary for Apigee config: allow_unauthorized == true)
           - name: envoy.filters.http.rbac
             typed_config:
               "@type": type.googleapis.com/envoy.config.filter.http.rbac.v2.RBAC
