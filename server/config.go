@@ -22,7 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"os"
 	"path"
 	"strings"
 	"time"
@@ -166,7 +166,7 @@ type AuthConfig struct {
 // Load config
 func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string, requireAnalyticsCredentials bool) error {
 	log.Debugf("reading config from: %s", configFile)
-	yamlFile, err := ioutil.ReadFile(configFile)
+	yamlFile, err := os.ReadFile(configFile)
 	if err != nil {
 		return err
 	}
@@ -219,9 +219,9 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string, 
 	if c.IsGCPManaged() {
 
 		if policySecretPath != "" && key == nil {
-			if key, err = ioutil.ReadFile(path.Join(policySecretPath, SecretPrivateKey)); err == nil {
-				if kidProps, err = ioutil.ReadFile(path.Join(policySecretPath, SecretPropsKey)); err == nil {
-					jwksBytes, err = ioutil.ReadFile(path.Join(policySecretPath, SecretJWKSKey))
+			if key, err = os.ReadFile(path.Join(policySecretPath, SecretPrivateKey)); err == nil {
+				if kidProps, err = os.ReadFile(path.Join(policySecretPath, SecretPropsKey)); err == nil {
+					jwksBytes, err = os.ReadFile(path.Join(policySecretPath, SecretJWKSKey))
 				}
 			}
 		}
@@ -247,7 +247,7 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string, 
 		if analyticsSecretPath != "" {
 			svc := path.Join(analyticsSecretPath, ServiceAccount)
 			log.Debugf("using analytics service account credentials from: %s", svc)
-			sa, err := ioutil.ReadFile(svc)
+			sa, err := os.ReadFile(svc)
 			if err != nil {
 				if analyticsSecretPath == DefaultAnalyticsSecretPath {
 					// allows fall back to default credentials if the path is the default one
