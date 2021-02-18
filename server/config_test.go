@@ -19,7 +19,6 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
-	"io/ioutil"
 	"os"
 	"path"
 	"testing"
@@ -129,7 +128,7 @@ func TestPlatformDetect(t *testing.T) {
 }
 
 func TestHybridSingleFile(t *testing.T) {
-	tf, err := ioutil.TempFile("", "")
+	tf, err := os.CreateTemp("", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +169,7 @@ func TestHybridSingleFile(t *testing.T) {
 }
 
 func TestMultifileConfig(t *testing.T) {
-	tf, err := ioutil.TempFile("", "")
+	tf, err := os.CreateTemp("", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +186,7 @@ func TestMultifileConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	secretDir, err := ioutil.TempDir("", "")
+	secretDir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -198,7 +197,7 @@ func TestMultifileConfig(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := ioutil.WriteFile(path.Join(secretDir, k), data, os.ModePerm); err != nil {
+		if err := os.WriteFile(path.Join(secretDir, k), data, os.ModePerm); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -212,7 +211,7 @@ func TestMultifileConfig(t *testing.T) {
 }
 
 func TestIncompletePolicySecret(t *testing.T) {
-	tf, err := ioutil.TempFile("", "")
+	tf, err := os.CreateTemp("", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,7 +251,7 @@ func TestLoadOrders(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tf, err := ioutil.TempFile("", "")
+	tf, err := os.CreateTemp("", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -278,7 +277,7 @@ func TestLoadOrders(t *testing.T) {
 
 	equal(t, c.Tenant.PrivateKeyID, "my kid")
 
-	tf, err = ioutil.TempFile("", "")
+	tf, err = os.CreateTemp("", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -316,7 +315,7 @@ func TestIgnoreIrrelevantConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tf, err := ioutil.TempFile("", "")
+	tf, err := os.CreateTemp("", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -351,7 +350,7 @@ func TestIgnoreIrrelevantConfig(t *testing.T) {
 }
 
 func TestLoadLegacyConfig(t *testing.T) {
-	tf, err := ioutil.TempFile("", "")
+	tf, err := os.CreateTemp("", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -392,7 +391,7 @@ tenant:
 
 	configCRD := makeConfigCRD(config)
 
-	tf, err := ioutil.TempFile("", "")
+	tf, err := os.CreateTemp("", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -411,12 +410,12 @@ tenant:
 		t.Fatal(err)
 	}
 
-	credDir, err := ioutil.TempDir("", "analytics-secret")
+	credDir, err := os.MkdirTemp("", "analytics-secret")
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
 	credFile := path.Join(credDir, ServiceAccount)
-	if err := ioutil.WriteFile(credFile, fakeServiceAccount(), 0644); err != nil {
+	if err := os.WriteFile(credFile, fakeServiceAccount(), 0644); err != nil {
 		t.Fatalf("%v", err)
 	}
 	defer os.RemoveAll(credDir)
@@ -468,7 +467,7 @@ func TestAnalyticsRollback(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tf, err := ioutil.TempFile("", "")
+	tf, err := os.CreateTemp("", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -510,7 +509,7 @@ func TestAnalyticsRollback(t *testing.T) {
 }
 
 func TestInvalidConfig(t *testing.T) {
-	tf, err := ioutil.TempFile("", "")
+	tf, err := os.CreateTemp("", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -529,7 +528,7 @@ func TestInvalidConfig(t *testing.T) {
 		t.Error("should have gotten error")
 	}
 
-	tf, err = ioutil.TempFile("", "")
+	tf, err = os.CreateTemp("", "")
 	if err != nil {
 		t.Fatal(err)
 	}

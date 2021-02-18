@@ -1,6 +1,6 @@
 module github.com/apigee/apigee-remote-service-envoy/loadtest/apigee
 
-go 1.15
+go 1.16
 
 require (
 	github.com/apigee/apigee-remote-service-envoy v1.2.1-0.20201020222450-69c583ebd596

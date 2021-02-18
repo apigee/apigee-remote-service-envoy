@@ -23,7 +23,7 @@
 # --build-arg BUILD_CONTAINER=goboring/golang:1.15.7b5
 # --build-arg RUN_CONTAINER=gcr.io/distroless/base
 
-ARG BUILD_CONTAINER=golang:1.15
+ARG BUILD_CONTAINER=golang:1.16
 ARG RUN_CONTAINER=gcr.io/distroless/static
 
 #--- Build binary in Go container ---#

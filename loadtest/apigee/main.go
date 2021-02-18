@@ -21,7 +21,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -148,7 +147,7 @@ func (ts *TestServer) Handler() http.Handler {
 	m := http.NewServeMux()
 
 	m.HandleFunc("/products", func(w http.ResponseWriter, r *http.Request) {
-		_, _ = io.Copy(ioutil.Discard, r.Body)
+		_, _ = io.Copy(io.Discard, r.Body)
 		time.Sleep(RESPONSE_DELAY)
 		resp := productsResponse
 		w.Header().Set("Content-Type", "application/json")
@@ -217,7 +216,7 @@ func (ts *TestServer) Handler() http.Handler {
 	})
 
 	m.HandleFunc("/certs", func(w http.ResponseWriter, r *http.Request) {
-		_, _ = io.Copy(ioutil.Discard, r.Body)
+		_, _ = io.Copy(io.Discard, r.Body)
 		time.Sleep(RESPONSE_DELAY)
 		resp := jwks
 		w.Header().Set("Content-Type", "application/json")
@@ -228,7 +227,7 @@ func (ts *TestServer) Handler() http.Handler {
 
 	// this is SaaS analytics
 	m.HandleFunc("/analytics/", func(w http.ResponseWriter, r *http.Request) {
-		_, _ = io.Copy(ioutil.Discard, r.Body)
+		_, _ = io.Copy(io.Discard, r.Body)
 		time.Sleep(RESPONSE_DELAY)
 		url := "%s/signed-upload-url?relative_file_path=%s&tenant=%s"
 		resp := map[string]interface{}{
@@ -242,7 +241,7 @@ func (ts *TestServer) Handler() http.Handler {
 
 	// this is UAP analytics
 	m.HandleFunc("/v1/organizations/", func(w http.ResponseWriter, r *http.Request) {
-		_, _ = io.Copy(ioutil.Discard, r.Body)
+		_, _ = io.Copy(io.Discard, r.Body)
 		time.Sleep(RESPONSE_DELAY)
 		url := "%s/signed-upload-url?relative_file_path=%s&tenant=%s"
 		resp := map[string]interface{}{
@@ -256,7 +255,7 @@ func (ts *TestServer) Handler() http.Handler {
 
 	// upload
 	m.HandleFunc("/signed-upload-url", func(w http.ResponseWriter, r *http.Request) {
-		_, _ = io.Copy(ioutil.Discard, r.Body)
+		_, _ = io.Copy(io.Discard, r.Body)
 		time.Sleep(RESPONSE_DELAY)
 		w.WriteHeader(http.StatusOK)
 		if _, err := w.Write([]byte("ok")); err != nil {
