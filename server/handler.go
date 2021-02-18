@@ -186,7 +186,6 @@ func NewHandler(config *Config) (*Handler, error) {
 		Client:             analyticsClient,
 		SendChannelSize:    config.Analytics.SendChannelSize,
 		CollectionInterval: config.Analytics.CollectionInterval,
-		FluentdEndpoint:    config.Analytics.FluentdEndpoint,
 		TLSCAFile:          config.Analytics.TLS.CAFile,
 		TLSCertFile:        config.Analytics.TLS.CertFile,
 		TLSKeyFile:         config.Analytics.TLS.KeyFile,

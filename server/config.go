@@ -146,7 +146,6 @@ type AnalyticsConfig struct {
 	FileLimit          int                 `yaml:"file_limit,omitempty" json:"file_limit,omitempty"`
 	SendChannelSize    int                 `yaml:"send_channel_size,omitempty" json:"send_channel_size,omitempty"`
 	CollectionInterval time.Duration       `yaml:"collection_interval,omitempty" json:"collection_interval,omitempty"`
-	FluentdEndpoint    string              `yaml:"fluentd_endpoint,omitempty" json:"fluentd_endpoint,omitempty"`
 	TLS                TLSClientConfig     `yaml:"tls,omitempty" json:"tls,omitempty"`
 	CredentialsJSON    []byte              `yaml:"-" json:"-"`
 	Credentials        *google.Credentials `yaml:"-" json:"-"`
@@ -251,7 +250,7 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string, 
 			sa, err := ioutil.ReadFile(svc)
 			if err != nil {
 				if analyticsSecretPath == DefaultAnalyticsSecretPath {
-					// allows fall back to default credentials or fluentd if the path is the default one
+					// allows fall back to default credentials if the path is the default one
 					log.Warnf("analytics service account credentials not found on default path, falling back to credentials from config file")
 				} else {
 					// returns error if the invalid path is explicitly specified
@@ -293,10 +292,10 @@ func (c *Config) Validate(requireAnalyticsCredentials bool) error {
 		errs = multierror.Append(errs, fmt.Errorf("tenant.remote_service_api is required"))
 	}
 	if len(c.Analytics.CredentialsJSON) == 0 {
-		if c.Tenant.InternalAPI == "" && c.Analytics.FluentdEndpoint == "" && requireAnalyticsCredentials {
+		if c.Tenant.InternalAPI == "" && requireAnalyticsCredentials {
 			cred, err := google.FindDefaultCredentials(context.Background(), ApigeeAPIScope)
 			if err != nil {
-				errs = multierror.Append(errs, fmt.Errorf("tenant.internal_api or tenant.analytics.fluentd_endpoint is required if analytics credentials not given"))
+				errs = multierror.Append(errs, fmt.Errorf("tenant.internal_api is required if analytics credentials not given"))
 			} else { // to avoid the non-name error
 				c.Analytics.Credentials = cred
 			}
