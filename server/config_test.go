@@ -55,7 +55,6 @@ analytics:
   file_limit: 1024
   send_channel_size: 10
   collection_interval: 10s
-  fluentd_endpoint: apigee-udca-myorg-test.apigee.svc.cluster.local:20001
   tls:
     ca_file: /opt/apigee/tls/ca.crt
     cert_file: /opt/apigee/tls/tls.crt
@@ -140,9 +139,7 @@ func TestHybridSingleFile(t *testing.T) {
     tenant:
       remote_service_api: https://org-test.apigee.net/remote-service
       org_name: org
-      env_name: env
-    analytics:
-      fluentd_endpoint: apigee-udca-myorg-test.apigee.svc.cluster.local:20001`
+      env_name: env`
 	configCRD := makeConfigCRD(config)
 	policySecretCRD, err := makePolicySecretCRD()
 	if err != nil {
@@ -207,7 +204,7 @@ func TestMultifileConfig(t *testing.T) {
 	}
 
 	c := DefaultConfig()
-	if err := c.Load(tf.Name(), secretDir, "", true); err != nil {
+	if err := c.Load(tf.Name(), secretDir, "", false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -242,7 +239,7 @@ func TestIncompletePolicySecret(t *testing.T) {
 	}
 
 	c := DefaultConfig()
-	if err := c.Load(tf.Name(), "", "", true); err != nil {
+	if err := c.Load(tf.Name(), "", "", false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -452,7 +449,7 @@ tenant:
 	}
 
 	wantErrs := []string{
-		"tenant.internal_api or tenant.analytics.fluentd_endpoint is required if analytics credentials not given",
+		"tenant.internal_api is required if analytics credentials not given",
 	}
 	merr := err.(*multierror.Error)
 	if merr.Len() != len(wantErrs) {
@@ -590,7 +587,7 @@ func TestValidate(t *testing.T) {
 
 	wantErrs = []string{
 		"tenant.remote_service_api is required",
-		"tenant.internal_api or tenant.analytics.fluentd_endpoint is required if analytics credentials not given",
+		"tenant.internal_api is required if analytics credentials not given",
 		"tenant.org_name is required",
 		"tenant.env_name is required",
 	}
@@ -725,9 +722,7 @@ func makeCRDs() (configCRD *ConfigMapCRD, policySecretCRD, analyticsSecretCRD *S
 tenant:
   remote_service_api: https://org-test.apigee.net/remote-service
   org_name: org
-  env_name: env
-analytics:
-  fluentd_endpoint: apigee-udca-myorg-test.apigee.svc.cluster.local:20001`
+  env_name: env`
 	configCRD = makeConfigCRD(config)
 	policySecretCRD, err = makePolicySecretCRD()
 	if err != nil {
