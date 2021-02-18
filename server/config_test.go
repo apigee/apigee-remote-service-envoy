@@ -204,7 +204,7 @@ func TestMultifileConfig(t *testing.T) {
 	}
 
 	c := DefaultConfig()
-	if err := c.Load(tf.Name(), secretDir, "", true); err != nil {
+	if err := c.Load(tf.Name(), secretDir, "", false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -239,7 +239,7 @@ func TestIncompletePolicySecret(t *testing.T) {
 	}
 
 	c := DefaultConfig()
-	if err := c.Load(tf.Name(), "", "", true); err != nil {
+	if err := c.Load(tf.Name(), "", "", false); err != nil {
 		t.Fatal(err)
 	}
 
