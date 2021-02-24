@@ -19,6 +19,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"reflect"
 	"testing"
 	"time"
 
@@ -413,7 +414,7 @@ func TestImmediateAnalytics(t *testing.T) {
 		t.Errorf("GatewayFlowID should not be empty")
 	}
 
-	if got != want {
+	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got: %#v, want: %#v", got, want)
 	}
 }
