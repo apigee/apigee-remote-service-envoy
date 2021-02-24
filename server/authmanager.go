@@ -124,26 +124,17 @@ func (a *JWTAuthManager) getToken() *jwt.Token {
 	return a.authToken
 }
 
-func LoadPrivateKey(privateKeyBytes []byte, rsaPrivateKeyPassword string) (*rsa.PrivateKey, error) {
+func LoadPrivateKey(privateKeyBytes []byte) (*rsa.PrivateKey, error) {
 
 	var err error
 	privPem, _ := pem.Decode(privateKeyBytes)
-	var privPemBytes []byte
 	if PEMKeyType != privPem.Type {
 		return nil, fmt.Errorf("%s required, found: %s", PEMKeyType, privPem.Type)
 	}
 
-	if rsaPrivateKeyPassword != "" {
-		if privPemBytes, err = x509.DecryptPEMBlock(privPem, []byte(rsaPrivateKeyPassword)); err != nil {
-			return nil, err
-		}
-	} else {
-		privPemBytes = privPem.Bytes
-	}
-
 	var parsedKey interface{}
-	if parsedKey, err = x509.ParsePKCS1PrivateKey(privPemBytes); err != nil {
-		if parsedKey, err = x509.ParsePKCS8PrivateKey(privPemBytes); err != nil {
+	if parsedKey, err = x509.ParsePKCS1PrivateKey(privPem.Bytes); err != nil {
+		if parsedKey, err = x509.ParsePKCS8PrivateKey(privPem.Bytes); err != nil {
 			return nil, err
 		}
 	}
