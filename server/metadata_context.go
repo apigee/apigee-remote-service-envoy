@@ -75,6 +75,30 @@ func stringValueFrom(v string) *structpb.Value {
 	}
 }
 
+func numberValueFrom(v float64) *structpb.Value {
+	return &structpb.Value{
+		Kind: &structpb.Value_NumberValue{
+			NumberValue: v,
+		},
+	}
+}
+
+func boolValueFrom(v bool) *structpb.Value {
+	return &structpb.Value{
+		Kind: &structpb.Value_BoolValue{
+			BoolValue: v,
+		},
+	}
+}
+
+func structValueFrom(v struct{}) *structpb.Value {
+	return &structpb.Value{
+		Kind: &structpb.Value_StructValue{
+			StructValue: &structpb.Struct{},
+		},
+	}
+}
+
 // decodeExtAuthzMetadata decodes the Envoy ext_authz's filter's metadata
 // fields into target (api) and auth context
 func (h *Handler) decodeExtAuthzMetadata(fields map[string]*structpb.Value) (string, *auth.Context) {

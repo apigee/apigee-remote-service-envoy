@@ -161,14 +161,14 @@ func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLo
 		cp := v.CommonProperties
 		requestPath := strings.SplitN(req.Path, "?", 2)[0] // Apigee doesn't want query params in requestPath
 		record := analytics.Record{
-			ClientReceivedStartTimestamp: pbTimestampToUnix(cp.StartTime),
-			ClientReceivedEndTimestamp:   pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToLastRxByte),
-			TargetSentStartTimestamp:     pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToFirstUpstreamTxByte),
-			TargetSentEndTimestamp:       pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToLastUpstreamTxByte),
-			TargetReceivedStartTimestamp: pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToFirstUpstreamRxByte),
-			TargetReceivedEndTimestamp:   pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToLastUpstreamRxByte),
-			ClientSentStartTimestamp:     pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToFirstDownstreamTxByte),
-			ClientSentEndTimestamp:       pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToLastDownstreamTxByte),
+			ClientReceivedStartTimestamp: pbTimestampToApigee(cp.StartTime),
+			ClientReceivedEndTimestamp:   pbTimestampAddDurationApigee(cp.StartTime, cp.TimeToLastRxByte),
+			TargetSentStartTimestamp:     pbTimestampAddDurationApigee(cp.StartTime, cp.TimeToFirstUpstreamTxByte),
+			TargetSentEndTimestamp:       pbTimestampAddDurationApigee(cp.StartTime, cp.TimeToLastUpstreamTxByte),
+			TargetReceivedStartTimestamp: pbTimestampAddDurationApigee(cp.StartTime, cp.TimeToFirstUpstreamRxByte),
+			TargetReceivedEndTimestamp:   pbTimestampAddDurationApigee(cp.StartTime, cp.TimeToLastUpstreamRxByte),
+			ClientSentStartTimestamp:     pbTimestampAddDurationApigee(cp.StartTime, cp.TimeToFirstDownstreamTxByte),
+			ClientSentEndTimestamp:       pbTimestampAddDurationApigee(cp.StartTime, cp.TimeToLastDownstreamTxByte),
 			APIProxy:                     api,
 			RequestURI:                   req.Path,
 			RequestPath:                  requestPath,
@@ -194,7 +194,7 @@ func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLo
 }
 
 // returns ms since epoch
-func pbTimestampToUnix(ts *timestamp.Timestamp) int64 {
+func pbTimestampToApigee(ts *timestamp.Timestamp) int64 {
 	t, err := ptypes.Timestamp(ts)
 	if err != nil {
 		log.Debugf("invalid timestamp: %s", err)
@@ -204,7 +204,7 @@ func pbTimestampToUnix(ts *timestamp.Timestamp) int64 {
 }
 
 // returns ms since epoch
-func pbTimestampAddDurationUnix(ts *timestamp.Timestamp, d *duration.Duration) int64 {
+func pbTimestampAddDurationApigee(ts *timestamp.Timestamp, d *duration.Duration) int64 {
 	t, err := ptypes.Timestamp(ts)
 	if err != nil {
 		log.Debugf("invalid timestamp: %s", err)
