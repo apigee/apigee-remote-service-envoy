@@ -32,7 +32,10 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-const gatewaySource = "envoy"
+const (
+	gatewaySource        = "envoy"
+	datacaptureNamespace = "envoy.filters.http.apigee.datacapture"
+)
 
 // AccessLogServer server
 type AccessLogServer struct {
@@ -89,24 +92,26 @@ func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLo
 	for _, v := range msg.HttpLogs.LogEntry {
 		req := v.Request
 
-		getExtAuthzMetadata := func() *structpb.Struct {
+		getMetadata := func(namespace string) *structpb.Struct {
 			props := v.GetCommonProperties()
 			if props == nil {
 				return nil
 			}
+			log.Debugf("props: %#v", props)
 
 			metadata := props.GetMetadata()
 			if metadata == nil {
 				return nil
 			}
+			log.Debugf("metadata: %#v", metadata)
 
-			return metadata.GetFilterMetadata()[extAuthzFilterNamespace]
+			return metadata.GetFilterMetadata()[namespace]
 		}
 
 		var api string
 		var authContext *auth.Context
 
-		extAuthzMetadata := getExtAuthzMetadata()
+		extAuthzMetadata := getMetadata(extAuthzFilterNamespace)
 		if extAuthzMetadata != nil {
 			api, authContext = a.handler.decodeExtAuthzMetadata(extAuthzMetadata.GetFields())
 		} else if a.handler.appendMetadataHeaders { // only check headers if knowing it may exist
@@ -122,6 +127,32 @@ func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLo
 			continue
 		}
 
+		var attributes []analytics.Attribute
+		attributesMetadata := getMetadata(datacaptureNamespace)
+		if attributesMetadata != nil && len(attributesMetadata.Fields) > 0 {
+			for k, v := range attributesMetadata.Fields {
+				attr := analytics.Attribute{
+					Name: k,
+				}
+				switch v.GetKind().(type) {
+				case *structpb.Value_NumberValue:
+					attr.Value = v.GetNumberValue()
+				case *structpb.Value_StringValue:
+					attr.Value = v.GetStringValue()
+				case *structpb.Value_BoolValue:
+					attr.Value = v.GetBoolValue()
+
+				case
+					*structpb.Value_StructValue,
+					*structpb.Value_ListValue:
+					log.Debugf("attribute %s is unsupported type: %s", k, v.GetKind())
+					continue
+				}
+				attributes = append(attributes, attr)
+			}
+			log.Debugf("custom attributes: %#v", attributes)
+		}
+
 		var responseCode int
 		if v.Response.ResponseCode != nil {
 			responseCode = int(v.Response.ResponseCode.Value)
@@ -130,14 +161,14 @@ func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLo
 		cp := v.CommonProperties
 		requestPath := strings.SplitN(req.Path, "?", 2)[0] // Apigee doesn't want query params in requestPath
 		record := analytics.Record{
-			ClientReceivedStartTimestamp: pbTimestampToUnix(cp.StartTime),
-			ClientReceivedEndTimestamp:   pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToLastRxByte),
-			TargetSentStartTimestamp:     pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToFirstUpstreamTxByte),
-			TargetSentEndTimestamp:       pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToLastUpstreamTxByte),
-			TargetReceivedStartTimestamp: pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToFirstUpstreamRxByte),
-			TargetReceivedEndTimestamp:   pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToLastUpstreamRxByte),
-			ClientSentStartTimestamp:     pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToFirstDownstreamTxByte),
-			ClientSentEndTimestamp:       pbTimestampAddDurationUnix(cp.StartTime, cp.TimeToLastDownstreamTxByte),
+			ClientReceivedStartTimestamp: pbTimestampToApigee(cp.StartTime),
+			ClientReceivedEndTimestamp:   pbTimestampAddDurationApigee(cp.StartTime, cp.TimeToLastRxByte),
+			TargetSentStartTimestamp:     pbTimestampAddDurationApigee(cp.StartTime, cp.TimeToFirstUpstreamTxByte),
+			TargetSentEndTimestamp:       pbTimestampAddDurationApigee(cp.StartTime, cp.TimeToLastUpstreamTxByte),
+			TargetReceivedStartTimestamp: pbTimestampAddDurationApigee(cp.StartTime, cp.TimeToFirstUpstreamRxByte),
+			TargetReceivedEndTimestamp:   pbTimestampAddDurationApigee(cp.StartTime, cp.TimeToLastUpstreamRxByte),
+			ClientSentStartTimestamp:     pbTimestampAddDurationApigee(cp.StartTime, cp.TimeToFirstDownstreamTxByte),
+			ClientSentEndTimestamp:       pbTimestampAddDurationApigee(cp.StartTime, cp.TimeToLastDownstreamTxByte),
 			APIProxy:                     api,
 			RequestURI:                   req.Path,
 			RequestPath:                  requestPath,
@@ -146,6 +177,7 @@ func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLo
 			ResponseStatusCode:           responseCode,
 			GatewaySource:                gatewaySource,
 			ClientIP:                     req.GetForwardedFor(),
+			Attributes:                   attributes,
 		}
 
 		// this may be more efficient to batch, but changing the golib impl would require
@@ -161,17 +193,18 @@ func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLo
 	return nil
 }
 
-// timeToUnix converts a time to a UNIX timestamp in milliseconds.
-func pbTimestampToUnix(ts *timestamp.Timestamp) int64 {
+// returns ms since epoch
+func pbTimestampToApigee(ts *timestamp.Timestamp) int64 {
 	t, err := ptypes.Timestamp(ts)
 	if err != nil {
 		log.Debugf("invalid timestamp: %s", err)
 		return 0
 	}
-	return t.UnixNano() / 1000000
+	return timeToApigeeInt(t)
 }
 
-func pbTimestampAddDurationUnix(ts *timestamp.Timestamp, d *duration.Duration) int64 {
+// returns ms since epoch
+func pbTimestampAddDurationApigee(ts *timestamp.Timestamp, d *duration.Duration) int64 {
 	t, err := ptypes.Timestamp(ts)
 	if err != nil {
 		log.Debugf("invalid timestamp: %s", err)
@@ -181,7 +214,7 @@ func pbTimestampAddDurationUnix(ts *timestamp.Timestamp, d *duration.Duration) i
 	if err != nil {
 		du = 0
 	}
-	return t.Add(du).UnixNano() / 1000000
+	return timeToApigeeInt(t.Add(du))
 }
 
 var (
@@ -191,3 +224,8 @@ var (
 		Help:      "Total number of analytics streaming requests received",
 	}, []string{"org", "status"})
 )
+
+// format time as ms since epoch
+func timeToApigeeInt(t time.Time) int64 {
+	return t.UnixNano() / (int64(time.Millisecond) / int64(time.Nanosecond))
+}

@@ -23,7 +23,6 @@ import (
 	"testing"
 	"time"
 
-	// "github.com/gogo/status"
 	"github.com/apigee/apigee-remote-service-golib/analytics"
 	"github.com/apigee/apigee-remote-service-golib/auth"
 	"github.com/golang/protobuf/ptypes"
@@ -37,7 +36,7 @@ import (
 	wrappers "github.com/golang/protobuf/ptypes/wrappers"
 )
 
-func makeFields() map[string]*structpb.Value {
+func makeExtAuthFields() map[string]*structpb.Value {
 	return map[string]*structpb.Value{
 		headerAPI:            stringValueFrom("api"),
 		headerAPIProducts:    stringValueFrom("product1,product2"),
@@ -64,7 +63,7 @@ func TestHandleHTTPAccessLogs(t *testing.T) {
 	thenUnix := now.Add(dur).UnixNano() / 1000000
 	durProto := ptypes.DurationProto(dur)
 
-	fields := makeFields()
+	extAuthzFields := makeExtAuthFields()
 
 	path := "path"
 	uri := "path?x=foo"
@@ -84,7 +83,15 @@ func TestHandleHTTPAccessLogs(t *testing.T) {
 			Metadata: &core.Metadata{
 				FilterMetadata: map[string]*structpb.Struct{
 					extAuthzFilterNamespace: {
-						Fields: fields,
+						Fields: extAuthzFields,
+					},
+					datacaptureNamespace: {
+						Fields: map[string]*structpb.Value{
+							"string": stringValueFrom("yellow"),
+							"number": numberValueFrom(3.14),
+							"bool":   boolValueFrom(true),
+							"struct": structValueFrom(struct{}{}),
+						},
 					},
 				},
 			},
@@ -112,8 +119,8 @@ func TestHandleHTTPAccessLogs(t *testing.T) {
 	testAnalyticsMan := &testAnalyticsMan{}
 	server := AccessLogServer{
 		handler: &Handler{
-			orgName:      fields[headerOrganization].GetStringValue(),
-			envName:      fields[headerEnvironment].GetStringValue(),
+			orgName:      extAuthzFields[headerOrganization].GetStringValue(),
+			envName:      extAuthzFields[headerEnvironment].GetStringValue(),
 			analyticsMan: testAnalyticsMan,
 		},
 	}
@@ -127,8 +134,8 @@ func TestHandleHTTPAccessLogs(t *testing.T) {
 	}
 
 	rec := recs[0]
-	if rec.APIProxy != fields[headerAPI].GetStringValue() {
-		t.Errorf("got: %s, want: %s", rec.APIProxy, fields[headerAPI].GetStringValue())
+	if rec.APIProxy != extAuthzFields[headerAPI].GetStringValue() {
+		t.Errorf("got: %s, want: %s", rec.APIProxy, extAuthzFields[headerAPI].GetStringValue())
 	}
 	if rec.ClientIP != clientIP {
 		t.Errorf("got: %s, want: %s", rec.ClientIP, clientIP)
@@ -175,6 +182,23 @@ func TestHandleHTTPAccessLogs(t *testing.T) {
 		t.Errorf("got: %s, want: %s", rec.UserAgent, userAgent)
 	}
 
+	attrMap := make(map[string]interface{})
+	for _, attr := range rec.Attributes {
+		attrMap[attr.Name] = attr.Value
+	}
+	if attrMap["string"] != "yellow" {
+		t.Errorf("got: %v, want: %v", attrMap["string"], "yellow")
+	}
+	if attrMap["number"] != float64(3.14) {
+		t.Errorf("got: %v, want: %v", attrMap["number"], float64(3.14))
+	}
+	if attrMap["bool"] != true {
+		t.Errorf("got: %v, want: %v", attrMap["bool"], true)
+	}
+	if _, ok := attrMap["struct"]; ok {
+		t.Errorf("got: %v, want: nil", attrMap["struct"])
+	}
+
 	// missing response code can happen when client kills request
 	msg.HttpLogs.LogEntry[0].Response.ResponseCode = nil
 	if err := server.handleHTTPLogs(msg); err != nil {
@@ -195,18 +219,18 @@ func TestTimeToUnix(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got := pbTimestampToUnix(nowProto)
+	got := pbTimestampToApigee(nowProto)
 	if got != want {
 		t.Errorf("got: %d, want: %d", got, want)
 	}
 
-	got = pbTimestampToUnix(nil)
+	got = pbTimestampToApigee(nil)
 	if got != 0 {
 		t.Errorf("got: %d, want: %d", got, 0)
 	}
 }
 
-func TestAddDurationUnix(t *testing.T) {
+func TestAddDurationApigee(t *testing.T) {
 	now := time.Now()
 	duration := 6 * time.Minute
 	want := now.Add(duration).UnixNano() / 1000000
@@ -216,18 +240,18 @@ func TestAddDurationUnix(t *testing.T) {
 		t.Fatal(err)
 	}
 	durationProto := ptypes.DurationProto(duration)
-	got := pbTimestampAddDurationUnix(nowProto, durationProto)
+	got := pbTimestampAddDurationApigee(nowProto, durationProto)
 
 	if got != want {
 		t.Errorf("got: %d, want: %d", got, want)
 	}
 
-	got = pbTimestampAddDurationUnix(nil, durationProto)
+	got = pbTimestampAddDurationApigee(nil, durationProto)
 	if got != 0 {
 		t.Errorf("got: %d, want: %d", got, 0)
 	}
 
-	got = pbTimestampAddDurationUnix(nowProto, nil)
+	got = pbTimestampAddDurationApigee(nowProto, nil)
 	want = now.UnixNano() / 1000000
 	if got != want {
 		t.Errorf("got: %d, want: %d", got, want)
@@ -358,7 +382,7 @@ func makeValidHTTPLog() *als.StreamAccessLogsMessage {
 							Metadata: &core.Metadata{
 								FilterMetadata: map[string]*structpb.Struct{
 									extAuthzFilterNamespace: {
-										Fields: makeFields(),
+										Fields: makeExtAuthFields(),
 									},
 								},
 							},
