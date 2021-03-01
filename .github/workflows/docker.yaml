@@ -150,7 +150,7 @@ jobs:
           push: true
           tags: ${{ steps.prep.outputs.tags }}
           build-args: |
-            BUILD_CONTAINER=goboring/golang:1.15.7b5
+            BUILD_CONTAINER=goboring/golang:1.16b7
             RUN_CONTAINER=gcr.io/distroless/base
             CGO_ENABLED=1
             LDFLAGS=-s -w -X main.version=${{ steps.prep.outputs.version }} -X main.commit=${{ github.SHA }} -X main.date=${{ steps.prep.outputs.created }}
