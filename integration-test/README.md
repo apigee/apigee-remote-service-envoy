@@ -30,7 +30,7 @@ Given proper access to the credentials, the script below can be used to simulate
 
 GCloud SDK command-line tool, Go 1.16+ and jq are required.
 
-```
+```bash
 #!/bin/bash
 
 # Fail on any error.
@@ -49,7 +49,7 @@ export OPDK_ENVOY_TEMPLATE=envoy-1.15
 export OPDK_ENVOY_TAG=v1.15.0
 export CGO_ENABLED=0 # 1
 export RUN_CONTAINER=gcr.io/distroless/base # ubuntu:xenial
-export BUILD_CONTAINER=golang:1.16 # goboring/golang:1.15.6b5
+export BUILD_CONTAINER=golang:1.16 # goboring/golang:1.16b7
 
 # uncomment one of the following command to test a specific Apigee platform
 # export ADAPTER_IMAGE_TAG=hybrid-test
