@@ -96,6 +96,7 @@ func TestCheck(t *testing.T) {
 
 	testAuthMan := &testAuthMan{}
 	testProductMan := &testProductMan{
+		target:  "api",
 		resolve: true,
 	}
 	testQuotaMan := &testQuotaMan{}
@@ -226,6 +227,28 @@ func TestCheck(t *testing.T) {
 		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.OK))
 	}
 
+	// bad target in context
+	req.Attributes.ContextExtensions = map[string]string{}
+	req.Attributes.ContextExtensions[targetContextKey] = "bad-target"
+	if resp, err = server.Check(context.Background(), req); err != nil {
+		t.Errorf("should not get error. got: %s", err)
+	}
+	if resp.Status.Code != int32(rpc.PERMISSION_DENIED) {
+		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.PERMISSION_DENIED))
+	}
+
+	// good target in context supersedes even if target header is bad
+	headers[headerAPI] = "bad-target"
+	req.Attributes.ContextExtensions[targetContextKey] = "api"
+	if resp, err = server.Check(context.Background(), req); err != nil {
+		t.Errorf("should not get error. got: %s", err)
+	}
+	if resp.Status.Code != int32(rpc.OK) {
+		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.OK))
+	}
+	delete(req.Attributes.ContextExtensions, targetContextKey)
+	headers[headerAPI] = "api"
+
 	// testAuthMan.ctx
 	if testAuthMan.apiKey != "foo" {
 		t.Errorf("got: %s, want: %s", testAuthMan.apiKey, "foo")
@@ -283,7 +306,6 @@ func TestCheck(t *testing.T) {
 	}
 
 	// multitenant receives context
-	req.Attributes.ContextExtensions = map[string]string{}
 	req.Attributes.ContextExtensions[envContextKey] = "test"
 	if resp, err = server.Check(context.Background(), req); err != nil {
 		t.Errorf("should not get error. got: %s", err)
@@ -342,7 +364,10 @@ func TestImmediateAnalytics(t *testing.T) {
 	}
 	testAuthMan.sendAuth(ac, auth.ErrBadAuth)
 
-	testProductMan := &testProductMan{resolve: true}
+	testProductMan := &testProductMan{
+		resolve: true,
+		target:  "api",
+	}
 	testQuotaMan := &testQuotaMan{}
 	testAnalyticsMan := &testAnalyticsMan{}
 	server := AuthorizationServer{
@@ -450,6 +475,7 @@ func (a *testAuthMan) sendAuth(ac *auth.Context, err error) {
 
 type testProductMan struct {
 	products map[string]*product.APIProduct
+	target   string
 	resolve  bool
 }
 
@@ -459,6 +485,9 @@ func (p *testProductMan) Products() product.ProductsNameMap {
 }
 func (p *testProductMan) Authorize(ac *auth.Context, target, path, method string) []product.AuthorizedOperation {
 	if !p.resolve {
+		return nil
+	}
+	if target != p.target {
 		return nil
 	}
 	values := []product.AuthorizedOperation{}

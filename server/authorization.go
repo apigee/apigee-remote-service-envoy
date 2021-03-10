@@ -38,6 +38,7 @@ import (
 const (
 	jwtFilterMetadataKey = "envoy.filters.http.jwt_authn"
 	envContextKey        = "apigee_environment"
+	targetContextKey     = "apigee_target"
 )
 
 // AuthorizationServer server
@@ -72,10 +73,15 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.Check
 	tracker := prometheusRequestTracker(rootContext)
 	defer tracker.record()
 
-	target, ok := req.Attributes.Request.Http.Headers[a.handler.targetHeader]
-	if !ok {
-		log.Debugf("missing target header %s", a.handler.targetHeader)
-		return a.unauthorized(req, tracker), nil
+	var target string
+	if t, ok := req.Attributes.ContextExtensions[targetContextKey]; ok { // target specified in context metadata
+		target = t
+	} else {
+		target, ok = req.Attributes.Request.Http.Headers[a.handler.targetHeader]
+		if !ok {
+			log.Debugf("missing target header %s", a.handler.targetHeader)
+			return a.unauthorized(req, tracker), nil
+		}
 	}
 
 	// check for JWT from Envoy filter
