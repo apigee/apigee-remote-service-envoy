@@ -85,9 +85,9 @@ func TestMetadataHeadersExceptions(t *testing.T) {
 		orgName: "org",
 		envName: "*",
 	}
-	h.targetHeader = "target"
+	h.apiHeader = "api"
 	header := map[string]string{
-		"target":          "target",
+		"api":             "api",
 		headerEnvironment: "test",
 	}
 
@@ -95,14 +95,14 @@ func TestMetadataHeadersExceptions(t *testing.T) {
 	if ac.Environment() != "*" {
 		t.Errorf("got: %s, want: %s", ac.Environment(), "*")
 	}
-	if api != "target" {
-		t.Errorf("got: %s, want: %s", api, "target")
+	if api != "api" {
+		t.Errorf("got: %s, want: %s", api, "api")
 	}
 
 	h.isMultitenant = true
 	api, ac = h.decodeMetadataHeaders(header)
-	if api != "target" {
-		t.Errorf("got: %s, want: %s", api, "target")
+	if api != "api" {
+		t.Errorf("got: %s, want: %s", api, "api")
 	}
 	if ac.Organization() != h.orgName {
 		t.Errorf("got: %s, want: %s", ac.Organization(), h.orgName)
@@ -111,7 +111,7 @@ func TestMetadataHeadersExceptions(t *testing.T) {
 		t.Errorf("got: %s, want: %s", ac.Environment(), "test")
 	}
 
-	h.targetHeader = "missing"
+	h.apiHeader = "missing"
 	api, ac = h.decodeMetadataHeaders(header)
 	if api != "" {
 		t.Errorf("api should be empty")

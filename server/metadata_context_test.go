@@ -116,10 +116,10 @@ func TestEncodeMetadataHeadersExceptions(t *testing.T) {
 		orgName: "org",
 		envName: "*",
 	}
-	h.targetHeader = "target"
+	h.apiHeader = "api"
 	metadata := &structpb.Struct{
 		Fields: map[string]*structpb.Value{
-			headerAPI: stringValueFrom("target"),
+			headerAPI: stringValueFrom("api"),
 		},
 	}
 
@@ -127,14 +127,14 @@ func TestEncodeMetadataHeadersExceptions(t *testing.T) {
 	if ac.Environment() != "*" {
 		t.Errorf("got: %s, want: %s", ac.Environment(), "*")
 	}
-	if api != "target" {
-		t.Errorf("got: %s, want: %s", api, "target")
+	if api != "api" {
+		t.Errorf("got: %s, want: %s", api, "api")
 	}
 
 	h.isMultitenant = true
 	api, ac = h.decodeExtAuthzMetadata(metadata.GetFields())
-	if api != "target" {
-		t.Errorf("got: %s, want: %s", api, "target")
+	if api != "api" {
+		t.Errorf("got: %s, want: %s", api, "api")
 	}
 	if ac.Organization() != h.orgName {
 		t.Errorf("got: %s, want: %s", ac.Organization(), h.orgName)
@@ -145,8 +145,8 @@ func TestEncodeMetadataHeadersExceptions(t *testing.T) {
 
 	metadata.Fields[headerEnvironment] = stringValueFrom("test")
 	api, ac = h.decodeExtAuthzMetadata(metadata.GetFields())
-	if api != "target" {
-		t.Errorf("got: %s, want: %s", api, "target")
+	if api != "api" {
+		t.Errorf("got: %s, want: %s", api, "api")
 	}
 	if ac.Organization() != h.orgName {
 		t.Errorf("got: %s, want: %s", ac.Organization(), h.orgName)

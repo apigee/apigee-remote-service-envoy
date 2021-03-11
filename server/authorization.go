@@ -38,7 +38,7 @@ import (
 const (
 	jwtFilterMetadataKey = "envoy.filters.http.jwt_authn"
 	envContextKey        = "apigee_environment"
-	targetContextKey     = "apigee_target"
+	apiContextKey        = "apigee_api"
 )
 
 // AuthorizationServer server
@@ -73,13 +73,13 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.Check
 	tracker := prometheusRequestTracker(rootContext)
 	defer tracker.record()
 
-	var target string
-	if t, ok := req.Attributes.ContextExtensions[targetContextKey]; ok { // target specified in context metadata
-		target = t
+	var api string
+	if v, ok := req.Attributes.ContextExtensions[apiContextKey]; ok { // api specified in context metadata
+		api = v
 	} else {
-		target, ok = req.Attributes.Request.Http.Headers[a.handler.targetHeader]
+		api, ok = req.Attributes.Request.Http.Headers[a.handler.apiHeader]
 		if !ok {
-			log.Debugf("missing target header %s", a.handler.targetHeader)
+			log.Debugf("missing api header %s", a.handler.apiHeader)
 			return a.unauthorized(req, tracker), nil
 		}
 	}
@@ -124,20 +124,20 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.Check
 	case auth.ErrNoAuth:
 		return a.unauthorized(req, tracker), nil
 	case auth.ErrBadAuth:
-		return a.denied(req, tracker, authContext, target), nil
+		return a.denied(req, tracker, authContext, api), nil
 	case auth.ErrInternalError:
 		return a.internalError(req, tracker, err), nil
 	}
 
 	if len(authContext.APIProducts) == 0 {
-		return a.denied(req, tracker, authContext, target), nil
+		return a.denied(req, tracker, authContext, api), nil
 	}
 
 	// authorize against products
 	method := req.Attributes.Request.Http.Method
-	authorizedOps := a.handler.productMan.Authorize(authContext, target, path, method)
+	authorizedOps := a.handler.productMan.Authorize(authContext, api, path, method)
 	if len(authorizedOps) == 0 {
-		return a.denied(req, tracker, authContext, target), nil
+		return a.denied(req, tracker, authContext, api), nil
 	}
 
 	// apply quotas to matched operations
@@ -160,18 +160,18 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.Check
 		return a.internalError(req, tracker, anyError), nil
 	}
 	if exceeded {
-		return a.quotaExceeded(req, tracker, authContext, target), nil
+		return a.quotaExceeded(req, tracker, authContext, api), nil
 	}
 
-	return a.authOK(tracker, authContext, target), nil
+	return a.authOK(tracker, authContext, api), nil
 }
 
-func (a *AuthorizationServer) authOK(tracker *prometheusRequestMetricTracker, authContext *auth.Context, target string) *envoy_auth.CheckResponse {
+func (a *AuthorizationServer) authOK(tracker *prometheusRequestMetricTracker, authContext *auth.Context, api string) *envoy_auth.CheckResponse {
 
 	okResponse := &envoy_auth.OkHttpResponse{}
 
 	if a.handler.appendMetadataHeaders {
-		headers := makeMetadataHeaders(target, authContext, true)
+		headers := makeMetadataHeaders(api, authContext, true)
 		okResponse.Headers = headers
 	}
 
@@ -183,7 +183,7 @@ func (a *AuthorizationServer) authOK(tracker *prometheusRequestMetricTracker, au
 		HttpResponse: &envoy_auth.CheckResponse_OkResponse{
 			OkResponse: okResponse,
 		},
-		DynamicMetadata: encodeExtAuthzMetadata(target, authContext, true),
+		DynamicMetadata: encodeExtAuthzMetadata(api, authContext, true),
 	}
 }
 
@@ -196,15 +196,15 @@ func (a *AuthorizationServer) internalError(req *envoy_auth.CheckRequest, tracke
 	return a.createDenyResponse(req, tracker, nil, "", rpc.INTERNAL)
 }
 
-func (a *AuthorizationServer) denied(req *envoy_auth.CheckRequest, tracker *prometheusRequestMetricTracker, authContext *auth.Context, target string) *envoy_auth.CheckResponse {
-	return a.createDenyResponse(req, tracker, authContext, target, rpc.PERMISSION_DENIED)
+func (a *AuthorizationServer) denied(req *envoy_auth.CheckRequest, tracker *prometheusRequestMetricTracker, authContext *auth.Context, api string) *envoy_auth.CheckResponse {
+	return a.createDenyResponse(req, tracker, authContext, api, rpc.PERMISSION_DENIED)
 }
 
-func (a *AuthorizationServer) quotaExceeded(req *envoy_auth.CheckRequest, tracker *prometheusRequestMetricTracker, authContext *auth.Context, target string) *envoy_auth.CheckResponse {
-	return a.createDenyResponse(req, tracker, authContext, target, rpc.RESOURCE_EXHAUSTED)
+func (a *AuthorizationServer) quotaExceeded(req *envoy_auth.CheckRequest, tracker *prometheusRequestMetricTracker, authContext *auth.Context, api string) *envoy_auth.CheckResponse {
+	return a.createDenyResponse(req, tracker, authContext, api, rpc.RESOURCE_EXHAUSTED)
 }
 
-func (a *AuthorizationServer) createDenyResponse(req *envoy_auth.CheckRequest, tracker *prometheusRequestMetricTracker, authContext *auth.Context, target string, code rpc.Code) *envoy_auth.CheckResponse {
+func (a *AuthorizationServer) createDenyResponse(req *envoy_auth.CheckRequest, tracker *prometheusRequestMetricTracker, authContext *auth.Context, api string, code rpc.Code) *envoy_auth.CheckResponse {
 
 	// use intended code, not OK
 	switch code {
@@ -229,7 +229,7 @@ func (a *AuthorizationServer) createDenyResponse(req *envoy_auth.CheckRequest, t
 				Code: int32(code),
 			},
 			// Envoy won't deliver this, so commenting it out for now. See below.
-			// DynamicMetadata: encodeExtAuthzMetadata(target, authContext, false),
+			// DynamicMetadata: encodeExtAuthzMetadata(api, authContext, false),
 		}
 
 		// Envoy automatically maps the other response status codes,
@@ -246,7 +246,7 @@ func (a *AuthorizationServer) createDenyResponse(req *envoy_auth.CheckRequest, t
 
 		// Envoy does not send metadata to ALS on a reject, so we create the
 		// analytics record here and the ALS handler can ignore the metadataless record.
-		if target != "" && authContext != nil {
+		if api != "" && authContext != nil {
 			start := req.Attributes.Request.Time.AsTime().UnixNano() / 1000000
 			duration := time.Now().Unix() - tracker.startTime.Unix()
 			sent := start + duration                                                   // use Envoy's start time to calculate
@@ -260,7 +260,7 @@ func (a *AuthorizationServer) createDenyResponse(req *envoy_auth.CheckRequest, t
 				TargetReceivedEndTimestamp:   0,
 				ClientSentStartTimestamp:     sent,
 				ClientSentEndTimestamp:       sent,
-				APIProxy:                     target,
+				APIProxy:                     api,
 				RequestURI:                   req.Attributes.Request.Http.Path,
 				RequestPath:                  requestPath,
 				RequestVerb:                  req.Attributes.Request.Http.Method,
@@ -285,7 +285,7 @@ func (a *AuthorizationServer) createDenyResponse(req *envoy_auth.CheckRequest, t
 	okResponse := &envoy_auth.OkHttpResponse{}
 
 	if a.handler.appendMetadataHeaders {
-		headers := makeMetadataHeaders(target, authContext, false)
+		headers := makeMetadataHeaders(api, authContext, false)
 		okResponse.Headers = headers
 	}
 
@@ -298,7 +298,7 @@ func (a *AuthorizationServer) createDenyResponse(req *envoy_auth.CheckRequest, t
 		HttpResponse: &envoy_auth.CheckResponse_OkResponse{
 			OkResponse: okResponse,
 		},
-		DynamicMetadata: encodeExtAuthzMetadata(target, authContext, false),
+		DynamicMetadata: encodeExtAuthzMetadata(api, authContext, false),
 	}
 }
 

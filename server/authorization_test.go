@@ -96,7 +96,7 @@ func TestCheck(t *testing.T) {
 
 	testAuthMan := &testAuthMan{}
 	testProductMan := &testProductMan{
-		target:  "api",
+		api:     "api",
 		resolve: true,
 	}
 	testQuotaMan := &testQuotaMan{}
@@ -104,7 +104,7 @@ func TestCheck(t *testing.T) {
 	server := AuthorizationServer{
 		handler: &Handler{
 			apiKeyClaim:           headerClientID,
-			targetHeader:          headerAPI,
+			apiHeader:             headerAPI,
 			apiKeyHeader:          "x-api-key",
 			authMan:               testAuthMan,
 			productMan:            testProductMan,
@@ -115,7 +115,7 @@ func TestCheck(t *testing.T) {
 		},
 	}
 
-	// no target header
+	// no api header
 	var resp *v3.CheckResponse
 	var err error
 	if resp, err = server.Check(context.Background(), req); err != nil {
@@ -227,9 +227,9 @@ func TestCheck(t *testing.T) {
 		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.OK))
 	}
 
-	// bad target in context
+	// bad api in context metadata
 	req.Attributes.ContextExtensions = map[string]string{}
-	req.Attributes.ContextExtensions[targetContextKey] = "bad-target"
+	req.Attributes.ContextExtensions[apiContextKey] = "bad-api"
 	if resp, err = server.Check(context.Background(), req); err != nil {
 		t.Errorf("should not get error. got: %s", err)
 	}
@@ -237,16 +237,16 @@ func TestCheck(t *testing.T) {
 		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.PERMISSION_DENIED))
 	}
 
-	// good target in context supersedes even if target header is bad
-	headers[headerAPI] = "bad-target"
-	req.Attributes.ContextExtensions[targetContextKey] = "api"
+	// good api in context supersedes even if api header is bad
+	headers[headerAPI] = "bad-api"
+	req.Attributes.ContextExtensions[apiContextKey] = "api"
 	if resp, err = server.Check(context.Background(), req); err != nil {
 		t.Errorf("should not get error. got: %s", err)
 	}
 	if resp.Status.Code != int32(rpc.OK) {
 		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.OK))
 	}
-	delete(req.Attributes.ContextExtensions, targetContextKey)
+	delete(req.Attributes.ContextExtensions, apiContextKey)
 	headers[headerAPI] = "api"
 
 	// testAuthMan.ctx
@@ -366,7 +366,7 @@ func TestImmediateAnalytics(t *testing.T) {
 
 	testProductMan := &testProductMan{
 		resolve: true,
-		target:  "api",
+		api:     "api",
 	}
 	testQuotaMan := &testQuotaMan{}
 	testAnalyticsMan := &testAnalyticsMan{}
@@ -375,7 +375,7 @@ func TestImmediateAnalytics(t *testing.T) {
 			orgName:               "org",
 			envName:               "env",
 			apiKeyClaim:           headerClientID,
-			targetHeader:          headerAPI,
+			apiHeader:             headerAPI,
 			apiKeyHeader:          "x-api-key",
 			authMan:               testAuthMan,
 			productMan:            testProductMan,
@@ -475,7 +475,7 @@ func (a *testAuthMan) sendAuth(ac *auth.Context, err error) {
 
 type testProductMan struct {
 	products map[string]*product.APIProduct
-	target   string
+	api      string
 	resolve  bool
 }
 
@@ -483,11 +483,11 @@ func (p *testProductMan) Close() {}
 func (p *testProductMan) Products() product.ProductsNameMap {
 	return p.products
 }
-func (p *testProductMan) Authorize(ac *auth.Context, target, path, method string) []product.AuthorizedOperation {
+func (p *testProductMan) Authorize(ac *auth.Context, api, path, method string) []product.AuthorizedOperation {
 	if !p.resolve {
 		return nil
 	}
-	if target != p.target {
+	if api != p.api {
 		return nil
 	}
 	values := []product.AuthorizedOperation{}

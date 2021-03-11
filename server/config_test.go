@@ -63,7 +63,7 @@ auth:
   api_key_claim: claim
   api_key_cache_duration: 30m
   api_key_header: x-api-key
-  target_header: :authority
+  api_header: :authority
   allow_unauthorized: false
   jwks_poll_interval: 0s
   jwt_provider_key: apigee

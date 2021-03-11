@@ -60,10 +60,10 @@ func (h *Handler) decodeMetadataHeaders(headers map[string]string) (string, *aut
 
 	api, ok := headers[headerAPI]
 	if !ok {
-		if api, ok = headers[h.targetHeader]; ok {
-			log.Debugf("No context header %s, using target header: %s", headerAPI, h.targetHeader)
+		if api, ok = headers[h.apiHeader]; ok {
+			log.Debugf("No context header %s, using api header: %s", headerAPI, h.apiHeader)
 		} else {
-			log.Debugf("No context header %s or target header: %s", headerAPI, h.targetHeader)
+			log.Debugf("No context header %s or api header: %s", headerAPI, h.apiHeader)
 			return "", nil
 		}
 	}
