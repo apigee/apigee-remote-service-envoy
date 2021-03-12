@@ -38,7 +38,7 @@ const (
 	headerScope          = "x-apigee-scope"
 )
 
-// encodeExtAuthzMetadata encodes given target and auth context into
+// encodeExtAuthzMetadata encodes given api and auth context into
 // Envoy ext_authz's filter's dynamic metadata
 func encodeExtAuthzMetadata(api string, ac *auth.Context, authorized bool) *structpb.Struct {
 	if ac == nil {
@@ -100,7 +100,7 @@ func structValueFrom(v struct{}) *structpb.Value {
 }
 
 // decodeExtAuthzMetadata decodes the Envoy ext_authz's filter's metadata
-// fields into target (api) and auth context
+// fields into api and auth context
 func (h *Handler) decodeExtAuthzMetadata(fields map[string]*structpb.Value) (string, *auth.Context) {
 
 	api := fields[headerAPI].GetStringValue()

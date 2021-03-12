@@ -43,7 +43,7 @@ type Handler struct {
 	envName               string
 	apiKeyClaim           string
 	apiKeyHeader          string
-	targetHeader          string
+	apiHeader             string
 	allowUnauthorized     bool
 	appendMetadataHeaders bool
 	jwtProviderKey        string
@@ -202,7 +202,7 @@ func NewHandler(config *Config) (*Handler, error) {
 		quotaMan:              quotaMan,
 		apiKeyClaim:           config.Auth.APIKeyClaim,
 		apiKeyHeader:          config.Auth.APIKeyHeader,
-		targetHeader:          config.Auth.TargetHeader,
+		apiHeader:             config.Auth.APIHeader,
 		allowUnauthorized:     config.Auth.AllowUnauthorized,
 		jwtProviderKey:        config.Auth.JWTProviderKey,
 		appendMetadataHeaders: config.Auth.AppendMetadataHeaders,

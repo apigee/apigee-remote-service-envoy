@@ -44,7 +44,7 @@ func TestNewHandler(t *testing.T) {
 	config.Auth = AuthConfig{
 		APIKeyClaim:  "claim",
 		APIKeyHeader: "header",
-		TargetHeader: "target",
+		APIHeader:    "api",
 	}
 
 	h, err := NewHandler(config)
@@ -84,8 +84,8 @@ func TestNewHandler(t *testing.T) {
 	if h.apiKeyHeader != config.Auth.APIKeyHeader {
 		t.Errorf("got: %s, want: %s", h.apiKeyHeader, config.Auth.APIKeyHeader)
 	}
-	if h.targetHeader != config.Auth.TargetHeader {
-		t.Errorf("got: %s, want: %s", h.targetHeader, config.Auth.TargetHeader)
+	if h.apiHeader != config.Auth.APIHeader {
+		t.Errorf("got: %s, want: %s", h.apiHeader, config.Auth.APIHeader)
 	}
 	if h.allowUnauthorized != config.Auth.AllowUnauthorized {
 		t.Errorf("got: %t, want: %t", h.allowUnauthorized, config.Auth.AllowUnauthorized)
