@@ -16,6 +16,8 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -117,11 +119,10 @@ func NewHandler(config *Config) (*Handler, error) {
 		}
 	}
 
-	tr := http.DefaultTransport
-	if config.Tenant.AllowUnverifiedSSLCert {
-		trans := tr.(*http.Transport).Clone()
-		trans.TLSClientConfig.InsecureSkipVerify = true
-		tr = trans
+	// get a roundtripper with client TLS config
+	tr, err := roundTripperWithTLS(config.Tenant.TLS)
+	if err != nil {
+		return nil, err
 	}
 
 	// add authorization to transport
@@ -173,8 +174,18 @@ func NewHandler(config *Config) (*Handler, error) {
 		analyticsClient = clientAuthorizedByCredentials(config, "analytics", config.Analytics.Credentials)
 		// overwrite the internalAPI to the GCP managed host
 		internalAPI, _ = url.Parse(GCPExperienceBase)
-	} else { // use the same client as other components if none has been assigned
-		log.Debugf("analytics http client not using any authorization")
+	} else {
+		log.Debugf("analytics http client not using GCP authorization")
+		tlsConfig := TLSClientConfig{ // only use AllowUnverifiedSSLCert first
+			AllowUnverifiedSSLCert: config.Analytics.TLS.AllowUnverifiedSSLCert,
+		}
+		if config.Analytics.LegacyEndpoint { // allow mTLS config for OPDK
+			tlsConfig = config.Analytics.TLS
+		}
+		tr, err := roundTripperWithTLS(tlsConfig)
+		if err != nil {
+			return nil, err
+		}
 		analyticsClient = instrumentedClientFor(config, "analytics", tr)
 	}
 
@@ -242,6 +253,39 @@ func clientAuthorizedByCredentials(config *Config, api string, cred *google.Cred
 	client.Transport = roundTripperWithPrometheus(config, api, rt)
 	client.Timeout = config.Tenant.ClientTimeout
 	return client
+}
+
+// roundTripperWithTLS returns a http.RoundTripper with given TLSClientConfig
+// and the default http.Transport will be used given a default TLSClientConfig
+func roundTripperWithTLS(config TLSClientConfig) (http.RoundTripper, error) {
+	tr := http.DefaultTransport.(*http.Transport).Clone()
+	if config.AllowUnverifiedSSLCert {
+		tr.TLSClientConfig.InsecureSkipVerify = true
+	}
+
+	// add given CA to the RootCAs
+	if config.CAFile != "" {
+		caCert, err := os.ReadFile(config.CAFile)
+		if err != nil {
+			return nil, err
+		}
+		caCertPool := x509.NewCertPool()
+		if ok := caCertPool.AppendCertsFromPEM(caCert); !ok {
+			return nil, fmt.Errorf("error appending CA to cert pool")
+		}
+		tr.TLSClientConfig.RootCAs = caCertPool
+	}
+
+	// use given certs to configure client-side TLS
+	if config.CertFile != "" && config.KeyFile != "" {
+		cert, err := tls.LoadX509KeyPair(config.CertFile, config.KeyFile)
+		if err != nil {
+			return nil, err
+		}
+		tr.TLSClientConfig.Certificates = []tls.Certificate{cert}
+	}
+
+	return tr, nil
 }
 
 var (
