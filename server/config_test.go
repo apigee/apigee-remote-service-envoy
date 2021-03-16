@@ -46,7 +46,11 @@ tenant:
   key: mykey
   secret: mysecret
   client_timeout: 30s
-  allow_unverified_ssl_cert: false
+  tls:
+    ca_file: /opt/apigee/tls/ca.crt
+    cert_file: /opt/apigee/tls/tls.crt
+    key_file: /opt/apigee/tls/tls.key
+    allow_unverified_ssl_cert: false
 products:
   refresh_rate: 2m
 analytics:
@@ -54,11 +58,6 @@ analytics:
   file_limit: 1024
   send_channel_size: 10
   collection_interval: 10s
-  tls:
-    ca_file: /opt/apigee/tls/ca.crt
-    cert_file: /opt/apigee/tls/tls.crt
-    key_file: /opt/apigee/tls/tls.key
-    allow_unverified_ssl_cert: false
 auth:
   api_key_claim: claim
   api_key_cache_duration: 30m
@@ -643,9 +642,9 @@ func TestValidateTLS(t *testing.T) {
 		t.Logf("round %d", i)
 		config.Global.TLS.CertFile = o[0]
 		config.Global.TLS.KeyFile = o[1]
-		config.Analytics.TLS.CAFile = o[2]
-		config.Analytics.TLS.CertFile = o[3]
-		config.Analytics.TLS.KeyFile = o[4]
+		config.Tenant.TLS.CAFile = o[2]
+		config.Tenant.TLS.CertFile = o[3]
+		config.Tenant.TLS.KeyFile = o[4]
 
 		err := config.Validate(true)
 		if err == nil {
@@ -653,7 +652,7 @@ func TestValidateTLS(t *testing.T) {
 		}
 		wantErrs := []string{
 			"global.tls.cert_file and global.tls.key_file are both required if either are present",
-			"all analytics.tls options are required if any are present",
+			"all tenant.tls options are required if any are present",
 		}
 		merr := err.(*multierror.Error)
 		if merr.Len() != len(wantErrs) {

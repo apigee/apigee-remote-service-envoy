@@ -177,10 +177,10 @@ func NewHandler(config *Config) (*Handler, error) {
 	} else {
 		log.Debugf("analytics http client not using GCP authorization")
 		tlsConfig := TLSClientConfig{ // only use AllowUnverifiedSSLCert first
-			AllowUnverifiedSSLCert: config.Analytics.TLS.AllowUnverifiedSSLCert,
+			AllowUnverifiedSSLCert: config.Tenant.TLS.AllowUnverifiedSSLCert,
 		}
 		if config.Analytics.LegacyEndpoint { // allow mTLS config for OPDK
-			tlsConfig = config.Analytics.TLS
+			tlsConfig = config.Tenant.TLS
 		}
 		tr, err := roundTripperWithTLS(tlsConfig)
 		if err != nil {

@@ -199,12 +199,6 @@ func TestNewHandlerWithTLS(t *testing.T) {
 		SendChannelSize:    10,
 		CollectionInterval: 2 * time.Minute,
 		LegacyEndpoint:     true,
-		TLS: TLSClientConfig{
-			CAFile:                 certFile,
-			CertFile:               certFile,
-			KeyFile:                keyFile,
-			AllowUnverifiedSSLCert: true,
-		},
 	}
 	config.Auth = AuthConfig{
 		APIKeyClaim:  "claim",
@@ -250,7 +244,7 @@ func TestNewHandlerWithTLS(t *testing.T) {
 	}
 
 	config.Tenant.TLS.CAFile = certFile
-	config.Analytics.TLS.CertFile = "bad-ca-path"
+	config.Tenant.TLS.CertFile = "bad-cert-path"
 	_, err = NewHandler(config)
 	if err == nil {
 		t.Error("should get error")
