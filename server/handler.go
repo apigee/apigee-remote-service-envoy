@@ -143,7 +143,6 @@ func NewHandler(config *Config) (*Handler, error) {
 	}
 
 	authMan, err := auth.NewManager(auth.Options{
-		PollInterval:        config.Auth.JWKSPollInterval,
 		Client:              instrumentedClientFor(config, "auth", tr),
 		APIKeyCacheDuration: config.Auth.APIKeyCacheDuration,
 		Org:                 config.Tenant.OrgName,

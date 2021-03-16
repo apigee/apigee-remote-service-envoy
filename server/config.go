@@ -154,7 +154,6 @@ type AnalyticsConfig struct {
 type AuthConfig struct {
 	APIKeyClaim           string        `yaml:"api_key_claim,omitempty" json:"api_key_claim,omitempty"`
 	APIKeyCacheDuration   time.Duration `yaml:"api_key_cache_duration,omitempty" json:"api_key_cache_duration,omitempty"`
-	JWKSPollInterval      time.Duration `yaml:"jwks_poll_interval,omitempty" json:"jwks_poll_interval,omitempty"`
 	APIKeyHeader          string        `yaml:"api_key_header,omitempty" json:"api_key_header,omitempty"`
 	APIHeader             string        `yaml:"api_header,omitempty" json:"api_header,omitempty"`
 	AllowUnauthorized     bool          `yaml:"allow_unauthorized,omitempty" json:"allow_unauthorized,omitempty"`
