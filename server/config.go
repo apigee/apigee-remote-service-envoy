@@ -126,7 +126,7 @@ type TenantConfig struct {
 	TLS                 TLSClientConfig `yaml:"tls,omitempty" json:"tls,omitempty"`
 	PrivateKey          *rsa.PrivateKey `yaml:"-" json:"-"`
 	PrivateKeyID        string          `yaml:"-" json:"-"`
-	JWKS                *jwk.Set        `yaml:"-" json:"-"`
+	JWKS                jwk.Set         `yaml:"-" json:"-"`
 	InternalJWTDuration time.Duration   `yaml:"-" json:"-"`
 	InternalJWTRefresh  time.Duration   `yaml:"-" json:"-"`
 }
@@ -233,7 +233,7 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string, 
 		}
 
 		c.Tenant.PrivateKeyID = props[SecretPropsKIDKey]
-		jwks := &jwk.Set{}
+		jwks := jwk.NewSet()
 		if err = json.Unmarshal(jwksBytes, jwks); err == nil {
 			c.Tenant.JWKS = jwks
 			if c.Tenant.PrivateKey, err = LoadPrivateKey(key); err != nil {

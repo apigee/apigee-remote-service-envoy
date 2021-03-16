@@ -83,11 +83,11 @@ func TestJWTAuthManager(t *testing.T) {
 	verifyHdr := func(hdr string) {
 		token := strings.TrimPrefix(hdr, "Bearer ")
 
-		jwkSet, err := jwk.ParseBytes(jwksBuf)
+		jwkSet, err := jwk.Parse(jwksBuf)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err = jws.VerifyWithJWKSet([]byte(token), jwkSet, nil); err != nil {
+		if _, err = jws.VerifySet([]byte(token), jwkSet); err != nil {
 			t.Fatal(err)
 		}
 	}
