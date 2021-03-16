@@ -20,10 +20,13 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"math/big"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path"
 	"testing"
@@ -239,6 +242,98 @@ func TestNewHandlerWithTLS(t *testing.T) {
 	if h.quotaMan == nil {
 		t.Errorf("quotaMan must be populated")
 	}
+
+	config.Tenant.TLS.CAFile = "bad-ca-path"
+	_, err = NewHandler(config)
+	if err == nil {
+		t.Error("should get error")
+	}
+
+	config.Tenant.TLS.CAFile = certFile
+	config.Analytics.TLS.CertFile = "bad-ca-path"
+	_, err = NewHandler(config)
+	if err == nil {
+		t.Error("should get error")
+	}
+}
+
+func TestMutualTLSRoundTripper(t *testing.T) {
+	ts := newMutualTLSServer()
+	defer ts.Close()
+
+	pemKey, pemCert, err := generateCert()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tempDir, err := os.MkdirTemp("", "tls")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer os.RemoveAll(tempDir)
+
+	keyFile := path.Join(tempDir, "key.pem")
+	certFile := path.Join(tempDir, "cert.pem")
+
+	if err := os.WriteFile(keyFile, pemKey, os.FileMode(0755)); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.WriteFile(certFile, pemCert, os.FileMode(0755)); err != nil {
+		t.Fatal(err)
+	}
+
+	var c *http.Client
+
+	req, err := http.NewRequest(http.MethodGet, ts.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tr := http.DefaultTransport.(*http.Transport).Clone()
+	tr.TLSClientConfig.InsecureSkipVerify = true
+	c = &http.Client{
+		Transport: tr,
+	}
+	_, err = c.Do(req)
+	if err == nil { // should have not error about no client cert
+		t.Error("should get error")
+	}
+
+	tlsConfig := TLSClientConfig{
+		CAFile:                 certFile,
+		CertFile:               certFile,
+		KeyFile:                keyFile,
+		AllowUnverifiedSSLCert: true,
+	}
+
+	rt, err := roundTripperWithTLS(tlsConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c = &http.Client{
+		Transport: rt,
+	}
+	_, err = c.Do(req)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func newMutualTLSServer() *httptest.Server {
+	ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte("{}"))
+	}))
+	// require client cert but skip verification
+	ts.TLS = &tls.Config{
+		RootCAs:    x509.NewCertPool(),
+		ClientAuth: tls.RequireAnyClientCert,
+	}
+	ts.StartTLS()
+
+	return ts
 }
 
 func generateCert() ([]byte, []byte, error) {
