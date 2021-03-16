@@ -146,7 +146,6 @@ type AnalyticsConfig struct {
 	FileLimit          int                 `yaml:"file_limit,omitempty" json:"file_limit,omitempty"`
 	SendChannelSize    int                 `yaml:"send_channel_size,omitempty" json:"send_channel_size,omitempty"`
 	CollectionInterval time.Duration       `yaml:"collection_interval,omitempty" json:"collection_interval,omitempty"`
-	TLS                TLSClientConfig     `yaml:"tls,omitempty" json:"tls,omitempty"`
 	CredentialsJSON    []byte              `yaml:"-" json:"-"`
 	Credentials        *google.Credentials `yaml:"-" json:"-"`
 }
@@ -314,9 +313,9 @@ func (c *Config) Validate(requireAnalyticsCredentials bool) error {
 		(c.Global.TLS.CertFile == "" || c.Global.TLS.KeyFile == "") {
 		errs = multierror.Append(errs, fmt.Errorf("global.tls.cert_file and global.tls.key_file are both required if either are present"))
 	}
-	if (c.Analytics.TLS.CAFile != "" || c.Analytics.TLS.CertFile != "" || c.Analytics.TLS.KeyFile != "") &&
-		(c.Analytics.TLS.CAFile == "" || c.Analytics.TLS.CertFile == "" || c.Analytics.TLS.KeyFile == "") {
-		errs = multierror.Append(errs, fmt.Errorf("all analytics.tls options are required if any are present"))
+	if (c.Tenant.TLS.CAFile != "" || c.Tenant.TLS.CertFile != "" || c.Tenant.TLS.KeyFile != "") &&
+		(c.Tenant.TLS.CAFile == "" || c.Tenant.TLS.CertFile == "" || c.Tenant.TLS.KeyFile == "") {
+		errs = multierror.Append(errs, fmt.Errorf("all tenant.tls options are required if any are present"))
 	}
 	return errs
 }
