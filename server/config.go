@@ -116,19 +116,19 @@ type TLSClientConfig struct {
 
 // TenantConfig is config relating to an Apigee tentant
 type TenantConfig struct {
-	InternalAPI            string          `yaml:"internal_api,omitempty" json:"internal_api,omitempty"`
-	RemoteServiceAPI       string          `yaml:"remote_service_api" json:"remote_service_api"`
-	OrgName                string          `yaml:"org_name" json:"org_name"`
-	EnvName                string          `yaml:"env_name" json:"env_name"`
-	Key                    string          `yaml:"key,omitempty" json:"key,omitempty"`
-	Secret                 string          `yaml:"secret,omitempty" json:"secret,omitempty"`
-	ClientTimeout          time.Duration   `yaml:"client_timeout,omitempty" json:"client_timeout,omitempty"`
-	AllowUnverifiedSSLCert bool            `yaml:"allow_unverified_ssl_cert,omitempty" json:"allow_unverified_ssl_cert,omitempty"`
-	PrivateKey             *rsa.PrivateKey `yaml:"-" json:"-"`
-	PrivateKeyID           string          `yaml:"-" json:"-"`
-	JWKS                   *jwk.Set        `yaml:"-" json:"-"`
-	InternalJWTDuration    time.Duration   `yaml:"-" json:"-"`
-	InternalJWTRefresh     time.Duration   `yaml:"-" json:"-"`
+	InternalAPI         string          `yaml:"internal_api,omitempty" json:"internal_api,omitempty"`
+	RemoteServiceAPI    string          `yaml:"remote_service_api" json:"remote_service_api"`
+	OrgName             string          `yaml:"org_name" json:"org_name"`
+	EnvName             string          `yaml:"env_name" json:"env_name"`
+	Key                 string          `yaml:"key,omitempty" json:"key,omitempty"`
+	Secret              string          `yaml:"secret,omitempty" json:"secret,omitempty"`
+	ClientTimeout       time.Duration   `yaml:"client_timeout,omitempty" json:"client_timeout,omitempty"`
+	TLS                 TLSClientConfig `yaml:"tls,omitempty" json:"tls,omitempty"`
+	PrivateKey          *rsa.PrivateKey `yaml:"-" json:"-"`
+	PrivateKeyID        string          `yaml:"-" json:"-"`
+	JWKS                *jwk.Set        `yaml:"-" json:"-"`
+	InternalJWTDuration time.Duration   `yaml:"-" json:"-"`
+	InternalJWTRefresh  time.Duration   `yaml:"-" json:"-"`
 }
 
 func (t *TenantConfig) IsMultitenant() bool {
