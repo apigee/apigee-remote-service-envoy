@@ -296,13 +296,25 @@ func TestCheck(t *testing.T) {
 		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.OK))
 	}
 
-	// multitenant missing context
-	server.handler.isMultitenant = true
+	// improper context, not multitenant
+	server.handler.envName = "test"
+	req.Attributes.ContextExtensions[envContextKey] = "prod"
 	if resp, err = server.Check(context.Background(), req); err != nil {
 		t.Errorf("should not get error. got: %s", err)
 	}
 	if resp.Status.Code != int32(rpc.INTERNAL) {
-		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.OK))
+		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.INTERNAL))
+	}
+
+	// multitenant missing context
+	server.handler.envName = "*"
+	server.handler.isMultitenant = true
+	delete(req.Attributes.ContextExtensions, envContextKey)
+	if resp, err = server.Check(context.Background(), req); err != nil {
+		t.Errorf("should not get error. got: %s", err)
+	}
+	if resp.Status.Code != int32(rpc.INTERNAL) {
+		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.INTERNAL))
 	}
 
 	// multitenant receives context
