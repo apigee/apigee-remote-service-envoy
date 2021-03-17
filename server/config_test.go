@@ -64,7 +64,6 @@ auth:
   api_key_header: x-api-key
   api_header: :authority
   allow_unauthorized: false
-  jwks_poll_interval: 0s
   jwt_provider_key: apigee
   append_metadata_headers: true`
 
