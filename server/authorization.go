@@ -56,22 +56,27 @@ func (a *AuthorizationServer) Register(s *grpc.Server, handler *Handler) {
 func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.CheckRequest) (*envoy_auth.CheckResponse, error) {
 
 	var rootContext context.Context = a.handler
+	var err error
+	envFromEnvoy, envFromEnvoyExists := req.Attributes.ContextExtensions[envContextKey]
 	if a.handler.isMultitenant {
-		if env, override := req.Attributes.ContextExtensions[envContextKey]; override {
+		if envFromEnvoyExists && envFromEnvoy != "" {
 			rootContext = &multitenantContext{
 				a.handler,
-				env,
+				envFromEnvoy,
 			}
 		} else {
-			tracker := prometheusRequestTracker(rootContext)
-			defer tracker.record()
-			err := fmt.Errorf("Envoy must be configured to send Apigee env in ContextExtensions[%s] in multitenant mode.", envContextKey)
-			return a.internalError(req, tracker, err), nil
+			err = fmt.Errorf("no %s metadata for multi-tentant mode", envContextKey)
 		}
+	} else if envFromEnvoyExists && envFromEnvoy != rootContext.Environment() {
+		err = fmt.Errorf("%s metadata (%s) disallowed when not in multi-tentant mode", envContextKey, rootContext.Environment())
 	}
 
 	tracker := prometheusRequestTracker(rootContext)
 	defer tracker.record()
+
+	if err != nil {
+		return a.internalError(req, tracker, err), nil
+	}
 
 	var api string
 	if v, ok := req.Attributes.ContextExtensions[apiContextKey]; ok { // api specified in context metadata
