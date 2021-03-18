@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/apigee/apigee-remote-service-golib/product"
+	"github.com/apigee/apigee-remote-service-golib/v2/product"
 	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/health/grpc_health_v1"
 )

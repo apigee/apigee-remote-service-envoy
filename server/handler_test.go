@@ -32,7 +32,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/apigee/apigee-remote-service-envoy/testutil"
+	"github.com/apigee/apigee-remote-service-envoy/v2/testutil"
 	"golang.org/x/oauth2/google"
 )
 

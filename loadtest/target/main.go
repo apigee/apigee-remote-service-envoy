@@ -21,7 +21,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/apigee/apigee-remote-service-golib/util"
+	"github.com/apigee/apigee-remote-service-golib/v2/util"
 )
 
 func main() {

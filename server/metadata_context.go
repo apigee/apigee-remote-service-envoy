@@ -17,9 +17,9 @@ package server
 import (
 	"strings"
 
-	"github.com/apigee/apigee-remote-service-golib/auth"
-	"github.com/apigee/apigee-remote-service-golib/context"
-	"github.com/apigee/apigee-remote-service-golib/log"
+	"github.com/apigee/apigee-remote-service-golib/v2/auth"
+	"github.com/apigee/apigee-remote-service-golib/v2/context"
+	"github.com/apigee/apigee-remote-service-golib/v2/log"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
