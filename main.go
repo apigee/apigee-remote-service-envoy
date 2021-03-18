@@ -26,8 +26,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/apigee/apigee-remote-service-envoy/server"
-	"github.com/apigee/apigee-remote-service-golib/log"
+	"github.com/apigee/apigee-remote-service-envoy/v2/server"
+	"github.com/apigee/apigee-remote-service-golib/v2/log"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"

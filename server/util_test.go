@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/apigee/apigee-remote-service-envoy/testutil"
+	"github.com/apigee/apigee-remote-service-envoy/v2/testutil"
 	pb "github.com/golang/protobuf/ptypes/struct"
 )
 

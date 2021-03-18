@@ -19,9 +19,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/apigee/apigee-remote-service-golib/analytics"
-	"github.com/apigee/apigee-remote-service-golib/auth"
-	"github.com/apigee/apigee-remote-service-golib/log"
+	"github.com/apigee/apigee-remote-service-golib/v2/analytics"
+	"github.com/apigee/apigee-remote-service-golib/v2/auth"
+	"github.com/apigee/apigee-remote-service-golib/v2/log"
 	als "github.com/envoyproxy/go-control-plane/envoy/service/accesslog/v3"
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/duration"

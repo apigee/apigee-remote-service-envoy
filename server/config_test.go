@@ -23,7 +23,7 @@ import (
 	"path"
 	"testing"
 
-	"github.com/apigee/apigee-remote-service-envoy/testutil"
+	"github.com/apigee/apigee-remote-service-envoy/v2/testutil"
 	"github.com/hashicorp/go-multierror"
 	"gopkg.in/yaml.v3"
 )

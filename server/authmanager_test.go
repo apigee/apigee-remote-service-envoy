@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/apigee/apigee-remote-service-envoy/testutil"
+	"github.com/apigee/apigee-remote-service-envoy/v2/testutil"
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/lestrrat-go/jwx/jws"
 )

@@ -19,7 +19,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/apigee/apigee-remote-service-golib/auth"
+	"github.com/apigee/apigee-remote-service-golib/v2/auth"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 

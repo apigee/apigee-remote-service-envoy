@@ -23,8 +23,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/apigee/apigee-remote-service-golib/analytics"
-	"github.com/apigee/apigee-remote-service-golib/auth"
+	"github.com/apigee/apigee-remote-service-golib/v2/analytics"
+	"github.com/apigee/apigee-remote-service-golib/v2/auth"
 	"github.com/golang/protobuf/ptypes"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/test/bufconn"

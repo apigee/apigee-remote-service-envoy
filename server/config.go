@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/apigee/apigee-remote-service-golib/log"
+	"github.com/apigee/apigee-remote-service-golib/v2/log"
 	"github.com/hashicorp/go-multierror"
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/pkg/errors"
