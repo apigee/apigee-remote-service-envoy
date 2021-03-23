@@ -17,9 +17,6 @@
 # Fail on any error.
 set -e
 
-# Display commands
-set -x
-
 ################################################################################
 # Provisioning remote-service
 ################################################################################
@@ -140,6 +137,9 @@ cleanUpKubernetes
 
 runEnvoyTests $CGSAAS_ENVOY_TAG $ADAPTER_IMAGE_TAG
 
+# Displaying log sof Envoy adapter running in Docker
+docker logs adapter
+
 applyToCluster istio-samples
 runIstioTests
 
@@ -147,5 +147,8 @@ docker stop envoy
 docker stop adapter
 
 runEnvoyMultiEnvTest $CGSAAS_ENVOY_TAG $ADAPTER_IMAGE_TAG
+
+# Displaying logs of Envoy adapter running in k8s
+kubectl logs -n apigee $(kubectl get pods -n apigee -o jsonpath={.items..metadata.name})
 
 echo -e "\nFinished integration test of the Apigee Envoy Adapter with Apigee SaaS."
