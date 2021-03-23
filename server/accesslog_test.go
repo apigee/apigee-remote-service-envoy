@@ -25,10 +25,11 @@ import (
 
 	"github.com/apigee/apigee-remote-service-golib/v2/analytics"
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
-	"github.com/golang/protobuf/ptypes"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/test/bufconn"
+	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/structpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	v3 "github.com/envoyproxy/go-control-plane/envoy/data/accesslog/v3"
@@ -54,14 +55,11 @@ func TestHandleHTTPAccessLogs(t *testing.T) {
 
 	now := time.Now()
 	nowUnix := now.UnixNano() / 1000000
-	nowProto, err := ptypes.TimestampProto(now)
-	if err != nil {
-		t.Fatal(err)
-	}
+	nowProto := timestamppb.New(now)
 
 	dur := 7 * time.Millisecond
 	thenUnix := now.Add(dur).UnixNano() / 1000000
-	durProto := ptypes.DurationProto(dur)
+	durProto := durationpb.New(dur)
 
 	extAuthzFields := makeExtAuthFields()
 
@@ -215,10 +213,7 @@ func TestTimeToUnix(t *testing.T) {
 	now := time.Now()
 	want := now.UnixNano() / 1000000
 
-	nowProto, err := ptypes.TimestampProto(now)
-	if err != nil {
-		t.Fatal(err)
-	}
+	nowProto := timestamppb.New(now)
 	got := pbTimestampToApigee(nowProto)
 	if got != want {
 		t.Errorf("got: %d, want: %d", got, want)
@@ -235,11 +230,8 @@ func TestAddDurationApigee(t *testing.T) {
 	duration := 6 * time.Minute
 	want := now.Add(duration).UnixNano() / 1000000
 
-	nowProto, err := ptypes.TimestampProto(now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	durationProto := ptypes.DurationProto(duration)
+	nowProto := timestamppb.New(now)
+	durationProto := durationpb.New(duration)
 	got := pbTimestampAddDurationApigee(nowProto, durationProto)
 
 	if got != want {
