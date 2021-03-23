@@ -23,7 +23,6 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
 	"github.com/apigee/apigee-remote-service-golib/v2/log"
 	als "github.com/envoyproxy/go-control-plane/envoy/service/accesslog/v3"
-	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/duration"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/prometheus/client_golang/prometheus"
@@ -195,26 +194,24 @@ func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLo
 
 // returns ms since epoch
 func pbTimestampToApigee(ts *timestamp.Timestamp) int64 {
-	t, err := ptypes.Timestamp(ts)
-	if err != nil {
+	if err := ts.CheckValid(); err != nil {
 		log.Debugf("invalid timestamp: %s", err)
 		return 0
 	}
-	return timeToApigeeInt(t)
+	return timeToApigeeInt(ts.AsTime())
 }
 
 // returns ms since epoch
 func pbTimestampAddDurationApigee(ts *timestamp.Timestamp, d *duration.Duration) int64 {
-	t, err := ptypes.Timestamp(ts)
-	if err != nil {
+	if err := ts.CheckValid(); err != nil {
 		log.Debugf("invalid timestamp: %s", err)
 		return 0
 	}
-	du, err := ptypes.Duration(d)
-	if err != nil {
+	du := d.AsDuration()
+	if err := d.CheckValid(); err != nil {
 		du = 0
 	}
-	return timeToApigeeInt(t.Add(du))
+	return timeToApigeeInt(ts.AsTime().Add(du))
 }
 
 var (

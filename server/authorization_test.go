@@ -32,9 +32,9 @@ import (
 	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	v3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	"github.com/gogo/googleapis/google/rpc"
-	"github.com/golang/protobuf/ptypes"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/structpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func TestRegister(t *testing.T) {
@@ -340,10 +340,7 @@ func TestImmediateAnalytics(t *testing.T) {
 	requestPath := "path"
 	uri := requestPath + "?x-api-key=foo"
 	requestTime := time.Now()
-	nowProto, err := ptypes.TimestampProto(requestTime)
-	if err != nil {
-		t.Fatal(err)
-	}
+	nowProto := timestamppb.New(requestTime)
 
 	req := &v3.CheckRequest{
 		Attributes: &v3.AttributeContext{
@@ -399,7 +396,8 @@ func TestImmediateAnalytics(t *testing.T) {
 	}
 
 	var resp *v3.CheckResponse
-	if resp, err = server.Check(context.Background(), req); err != nil {
+	resp, err := server.Check(context.Background(), req)
+	if err != nil {
 		t.Errorf("should not get error. got: %s", err)
 	}
 	if resp.Status.Code != int32(rpc.PERMISSION_DENIED) {
