@@ -185,6 +185,8 @@ func NewHandler(config *Config) (*Handler, error) {
 		if err != nil {
 			return nil, err
 		}
+		// the same method is called previously with same inputs, no need to check error again
+		tr, _ = AuthorizationRoundTripper(config, tr)
 		analyticsClient = instrumentedClientFor(config, "analytics", tr)
 	}
 
