@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	"github.com/apigee/apigee-remote-service-envoy/v2/testutil"
-	"github.com/hashicorp/go-multierror"
+	"github.com/apigee/apigee-remote-service-golib/v2/errorset"
 	"gopkg.in/yaml.v3"
 )
 
@@ -448,7 +448,7 @@ tenant:
 	wantErrs := []string{
 		"tenant.internal_api is required if analytics credentials not given",
 	}
-	merr := err.(*multierror.Error)
+	merr := err.(*errorset.Error)
 	if merr.Len() != len(wantErrs) {
 		t.Fatalf("got %d errors, want: %d, errors: %s", merr.Len(), len(wantErrs), merr)
 	}
@@ -575,7 +575,7 @@ func TestValidate(t *testing.T) {
 
 	c := &Config{}
 	var wantErrs []string
-	var merr *multierror.Error
+	var merr *errorset.Error
 
 	err := c.Validate(true)
 	if err == nil {
@@ -588,7 +588,7 @@ func TestValidate(t *testing.T) {
 		"tenant.org_name is required",
 		"tenant.env_name is required",
 	}
-	merr = err.(*multierror.Error)
+	merr = err.(*errorset.Error)
 	if merr.Len() != len(wantErrs) {
 		t.Fatalf("got %d errors, want: %d, errors: %s", merr.Len(), len(wantErrs), merr)
 	}
@@ -607,7 +607,7 @@ func TestValidate(t *testing.T) {
 		"tenant.org_name is required",
 		"tenant.env_name is required",
 	}
-	merr = err.(*multierror.Error)
+	merr = err.(*errorset.Error)
 	if merr.Len() != len(wantErrs) {
 		t.Fatalf("got %d errors, want: %d, errors: %s", merr.Len(), len(wantErrs), merr)
 	}
@@ -653,7 +653,7 @@ func TestValidateTLS(t *testing.T) {
 			"global.tls.cert_file and global.tls.key_file are both required if either are present",
 			"all tenant.tls options are required if any are present",
 		}
-		merr := err.(*multierror.Error)
+		merr := err.(*errorset.Error)
 		if merr.Len() != len(wantErrs) {
 			t.Fatalf("got %d errors, want: %d, errors: %s", merr.Len(), len(wantErrs), merr)
 		}
