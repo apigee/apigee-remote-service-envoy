@@ -27,8 +27,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/apigee/apigee-remote-service-golib/v2/errorset"
 	"github.com/apigee/apigee-remote-service-golib/v2/log"
-	"github.com/hashicorp/go-multierror"
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/pkg/errors"
 	"golang.org/x/oauth2/google"
@@ -287,35 +287,35 @@ func (c *Config) IsOPDK() bool {
 func (c *Config) Validate(requireAnalyticsCredentials bool) error {
 	var errs error
 	if c.Tenant.RemoteServiceAPI == "" {
-		errs = multierror.Append(errs, fmt.Errorf("tenant.remote_service_api is required"))
+		errs = errorset.Append(errs, fmt.Errorf("tenant.remote_service_api is required"))
 	}
 	if len(c.Analytics.CredentialsJSON) == 0 {
 		if c.Tenant.InternalAPI == "" && requireAnalyticsCredentials {
 			cred, err := google.FindDefaultCredentials(context.Background(), ApigeeAPIScope)
 			if err != nil {
-				errs = multierror.Append(errs, fmt.Errorf("tenant.internal_api is required if analytics credentials not given"))
+				errs = errorset.Append(errs, fmt.Errorf("tenant.internal_api is required if analytics credentials not given"))
 			} else { // to avoid the non-name error
 				c.Analytics.Credentials = cred
 			}
 		}
 	} else {
 		if c.Tenant.InternalAPI != "" {
-			errs = multierror.Append(errs, fmt.Errorf("tenant.internal_api and analytics credentials are mutually exclusive"))
+			errs = errorset.Append(errs, fmt.Errorf("tenant.internal_api and analytics credentials are mutually exclusive"))
 		}
 	}
 	if c.Tenant.OrgName == "" {
-		errs = multierror.Append(errs, fmt.Errorf("tenant.org_name is required"))
+		errs = errorset.Append(errs, fmt.Errorf("tenant.org_name is required"))
 	}
 	if c.Tenant.EnvName == "" {
-		errs = multierror.Append(errs, fmt.Errorf("tenant.env_name is required"))
+		errs = errorset.Append(errs, fmt.Errorf("tenant.env_name is required"))
 	}
 	if (c.Global.TLS.CertFile != "" || c.Global.TLS.KeyFile != "") &&
 		(c.Global.TLS.CertFile == "" || c.Global.TLS.KeyFile == "") {
-		errs = multierror.Append(errs, fmt.Errorf("global.tls.cert_file and global.tls.key_file are both required if either are present"))
+		errs = errorset.Append(errs, fmt.Errorf("global.tls.cert_file and global.tls.key_file are both required if either are present"))
 	}
 	if (c.Tenant.TLS.CAFile != "" || c.Tenant.TLS.CertFile != "" || c.Tenant.TLS.KeyFile != "") &&
 		(c.Tenant.TLS.CAFile == "" || c.Tenant.TLS.CertFile == "" || c.Tenant.TLS.KeyFile == "") {
-		errs = multierror.Append(errs, fmt.Errorf("all tenant.tls options are required if any are present"))
+		errs = errorset.Append(errs, fmt.Errorf("all tenant.tls options are required if any are present"))
 	}
 	return errs
 }
