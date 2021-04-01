@@ -30,7 +30,7 @@ import (
 	"time"
 
 	"github.com/apigee/apigee-remote-service-envoy/v2/server"
-	"github.com/apigee/apigee-remote-service-golib/v2/auth"
+	"github.com/apigee/apigee-remote-service-golib/v2/auth/key"
 	"github.com/apigee/apigee-remote-service-golib/v2/product"
 	"github.com/apigee/apigee-remote-service-golib/v2/quota"
 	"github.com/apigee/apigee-remote-service-golib/v2/util"
@@ -158,14 +158,14 @@ func (ts *TestServer) Handler() http.Handler {
 
 	m.HandleFunc("/verifyApiKey", func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(RESPONSE_DELAY)
-		var req auth.APIKeyRequest
+		var req key.APIKeyRequest
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			log.Fatal(err)
 		}
 		defer r.Body.Close()
 
-		resp := auth.APIKeyResponse{}
+		resp := key.APIKeyResponse{}
 		if product, ok := productsMap[req.APIKey]; ok {
 			resp, err = createVerifyAPIKeyResponse(product, privateKey)
 			if err != nil {
@@ -317,7 +317,7 @@ func createProducts(num int) map[string]product.APIProduct {
 	return products
 }
 
-func createVerifyAPIKeyResponse(product product.APIProduct, privateKey *rsa.PrivateKey) (auth.APIKeyResponse, error) {
+func createVerifyAPIKeyResponse(product product.APIProduct, privateKey *rsa.PrivateKey) (key.APIKeyResponse, error) {
 	token := jwt.New()
 	_ = token.Set(jwt.AudienceKey, "remote-service-client")
 	_ = token.Set(jwt.JwtIDKey, "29e2320b-787c-4625-8599-acc5e05c68d0")
@@ -331,7 +331,7 @@ func createVerifyAPIKeyResponse(product product.APIProduct, privateKey *rsa.Priv
 	_ = token.Set("api_product_list", []string{product.Name})
 	payload, err := jwt.Sign(token, jwa.RS256, privateKey)
 
-	return auth.APIKeyResponse{Token: string(payload)}, err
+	return key.APIKeyResponse{Token: string(payload)}, err
 }
 
 func createJWKS(privateKey *rsa.PrivateKey) (*JWKS, error) {
