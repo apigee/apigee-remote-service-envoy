@@ -18,7 +18,7 @@ package arcconfig
 
 import "time"
 
-// APIRuntimeControlConfig is an Apigee Environment-level config for
+// EnvironmentConfig is an Apigee Environment-level config for
 // Envoy Adapter. It contains a list of operations for the adapter to
 // perform request authentication and authorization.
 type EnvironmentConfig struct {
@@ -29,6 +29,7 @@ type EnvironmentConfig struct {
 	ProxyConfigs []ProxyConfig
 }
 
+// ProxyConfig has the proxy configuration
 type ProxyConfig struct {
 	// Top-level basepath for the proxy config
 	Basepath string `yaml:"basepath,omitempty" json:"basepath,omitempty"`
