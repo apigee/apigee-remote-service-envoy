@@ -35,7 +35,7 @@ type APIRuntimeControlConfig struct {
 // An API Operation associates a set of rules with a set of request matching
 // settings.
 type Operation struct {
-	// Name of the operation. Unique within a ApigeeRuntimeControlConfig.
+	// Name of the operation. Unique within a APIRuntimeControlConfig.
 	Name string `yaml:"name"`
 
 	// Authentication defines the AuthenticationRequirement
