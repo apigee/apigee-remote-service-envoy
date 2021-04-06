@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package arcconfig defines the Apigee Runtime Control config and provides
+// the config loading and validation functions.
 package arcconfig
 
 import "time"
