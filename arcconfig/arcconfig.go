@@ -18,10 +18,10 @@ package arcconfig
 
 import "time"
 
-// ApigeeRuntimeControlConfig is an Apigee Environment-level config for
+// APIRuntimeControlConfig is an Apigee Environment-level config for
 // Envoy Adapter. It contains a list of operations for the adapter to
 // perform request authentication and authorization.
-type ApigeeRuntimeControlConfig struct {
+type APIRuntimeControlConfig struct {
 	// Name of the config
 	Name string `yaml:"name"`
 
