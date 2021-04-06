@@ -118,8 +118,8 @@ type HTTPMatch struct {
 	// basepath defined anywhere.
 	PathTemplate string `yaml:"path_template"`
 
-	// HTTP method
-	Method HTTPMethod `yaml:"method,omitempty"`
+	// HTTP method (e.g. GET, POST, PUT, etc.)
+	Method string `yaml:"method,omitempty"`
 }
 
 // HTTPParameter defines an HTTP paramter
@@ -147,18 +147,3 @@ type JWTClaim struct {
 	// Name of the claim
 	Name string `yaml:"name"`
 }
-
-type HTTPMethod int
-
-const (
-	UnknownMethod HTTPMethod = iota
-	HTTPGet
-	HTTPPost
-	HTTPPut
-	HTTPDelete
-	HTTPPatch
-	HTTPOptions
-	HTTPHead
-	HTTPConnect
-	HTTPTrace
-)
