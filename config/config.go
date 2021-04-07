@@ -210,10 +210,10 @@ type Operation struct {
 	// HTTP matching rules for this operation.
 	HTTPMatches []HTTPMatch `yaml:"http_match,omitempty" json:"http_match,omitempty"`
 
-	// Name of the target server for this operation. This will be sent to Envoy
+	// Target server for this operation. This will be sent to Envoy
 	// for routing to the corresponding upstream cluster upon a successful
 	// authorization of the operation.
-	Target string `yaml:"target" json:"target"`
+	Target Target `yaml:"target" json:"target"`
 }
 
 // AuthenticationRequirement defines the authentication requirement.
@@ -270,6 +270,20 @@ type ConsumerAuthorization struct {
 	In []HTTPParameter `yaml:"in" json:"in"`
 }
 
+// Target contains the name of the target server and request transformation
+type Target struct {
+	// Name of the target
+	Name string `yaml:"name" json:"name"`
+
+	// RequestTransformation defines how the request should be modified, e.g. a path rewrite
+	RequestTransformation RequestTransformation `yaml:"request_transformation,omitempty" json:"request_transformation,omitempty"`
+}
+
+type RequestTransformation struct {
+	// StringTransformation to rewrite the path request header
+	PathRewrite StringTransformation `yaml:"path_rewrite,omitempty" json:"path_rewrite,omitempty"`
+}
+
 // HTTPMatch is an HTTP request matching rule
 type HTTPMatch struct {
 	// URL path template using to match incoming requests and optionally identify
@@ -294,16 +308,16 @@ type HTTPParameter struct {
 
 	// String modification to strip off matched value (e.g. "Bearer " for Authorization
 	// tokens).
-	Modification StringModification `yaml:"modification,omitempty" json:"modification,omitempty"`
+	Transformation StringTransformation `yaml:"transformation,omitempty" json:"transformation,omitempty"`
 }
 
-// StringModification uses simple template syntax
+// StringTransformation uses simple template syntax
 // e.g. template: "prefix-{{foo}}-{{bar}}-suffix"
 //      substitution: "{{foo}}_{{bar}}"
 //      -->
 //      input: "prefix-hello-world-suffix"
 //      output: "hello_world"
-type StringModification struct {
+type StringTransformation struct {
 	// String template, optionally containing variable declarations.
 	Template string `yaml:"template,omitempty" json:"template,omitempty"`
 
