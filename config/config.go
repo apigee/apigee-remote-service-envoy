@@ -298,8 +298,8 @@ type HTTPParameter struct {
 }
 
 // StringModification uses simple template syntax
-// e.g. template: "prefix-{foo}-{bar}-suffix"
-//      substitution: "{foo}_{bar}"
+// e.g. template: "prefix-{{foo}}-{{bar}}-suffix"
+//      substitution: "{{foo}}_{{bar}}"
 //      -->
 //      input: "prefix-hello-world-suffix"
 //      output: "hello_world"
