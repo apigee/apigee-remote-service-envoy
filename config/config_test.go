@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package server
+package config
 
 import (
 	"bytes"
@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/apigee/apigee-remote-service-envoy/v2/testutil"
+	"github.com/apigee/apigee-remote-service-envoy/v2/util"
 	"github.com/apigee/apigee-remote-service-golib/v2/errorset"
 	"gopkg.in/yaml.v3"
 )
@@ -413,7 +414,7 @@ tenant:
 		t.Fatalf("%v", err)
 	}
 	credFile := path.Join(credDir, ServiceAccount)
-	if err := os.WriteFile(credFile, fakeServiceAccount(), 0644); err != nil {
+	if err := os.WriteFile(credFile, testutil.FakeServiceAccount(), 0644); err != nil {
 		t.Fatalf("%v", err)
 	}
 	defer os.RemoveAll(credDir)
@@ -671,11 +672,11 @@ func makePolicySecretCRD() (*SecretCRD, error) {
 	if err != nil {
 		return nil, err
 	}
-	pkBytes := pem.EncodeToMemory(&pem.Block{Type: PEMKeyType, Bytes: x509.MarshalPKCS1PrivateKey(privateKey)})
+	pkBytes := pem.EncodeToMemory(&pem.Block{Type: util.PEMKeyType, Bytes: x509.MarshalPKCS1PrivateKey(privateKey)})
 
 	props := map[string]string{SecretPropsKIDKey: kid}
 	propsBuf := new(bytes.Buffer)
-	if err := WriteProperties(propsBuf, props); err != nil {
+	if err := util.WriteProperties(propsBuf, props); err != nil {
 		return nil, err
 	}
 

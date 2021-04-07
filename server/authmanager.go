@@ -16,15 +16,14 @@ package server
 
 import (
 	"crypto/rsa"
-	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
-	"encoding/pem"
 	"fmt"
 	"net/http"
 	"sync"
 	"time"
 
+	"github.com/apigee/apigee-remote-service-envoy/v2/config"
 	"github.com/apigee/apigee-remote-service-golib/v2/log"
 	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jws"
@@ -45,14 +44,14 @@ type AuthManager interface {
 }
 
 // NewAuthManager creates an auth manager
-func NewAuthManager(config *Config) (AuthManager, error) {
-	if config.IsGCPManaged() {
+func NewAuthManager(cfg *config.Config) (AuthManager, error) {
+	if cfg.IsGCPManaged() {
 		m := &JWTAuthManager{}
-		return m, m.start(config)
+		return m, m.start(cfg)
 	}
 
 	// basic API Key auth
-	auth := fmt.Sprintf("%s:%s", config.Tenant.Key, config.Tenant.Secret)
+	auth := fmt.Sprintf("%s:%s", cfg.Tenant.Key, cfg.Tenant.Secret)
 	encodedAuth := base64.StdEncoding.EncodeToString([]byte(auth))
 	return &StaticAuthManager{
 		authHeader: fmt.Sprintf("Basic %s", encodedAuth),
@@ -76,12 +75,12 @@ type JWTAuthManager struct {
 	timer         *time.Timer
 }
 
-func (a *JWTAuthManager) start(config *Config) error {
+func (a *JWTAuthManager) start(cfg *config.Config) error {
 
-	privateKey := config.Tenant.PrivateKey
-	kid := config.Tenant.PrivateKeyID
-	jwtExpiration := config.Tenant.InternalJWTDuration
-	jwtRefresh := config.Tenant.InternalJWTRefresh
+	privateKey := cfg.Tenant.PrivateKey
+	kid := cfg.Tenant.PrivateKeyID
+	jwtExpiration := cfg.Tenant.InternalJWTDuration
+	jwtRefresh := cfg.Tenant.InternalJWTRefresh
 
 	// set synchronously - if no error, should not occur thereafter
 	if err := a.replaceJWT(privateKey, kid, jwtExpiration); err != nil {
@@ -138,31 +137,6 @@ func (a *JWTAuthManager) getToken() *jwt.Token {
 	return a.authToken
 }
 
-func LoadPrivateKey(privateKeyBytes []byte) (*rsa.PrivateKey, error) {
-
-	var err error
-	privPem, _ := pem.Decode(privateKeyBytes)
-	if PEMKeyType != privPem.Type {
-		return nil, fmt.Errorf("%s required, found: %s", PEMKeyType, privPem.Type)
-	}
-
-	var parsedKey interface{}
-	if parsedKey, err = x509.ParsePKCS1PrivateKey(privPem.Bytes); err != nil {
-		if parsedKey, err = x509.ParsePKCS8PrivateKey(privPem.Bytes); err != nil {
-			return nil, err
-		}
-	}
-
-	var privateKey *rsa.PrivateKey
-	var ok bool
-	privateKey, ok = parsedKey.(*rsa.PrivateKey)
-	if !ok {
-		return nil, err
-	}
-
-	return privateKey, nil
-}
-
 // SignJWT signs an token with specified algorithm and keys
 func SignJWT(t jwt.Token, method jwa.SignatureAlgorithm, key interface{}, kid string) ([]byte, error) {
 	buf, err := json.Marshal(t)
@@ -217,9 +191,9 @@ func (rt roundTripperFunc) RoundTrip(r *http.Request) (*http.Response, error) {
 }
 
 // AuthorizationRoundTripper adds an authorization header to any handled request
-func AuthorizationRoundTripper(config *Config, next http.RoundTripper) (http.RoundTripper, error) {
+func AuthorizationRoundTripper(cfg *config.Config, next http.RoundTripper) (http.RoundTripper, error) {
 
-	authManager, err := NewAuthManager(config)
+	authManager, err := NewAuthManager(cfg)
 	if err != nil {
 		return nil, err
 	}

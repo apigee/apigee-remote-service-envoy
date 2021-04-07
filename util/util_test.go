@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Package protostruct supports operations on the protocol buffer Struct message.
-package server
+package util
 
 import (
 	"bytes"

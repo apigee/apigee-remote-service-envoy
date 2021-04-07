@@ -26,6 +26,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/apigee/apigee-remote-service-envoy/v2/config"
 	"github.com/apigee/apigee-remote-service-envoy/v2/server"
 	"github.com/apigee/apigee-remote-service-golib/v2/log"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
@@ -99,16 +100,16 @@ func main() {
 
 			fmt.Printf("apigee-remote-service-envoy version %s %s [%s]\n", version, date, commit)
 
-			config := server.DefaultConfig()
-			if err := config.Load(configFile, policySecretPath, analyticsSecretPath, true); err != nil {
+			cfg := config.DefaultConfig()
+			if err := cfg.Load(configFile, policySecretPath, analyticsSecretPath, true); err != nil {
 				log.Errorf("Unable to load config: %s:\n%v", configFile, err)
 				os.Exit(1)
 			}
 
-			b, _ := json.Marshal(config)
+			b, _ := json.Marshal(cfg)
 			log.Debugf("Config: \n%v", string(b))
 
-			serve(config)
+			serve(cfg)
 			select {} // infinite loop
 		},
 	}
@@ -116,7 +117,7 @@ func main() {
 	rootCmd.Flags().BoolVarP(&logJSON, "json-log", "j", false, "Log as JSON")
 	rootCmd.Flags().StringVarP(&configFile, "config", "c", "config.yaml", "Config file")
 	rootCmd.Flags().StringVarP(&policySecretPath, "policy-secret", "p", "/policy-secret", "Policy secret mount point")
-	rootCmd.Flags().StringVarP(&analyticsSecretPath, "analytics-secret", "a", server.DefaultAnalyticsSecretPath, "Analytics secret mount point")
+	rootCmd.Flags().StringVarP(&analyticsSecretPath, "analytics-secret", "a", config.DefaultAnalyticsSecretPath, "Analytics secret mount point")
 
 	rootCmd.SetArgs(os.Args[1:])
 	if err := rootCmd.Execute(); err != nil {
@@ -125,19 +126,19 @@ func main() {
 	}
 }
 
-func serve(config *server.Config) {
+func serve(cfg *config.Config) {
 
 	// gRPC server
 	opts := []grpc.ServerOption{
 		grpc.KeepaliveParams(keepalive.ServerParameters{
-			MaxConnectionAge: config.Global.KeepAliveMaxConnectionAge,
+			MaxConnectionAge: cfg.Global.KeepAliveMaxConnectionAge,
 		}),
 		grpc.StreamInterceptor(grpc_prometheus.StreamServerInterceptor),
 		grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor),
 	}
 
-	if config.Global.TLS.CertFile != "" {
-		creds, err := credentials.NewServerTLSFromFile(config.Global.TLS.CertFile, config.Global.TLS.KeyFile)
+	if cfg.Global.TLS.CertFile != "" {
+		creds, err := credentials.NewServerTLSFromFile(cfg.Global.TLS.CertFile, cfg.Global.TLS.KeyFile)
 		if err != nil {
 			panic(err)
 		}
@@ -147,7 +148,7 @@ func serve(config *server.Config) {
 	grpc_prometheus.Register(grpcServer)
 
 	// Apigee Remote Service
-	rsHandler, err := server.NewHandler(config)
+	rsHandler, err := server.NewHandler(cfg)
 	if err != nil {
 		log.Errorf("gRPC NewHandler: %v", err)
 		panic(err)
@@ -155,7 +156,7 @@ func serve(config *server.Config) {
 	as := &server.AuthorizationServer{}
 	as.Register(grpcServer, rsHandler)
 	ls := &server.AccessLogServer{}
-	ls.Register(grpcServer, rsHandler, config.Global.KeepAliveMaxConnectionAge)
+	ls.Register(grpcServer, rsHandler, cfg.Global.KeepAliveMaxConnectionAge)
 
 	// grpc health
 	grpcHealth := health.NewServer()
@@ -163,12 +164,12 @@ func serve(config *server.Config) {
 	kubeHealth := server.NewKubeHealth(rsHandler, grpcHealth)
 
 	// grpc listener
-	grpcListener, err := net.Listen("tcp", config.Global.APIAddress)
+	grpcListener, err := net.Listen("tcp", cfg.Global.APIAddress)
 	if err != nil {
 		panic(err)
 	}
 
-	log.Infof("listening: %s", config.Global.APIAddress)
+	log.Infof("listening: %s", cfg.Global.APIAddress)
 	go func() {
 		if err := grpcServer.Serve(grpcListener); err != nil {
 			log.Infof("%s", err)
@@ -176,7 +177,7 @@ func serve(config *server.Config) {
 	}()
 
 	// prometheus listener
-	metricsListener, err := net.Listen("tcp", config.Global.MetricsAddress)
+	metricsListener, err := net.Listen("tcp", cfg.Global.MetricsAddress)
 	if err != nil {
 		panic(err)
 	}
@@ -186,11 +187,11 @@ func serve(config *server.Config) {
 	mux.HandleFunc("/healthz", kubeHealth.HandlerFunc())
 
 	httpServer := &http.Server{
-		Addr:    config.Global.MetricsAddress,
+		Addr:    cfg.Global.MetricsAddress,
 		Handler: mux,
 	}
-	if config.Global.TLS.CertFile != "" {
-		cert, err := tls.LoadX509KeyPair(config.Global.TLS.CertFile, config.Global.TLS.KeyFile)
+	if cfg.Global.TLS.CertFile != "" {
+		cert, err := tls.LoadX509KeyPair(cfg.Global.TLS.CertFile, cfg.Global.TLS.KeyFile)
 		if err != nil {
 			panic(err)
 		}
@@ -201,7 +202,7 @@ func serve(config *server.Config) {
 		metricsListener = tls.NewListener(metricsListener, httpServer.TLSConfig)
 	}
 
-	log.Infof("listening: %s", config.Global.MetricsAddress)
+	log.Infof("listening: %s", cfg.Global.MetricsAddress)
 	go func() {
 		if err := httpServer.Serve(metricsListener); err != nil {
 			log.Infof("%s", err)
