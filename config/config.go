@@ -198,6 +198,11 @@ type ProxyConfig struct {
 	// ConsumerAuthorization defines the proxy-level consumer authorization
 	ConsumerAuthorization ConsumerAuthorization `yaml:"consumer_authorization,omitempty" json:"consumer_authorization,omitempty"`
 
+	// Name of the target server for this proxy. This will be sent to Envoy
+	// for routing to the corresponding upstream cluster upon a successful
+	// authorization.
+	Target string `yaml:"target" json:"target"`
+
 	// A list of Operations, names of which must be unique within the proxy config.
 	Operations []APIOperation `yaml:"operations,omitempty" json:"operations,omitempty"`
 }
