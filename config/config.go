@@ -184,13 +184,19 @@ type EnvironmentConfig struct {
 	ID string `yaml:"id" json:"id"`
 
 	// A list of proxy configs
-	ProxyConfigs []ProxyConfig
+	ProxyConfigs []ProxyConfig `yaml:"proxy_configs" json:"proxy_configs"`
 }
 
 // ProxyConfig has the proxy configuration.
 type ProxyConfig struct {
 	// Top-level basepath for the proxy config
 	Basepath string `yaml:"basepath,omitempty" json:"basepath,omitempty"`
+
+	// Authentication defines the proxy-level authentication requirement
+	Authentication AuthenticationRequirement `yaml:"authentication,omitempty" json:"authentication,omitempty"`
+
+	// ConsumerAuthorization defines the proxy-level consumer authorization
+	ConsumerAuthorization ConsumerAuthorization `yaml:"consumer_authorization,omitempty" json:"consumer_authorization,omitempty"`
 
 	// A list of Operations, names of which must be unique within the proxy config.
 	Operations []APIOperation `yaml:"operations,omitempty" json:"operations,omitempty"`
@@ -202,10 +208,10 @@ type APIOperation struct {
 	// Name of the operation. Unique within a APIRuntimeControlConfig.
 	Name string `yaml:"name" json:"name"`
 
-	// Authentication defines the AuthenticationRequirement
+	// Authentication defines the operation-level authentication requirement and overrides whatever in the proxy level
 	Authentication AuthenticationRequirement `yaml:"authentication,omitempty" json:"authentication,omitempty"`
 
-	// ConsumerAuthorization defines the ConsumerAuthorization
+	// ConsumerAuthorization defines the operation-level consumer authorization and overrides whatever in the proxy level
 	ConsumerAuthorization ConsumerAuthorization `yaml:"consumer_authorization,omitempty" json:"consumer_authorization,omitempty"`
 
 	// HTTP matching rules for this operation.
@@ -217,20 +223,24 @@ type APIOperation struct {
 	Target string `yaml:"target" json:"target"`
 }
 
-// AuthenticationRequirement defines the authentication requirement.
-// Precisely one of JWT, Any and All should be set.
-type AuthenticationRequirement struct {
-	// JWT defines the JWTAuthentication
-	JWT JWTAuthentication `yaml:"jwt,omitempty" json:"jwt,omitempty"`
-
-	// Any contains a list of AuthenticationRequirements.
-	// A successful authentication requires one of them being satisfied.
-	Any []AuthenticationRequirement `yaml:"any,omitempty" json:"any,omitempty"`
-
-	// All contains a list of AuthenticationRequirements.
-	// A successful authentication requires all of them being satisfied.
-	All []AuthenticationRequirement `yaml:"all,omitempty" json:"all,omitempty"`
+// AuthenticationRequirement is the interface defining the authentication requirement.
+type AuthenticationRequirement interface {
+	authenticationRequirement()
 }
+
+// AnyAuthenticationRequirements requires any of emclosed requirements to be satisfied for a successful authentication.
+type AnyAuthenticationRequirements struct {
+	Any []AuthenticationRequirement
+}
+
+func (AnyAuthenticationRequirements) authenticationRequirement() {}
+
+// AllAuthenticationRequirements requires all of emclosed requirements to be satisfied for a successful authentication.
+type AllAuthenticationRequirements struct {
+	All []AuthenticationRequirement
+}
+
+func (AllAuthenticationRequirements) authenticationRequirement()
 
 // JWTAuthentication defines the JWT authentication.
 type JWTAuthentication struct {
@@ -241,7 +251,7 @@ type JWTAuthentication struct {
 	Issuer string `yaml:"issuer" json:"issuer"`
 
 	// The JWKS source
-	JWKSource JWKSSource
+	JWKSSource JWKSSource
 
 	// Audiences contains a list of audiences
 	Audiences []string `yaml:"audiences,omitempty" json:"audiences,omitempty"`
@@ -253,6 +263,8 @@ type JWTAuthentication struct {
 	// Locations where JWT may be found. First match wins.
 	In []HTTPParameter `yaml:"in" json:"in"`
 }
+
+func (JWTAuthentication) authenticationRequirement()
 
 // JWKSSource is the JWKS source.
 type JWKSSource interface {
@@ -314,8 +326,8 @@ func (Header) paramMatch() {}
 
 // JWTClaim is reference to a JWT claim.
 type JWTClaim struct {
-	// Name of the JWT provider
-	Provider string `yaml:"provider" json:"provider"`
+	// Name of the JWT requirement
+	Requirement string `yaml:"requirement" json:"requirement"`
 
 	// Name of the claim
 	Name string `yaml:"name" json:"name"`
