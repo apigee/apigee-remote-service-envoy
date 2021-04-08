@@ -245,7 +245,7 @@ type AllAuthenticationRequirements struct {
 	All []AuthenticationRequirement
 }
 
-func (AllAuthenticationRequirements) authenticationRequirement()
+func (AllAuthenticationRequirements) authenticationRequirement() {}
 
 // JWTAuthentication defines the JWT authentication.
 type JWTAuthentication struct {
@@ -269,7 +269,7 @@ type JWTAuthentication struct {
 	In []HTTPParameter `yaml:"in" json:"in"`
 }
 
-func (JWTAuthentication) authenticationRequirement()
+func (JWTAuthentication) authenticationRequirement() {}
 
 // JWKSSource is the JWKS source.
 type JWKSSource interface {
