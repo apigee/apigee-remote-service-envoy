@@ -166,7 +166,7 @@ type AuthConfig struct {
 	AppendMetadataHeaders bool          `yaml:"append_metadata_headers,omitempty" json:"append_metadata_headers,omitempty"`
 }
 
-// EnvConfigs contains environment configs or URIs to them
+// EnvConfigs contains environment configs or URIs to them.
 type EnvConfigs struct {
 	// A list of strings containing environment config URIs
 	// Only the local file system is supported currently, e.g., file://path/to/config.yaml
@@ -187,7 +187,7 @@ type EnvironmentConfig struct {
 	ProxyConfigs []ProxyConfig
 }
 
-// ProxyConfig has the proxy configuration
+// ProxyConfig has the proxy configuration.
 type ProxyConfig struct {
 	// Top-level basepath for the proxy config
 	Basepath string `yaml:"basepath,omitempty" json:"basepath,omitempty"`
@@ -232,7 +232,7 @@ type AuthenticationRequirement struct {
 	All []AuthenticationRequirement `yaml:"all,omitempty" json:"all,omitempty"`
 }
 
-// JWTAuthentication defines the JWT authentication
+// JWTAuthentication defines the JWT authentication.
 type JWTAuthentication struct {
 	// Name of this JWT requirement, unique within the Proxy.
 	Name string `yaml:"name" json:"name"`
@@ -241,7 +241,7 @@ type JWTAuthentication struct {
 	Issuer string `yaml:"issuer" json:"issuer"`
 
 	// The JWKS source
-	JWKSource JWKSSource `yaml:"jwks_source" json:"jwks_source"`
+	JWKSource JWKSSource
 
 	// Audiences contains a list of audiences
 	Audiences []string `yaml:"audiences,omitempty" json:"audiences,omitempty"`
@@ -254,12 +254,12 @@ type JWTAuthentication struct {
 	In []HTTPParameter `yaml:"in" json:"in"`
 }
 
-// JWKSSource is the JWKS source
-type JWKSSource struct {
-	RemoteJWKS RemoteJWKS `yaml:"remote_jwks" json:"remote_jwks"`
+// JWKSSource is the JWKS source.
+type JWKSSource interface {
+	jwksSource()
 }
 
-// RemoteJWKS contains information for remote JWKS
+// RemoteJWKS contains information for remote JWKS.
 type RemoteJWKS struct {
 	// URL of the JWKS
 	URL string `yaml:"url" json:"url"`
@@ -268,7 +268,9 @@ type RemoteJWKS struct {
 	CacheDuration time.Duration `yaml:"cache_duration,omitempty" json:"cache_duration,omitempty"`
 }
 
-// ConsumerAuthorization is the configuration of API consumer authorization
+func (RemoteJWKS) jwksSource() {}
+
+// ConsumerAuthorization is the configuration of API consumer authorization.
 type ConsumerAuthorization struct {
 	FailOpen bool `yaml:"fail_open,omitempty" json:"fail_open,omitempty"`
 
@@ -276,7 +278,7 @@ type ConsumerAuthorization struct {
 	In []HTTPParameter `yaml:"in" json:"in"`
 }
 
-// HTTPMatch is an HTTP request matching rule
+// HTTPMatch is an HTTP request matching rule.
 type HTTPMatch struct {
 	// URL path template using to match incoming requests and optionally identify
 	// path variables.
@@ -286,24 +288,42 @@ type HTTPMatch struct {
 	Method string `yaml:"method,omitempty" json:"method,omitempty"`
 }
 
-// HTTPParameter defines an HTTP paramter
-// Precisely one of Query, Header or JWTClaim should be set.
+// HTTPParameter defines an HTTP paramter.
 type HTTPParameter struct {
-	// Name of a query paramter
-	Query string `yaml:"query,omitempty" json:"query,omitempty"`
+	// Query, Header and JWTClaim are supported.
+	Match ParamMatch
 
-	// Name of a header
-	Header string `yaml:"header,omitempty" json:"header,omitempty"`
-
-	// A JWTClaim
-	JWTClaim JWTClaim `yaml:"jwt_claim,omitempty" json:"jwt_claim,omitempty"`
-
-	// String modification to strip off matched value (e.g. "Bearer " for Authorization
-	// tokens).
+	// Optional transformation of the parameter value (e.g. "Bearer " for Authorization tokens).
 	Transformation StringTransformation `yaml:"transformation,omitempty" json:"transformation,omitempty"`
 }
 
-// StringTransformation uses simple template syntax
+// ParamMatch tells the location of the HTTP paramter.
+type ParamMatch interface {
+	paramMatch()
+}
+
+// Name of a query paramter
+type Query string
+
+func (Query) paramMatch() {}
+
+// Name of a header
+type Header string
+
+func (Header) paramMatch() {}
+
+// JWTClaim is reference to a JWT claim.
+type JWTClaim struct {
+	// Name of the JWT provider
+	Provider string `yaml:"provider" json:"provider"`
+
+	// Name of the claim
+	Name string `yaml:"name" json:"name"`
+}
+
+func (JWTClaim) paramMatch() {}
+
+// StringTransformation uses simple template syntax.
 // e.g. template: "prefix-{foo}-{bar}-suffix"
 //      substitution: "{foo}_{bar}"
 //      -->
@@ -315,15 +335,6 @@ type StringTransformation struct {
 
 	// Substitution string, optionally using variables declared in the template.
 	Substitution string `yaml:"substitution,omitempty" json:"substitution,omitempty"`
-}
-
-// JWTClaim is reference to a JWT claim.
-type JWTClaim struct {
-	// Name of the JWT provider
-	Provider string `yaml:"provider" json:"provider"`
-
-	// Name of the claim
-	Name string `yaml:"name" json:"name"`
 }
 
 // Load config
