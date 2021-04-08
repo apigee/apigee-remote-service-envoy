@@ -166,13 +166,14 @@ type AuthConfig struct {
 	AppendMetadataHeaders bool          `yaml:"append_metadata_headers,omitempty" json:"append_metadata_headers,omitempty"`
 }
 
-// EnvConfigs
+// EnvConfigs contains environment configs or URIs to them
 type EnvConfigs struct {
-	// A list of files containing environment config
-	ConfigFiles []string `yaml:"config_files,omitempty" json:"config_files,omitempty"`
+	// A list of strings containing environment config URIs
+	// Only the local file system is supported currently, e.g., file://path/to/config.yaml
+	ConfigURIs []string `yaml:"config_uris,omitempty" json:"config_uris,omitempty"`
 
 	// A list of environment configs
-	InlineConfigs []EnvironmentConfig `yaml:"inline_configs,omitempty" json:"inline_configs,omitempty"`
+	Inline []EnvironmentConfig `yaml:"inline,omitempty" json:"inline,omitempty"`
 }
 
 // EnvironmentConfig is an Apigee Environment-level config for
@@ -192,12 +193,12 @@ type ProxyConfig struct {
 	Basepath string `yaml:"basepath,omitempty" json:"basepath,omitempty"`
 
 	// A list of Operations, names of which must be unique within the proxy config.
-	Operations []Operation `yaml:"operations,omitempty" json:"operations,omitempty"`
+	Operations []APIOperation `yaml:"operations,omitempty" json:"operations,omitempty"`
 }
 
-// An API Operation associates a set of rules with a set of request matching
+// An APIOperation associates a set of rules with a set of request matching
 // settings.
-type Operation struct {
+type APIOperation struct {
 	// Name of the operation. Unique within a APIRuntimeControlConfig.
 	Name string `yaml:"name" json:"name"`
 
@@ -210,10 +211,10 @@ type Operation struct {
 	// HTTP matching rules for this operation.
 	HTTPMatches []HTTPMatch `yaml:"http_match,omitempty" json:"http_match,omitempty"`
 
-	// Target server for this operation. This will be sent to Envoy
+	// Name of the target server for this operation. This will be sent to Envoy
 	// for routing to the corresponding upstream cluster upon a successful
 	// authorization of the operation.
-	Target Target `yaml:"target" json:"target"`
+	Target string `yaml:"target" json:"target"`
 }
 
 // AuthenticationRequirement defines the authentication requirement.
@@ -233,14 +234,14 @@ type AuthenticationRequirement struct {
 
 // JWTAuthentication defines the JWT authentication
 type JWTAuthentication struct {
-	// Name of this JWT Provider, unique within the Proxy.
+	// Name of this JWT requirement, unique within the Proxy.
 	Name string `yaml:"name" json:"name"`
 
 	// JWT issuer ("iss" claim)
 	Issuer string `yaml:"issuer" json:"issuer"`
 
-	// A remote JWKS source
-	RemoteJWKS RemoteJWKS `yaml:"remote_jwks" json:"remote_jwks"`
+	// The JWKS source
+	JWKSource JWKSSource `yaml:"jwks_source" json:"jwks_source"`
 
 	// Audiences contains a list of audiences
 	Audiences []string `yaml:"audiences,omitempty" json:"audiences,omitempty"`
@@ -251,6 +252,11 @@ type JWTAuthentication struct {
 
 	// Locations where JWT may be found. First match wins.
 	In []HTTPParameter `yaml:"in" json:"in"`
+}
+
+// JWKSSource is the JWKS source
+type JWKSSource struct {
+	RemoteJWKS RemoteJWKS `yaml:"remote_jwks" json:"remote_jwks"`
 }
 
 // RemoteJWKS contains information for remote JWKS
@@ -268,20 +274,6 @@ type ConsumerAuthorization struct {
 
 	// Locations of API consumer credential (API Key). First match wins.
 	In []HTTPParameter `yaml:"in" json:"in"`
-}
-
-// Target contains the name of the target server and request transformation
-type Target struct {
-	// Name of the target
-	Name string `yaml:"name" json:"name"`
-
-	// RequestTransformation defines how the request should be modified, e.g. a path rewrite
-	RequestTransformation RequestTransformation `yaml:"request_transformation,omitempty" json:"request_transformation,omitempty"`
-}
-
-type RequestTransformation struct {
-	// StringTransformation to rewrite the path request header
-	PathRewrite StringTransformation `yaml:"path_rewrite,omitempty" json:"path_rewrite,omitempty"`
 }
 
 // HTTPMatch is an HTTP request matching rule
@@ -312,8 +304,8 @@ type HTTPParameter struct {
 }
 
 // StringTransformation uses simple template syntax
-// e.g. template: "prefix-{{foo}}-{{bar}}-suffix"
-//      substitution: "{{foo}}_{{bar}}"
+// e.g. template: "prefix-{foo}-{bar}-suffix"
+//      substitution: "{foo}_{bar}"
 //      -->
 //      input: "prefix-hello-world-suffix"
 //      output: "hello_world"
