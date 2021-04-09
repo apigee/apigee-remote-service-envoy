@@ -666,6 +666,62 @@ func TestValidateTLS(t *testing.T) {
 	}
 }
 
+func TestAuthenticationRequirementTypes(t *testing.T) {
+	j := JWTAuthentication{}
+	j.authenticationRequirement()
+
+	any := AnyAuthenticationRequirements{}
+	any.authenticationRequirement()
+
+	all := AllAuthenticationRequirements{}
+	all.authenticationRequirement()
+}
+
+func TestJWKSSourceTypes(t *testing.T) {
+	j := RemoteJWKS{}
+	j.jwksSource()
+}
+
+func TestParamMatchTypes(t *testing.T) {
+	h := Header("header")
+	h.paramMatch()
+
+	q := Query("query")
+	q.paramMatch()
+
+	j := JWTClaim{}
+	j.paramMatch()
+}
+
+func TestMultitenant(t *testing.T) {
+	tests := []struct {
+		desc string
+		tc   TenantConfig
+		want bool
+	}{
+		{
+			desc: "multitenant",
+			tc: TenantConfig{
+				EnvName: "*",
+			},
+			want: true,
+		},
+		{
+			desc: "not multitenant",
+			tc: TenantConfig{
+				EnvName: "env",
+			},
+			want: false,
+		},
+	}
+
+	for _, test := range tests {
+		if got := test.tc.IsMultitenant(); got != test.want {
+			t.Errorf("tc.IsMultitenant() = %v, want = %v", got, test.want)
+		}
+	}
+}
+
 func makePolicySecretCRD() (*SecretCRD, error) {
 	kid := "my kid"
 	privateKey, jwksBuf, err := testutil.GenerateKeyAndJWKs(kid)
