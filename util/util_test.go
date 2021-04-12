@@ -69,6 +69,11 @@ func TestLoadPrivateKey(t *testing.T) {
 			pkBytes: badKeyBuf2.Bytes(),
 			wantErr: true,
 		},
+		{
+			desc:    "bad bytes",
+			pkBytes: []byte("not a private key"),
+			wantErr: true,
+		},
 	}
 
 	for _, test := range tests {

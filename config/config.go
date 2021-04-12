@@ -34,6 +34,7 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/v2/log"
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 	"golang.org/x/oauth2/google"
 	"gopkg.in/yaml.v3"
 )
@@ -51,7 +52,16 @@ const (
 	// DefaultAnalyticsSecretPath is the default path the analytics credentials directory
 	DefaultAnalyticsSecretPath = "/analytics-secret"
 
-	ApigeeAPIScope = "https://www.googleapis.com/auth/cloud-platform" // scope Apigee API needs
+	// ApigeeAPIScope specifies the scope Apigee API needs
+	ApigeeAPIScope = "https://www.googleapis.com/auth/cloud-platform"
+
+	// EnvironmentVairiablePrefix is the prefix of the env vars that can override given config
+	EnvironmentVariablePrefix = "APIGEE"
+
+	RemoteServiceKey     = "TENANT.PRIVATE_KEY"
+	RemoteServiceKeyID   = "TENANT.PRIVATE_KEY_ID"
+	RemoteServiceJWKS    = "TENANT.JWKS"
+	AnalyticsCredentials = "ANALYTICS.CREDENTIALS_JSON"
 )
 
 // DefaultConfig returns a config with defaults set
@@ -87,48 +97,48 @@ func DefaultConfig() *Config {
 // Config is all config
 // Auth and EnvConfigs are mutually exclusive
 type Config struct {
-	Global     GlobalConfig    `yaml:"global,omitempty" json:"global,omitempty"`
-	Tenant     TenantConfig    `yaml:"tenant,omitempty" json:"tenant,omitempty"`
-	Products   ProductsConfig  `yaml:"products,omitempty" json:"products,omitempty"`
-	Analytics  AnalyticsConfig `yaml:"analytics,omitempty" json:"analytics,omitempty"`
-	Auth       AuthConfig      `yaml:"auth,omitempty" json:"auth,omitempty"`
-	EnvConfigs EnvConfigs      `yaml:"env_configs,omitempty" json:"env_configs,omitempty"`
+	Global     GlobalConfig    `yaml:"global,omitempty" json:"global,omitempty" mapstructure:"global,omitempty"`
+	Tenant     TenantConfig    `yaml:"tenant,omitempty" json:"tenant,omitempty" mapstructure:"tenant,omitempty"`
+	Products   ProductsConfig  `yaml:"products,omitempty" json:"products,omitempty" mapstructure:"products,omitempty"`
+	Analytics  AnalyticsConfig `yaml:"analytics,omitempty" json:"analytics,omitempty" mapstructure:"analytics,omitempty"`
+	Auth       AuthConfig      `yaml:"auth,omitempty" json:"auth,omitempty" mapstructure:"auth,omitempty"`
+	EnvConfigs EnvConfigs      `yaml:"env_configs,omitempty" json:"env_configs,omitempty" mapstructure:"env_configs,omitempty"`
 }
 
 // GlobalConfig is global configuration for the server
 type GlobalConfig struct {
-	APIAddress                string            `yaml:"api_address,omitempty" json:"api_address,omitempty"`
-	MetricsAddress            string            `yaml:"metrics_address,omitempty" json:"metrics_address,omitempty"`
-	TempDir                   string            `yaml:"temp_dir,omitempty" json:"temp_dir,omitempty"`
-	KeepAliveMaxConnectionAge time.Duration     `yaml:"keep_alive_max_connection_age,omitempty" json:"keep_alive_max_connection_age,omitempty"`
-	TLS                       TLSListenerConfig `yaml:"tls,omitempty" json:"tls,omitempty"`
+	APIAddress                string            `yaml:"api_address,omitempty" json:"api_address,omitempty" mapstructure:"api_address,omitempty"`
+	MetricsAddress            string            `yaml:"metrics_address,omitempty" json:"metrics_address,omitempty" mapstructure:"metrics_address,omitempty"`
+	TempDir                   string            `yaml:"temp_dir,omitempty" json:"temp_dir,omitempty" mapstructure:"temp_dir,omitempty"`
+	KeepAliveMaxConnectionAge time.Duration     `yaml:"keep_alive_max_connection_age,omitempty" json:"keep_alive_max_connection_age,omitempty" mapstructure:"keep_alive_max_connection_age,omitempty"`
+	TLS                       TLSListenerConfig `yaml:"tls,omitempty" json:"tls,omitempty" mapstructure:"tls,omitempty"`
 	Namespace                 string            `yaml:"-" json:"-"`
 }
 
 // TLSListenerConfig is tls configuration
 type TLSListenerConfig struct {
-	KeyFile  string `yaml:"key_file,omitempty" json:"key_file,omitempty"`
-	CertFile string `yaml:"cert_file,omitempty" json:"cert_file,omitempty"`
+	KeyFile  string `yaml:"key_file,omitempty" json:"key_file,omitempty" mapstructure:"key_file,omitempty"`
+	CertFile string `yaml:"cert_file,omitempty" json:"cert_file,omitempty" mapstructure:"cert_file,omitempty"`
 }
 
 // TLSClientConfig is mtls configuration
 type TLSClientConfig struct {
-	CAFile                 string `yaml:"ca_file,omitempty" json:"ca_file,omitempty"`
-	KeyFile                string `yaml:"key_file,omitempty" json:"key_file,omitempty"`
-	CertFile               string `yaml:"cert_file,omitempty" json:"cert_file,omitempty"`
-	AllowUnverifiedSSLCert bool   `yaml:"allow_unverified_ssl_cert,omitempty" json:"allow_unverified_ssl_cert,omitempty"`
+	CAFile                 string `yaml:"ca_file,omitempty" json:"ca_file,omitempty" mapstructure:"ca_file,omitempty"`
+	KeyFile                string `yaml:"key_file,omitempty" json:"key_file,omitempty" mapstructure:"key_file,omitempty"`
+	CertFile               string `yaml:"cert_file,omitempty" json:"cert_file,omitempty" mapstructure:"cert_file,omitempty"`
+	AllowUnverifiedSSLCert bool   `yaml:"allow_unverified_ssl_cert,omitempty" json:"allow_unverified_ssl_cert,omitempty" mapstructure:"allow_unverified_ssl_cert,omitempty"`
 }
 
 // TenantConfig is config relating to an Apigee tentant
 type TenantConfig struct {
-	InternalAPI         string          `yaml:"internal_api,omitempty" json:"internal_api,omitempty"`
-	RemoteServiceAPI    string          `yaml:"remote_service_api" json:"remote_service_api"`
-	OrgName             string          `yaml:"org_name" json:"org_name"`
-	EnvName             string          `yaml:"env_name" json:"env_name"`
-	Key                 string          `yaml:"key,omitempty" json:"key,omitempty"`
-	Secret              string          `yaml:"secret,omitempty" json:"secret,omitempty"`
-	ClientTimeout       time.Duration   `yaml:"client_timeout,omitempty" json:"client_timeout,omitempty"`
-	TLS                 TLSClientConfig `yaml:"tls,omitempty" json:"tls,omitempty"`
+	InternalAPI         string          `yaml:"internal_api,omitempty" json:"internal_api,omitempty" mapstructure:"internal_api,omitempty"`
+	RemoteServiceAPI    string          `yaml:"remote_service_api" json:"remote_service_api" mapstructure:"remote_service_api"`
+	OrgName             string          `yaml:"org_name" json:"org_name" mapstructure:"org_name"`
+	EnvName             string          `yaml:"env_name" json:"env_name" mapstructure:"env_name"`
+	Key                 string          `yaml:"key,omitempty" json:"key,omitempty" mapstructure:"key,omitempty"`
+	Secret              string          `yaml:"secret,omitempty" json:"secret,omitempty" mapstructure:"secret,omitempty"`
+	ClientTimeout       time.Duration   `yaml:"client_timeout,omitempty" json:"client_timeout,omitempty" mapstructure:"client_timeout,omitempty"`
+	TLS                 TLSClientConfig `yaml:"tls,omitempty" json:"tls,omitempty" mapstructure:"tls,omitempty"`
 	PrivateKey          *rsa.PrivateKey `yaml:"-" json:"-"`
 	PrivateKeyID        string          `yaml:"-" json:"-"`
 	JWKS                jwk.Set         `yaml:"-" json:"-"`
@@ -142,28 +152,28 @@ func (t *TenantConfig) IsMultitenant() bool {
 
 // ProductsConfig is products-related config
 type ProductsConfig struct {
-	RefreshRate time.Duration `yaml:"refresh_rate,omitempty" json:"refresh_rate,omitempty"`
+	RefreshRate time.Duration `yaml:"refresh_rate,omitempty" json:"refresh_rate,omitempty" mapstructure:"refresh_rate,omitempty"`
 }
 
 // AnalyticsConfig is analytics-related config
 type AnalyticsConfig struct {
-	LegacyEndpoint     bool                `yaml:"legacy_endpoint,omitempty" json:"legacy_endpoint,omitempty"`
-	FileLimit          int                 `yaml:"file_limit,omitempty" json:"file_limit,omitempty"`
-	SendChannelSize    int                 `yaml:"send_channel_size,omitempty" json:"send_channel_size,omitempty"`
-	CollectionInterval time.Duration       `yaml:"collection_interval,omitempty" json:"collection_interval,omitempty"`
+	LegacyEndpoint     bool                `yaml:"legacy_endpoint,omitempty" json:"legacy_endpoint,omitempty" mapstructure:"legacy_endpoint,omitempty"`
+	FileLimit          int                 `yaml:"file_limit,omitempty" json:"file_limit,omitempty" mapstructure:"file_limit,omitempty"`
+	SendChannelSize    int                 `yaml:"send_channel_size,omitempty" json:"send_channel_size,omitempty" mapstructure:"send_channel_size,omitempty"`
+	CollectionInterval time.Duration       `yaml:"collection_interval,omitempty" json:"collection_interval,omitempty" mapstructure:"collection_interval,omitempty"`
 	CredentialsJSON    []byte              `yaml:"-" json:"-"`
 	Credentials        *google.Credentials `yaml:"-" json:"-"`
 }
 
 // AuthConfig is auth-related config
 type AuthConfig struct {
-	APIKeyClaim           string        `yaml:"api_key_claim,omitempty" json:"api_key_claim,omitempty"`
-	APIKeyCacheDuration   time.Duration `yaml:"api_key_cache_duration,omitempty" json:"api_key_cache_duration,omitempty"`
-	APIKeyHeader          string        `yaml:"api_key_header,omitempty" json:"api_key_header,omitempty"`
-	APIHeader             string        `yaml:"api_header,omitempty" json:"api_header,omitempty"`
-	AllowUnauthorized     bool          `yaml:"allow_unauthorized,omitempty" json:"allow_unauthorized,omitempty"`
-	JWTProviderKey        string        `yaml:"jwt_provider_key,omitempty" json:"jwt_provider_key,omitempty"`
-	AppendMetadataHeaders bool          `yaml:"append_metadata_headers,omitempty" json:"append_metadata_headers,omitempty"`
+	APIKeyClaim           string        `yaml:"api_key_claim,omitempty" json:"api_key_claim,omitempty" mapstructure:"api_key_claim,omitempty"`
+	APIKeyCacheDuration   time.Duration `yaml:"api_key_cache_duration,omitempty" json:"api_key_cache_duration,omitempty" mapstructure:"api_key_cache_duration,omitempty"`
+	APIKeyHeader          string        `yaml:"api_key_header,omitempty" json:"api_key_header,omitempty" mapstructure:"api_key_header,omitempty"`
+	APIHeader             string        `yaml:"api_header,omitempty" json:"api_header,omitempty" mapstructure:"api_header,omitempty"`
+	AllowUnauthorized     bool          `yaml:"allow_unauthorized,omitempty" json:"allow_unauthorized,omitempty" mapstructure:"allow_unauthorized,omitempty"`
+	JWTProviderKey        string        `yaml:"jwt_provider_key,omitempty" json:"jwt_provider_key,omitempty" mapstructure:"jwt_provider_key,omitempty"`
+	AppendMetadataHeaders bool          `yaml:"append_metadata_headers,omitempty" json:"append_metadata_headers,omitempty" mapstructure:"append_metadata_headers,omitempty"`
 }
 
 // EnvConfigs contains environment configs or URIs to them.
@@ -356,6 +366,13 @@ type StringTransformation struct {
 
 // Load config
 func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string, requireAnalyticsCredentials bool) error {
+	// enable automatic environment variable check + the prefix
+	viper.AutomaticEnv()
+	viper.SetEnvPrefix(EnvironmentVariablePrefix)
+
+	// set config to yaml
+	viper.SetConfigType("yaml")
+
 	log.Debugf("reading config from: %s", configFile)
 	yamlFile, err := os.ReadFile(configFile)
 	if err != nil {
@@ -372,10 +389,10 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string, 
 		if crd.Kind == "ConfigMap" {
 			configBytes = []byte(crd.Data["config.yaml"])
 			if configBytes != nil {
-				if err = yaml.Unmarshal(configBytes, c); err != nil {
+				c.Global.Namespace = crd.Metadata.Namespace
+				if err = c.unmarshalWithConfig(configBytes); err != nil {
 					return errors.Wrap(err, "bad config file format")
 				}
-				c.Global.Namespace = crd.Metadata.Namespace
 			}
 		} else if crd.Kind == "Secret" {
 			if strings.Contains(crd.Metadata.Name, "policy") {
@@ -401,7 +418,7 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string, 
 
 	// didn't load, try as simple config file
 	if configBytes == nil {
-		if err = yaml.Unmarshal(yamlFile, c); err != nil {
+		if err = c.unmarshalWithConfig(yamlFile); err != nil {
 			return errors.Wrap(err, "bad config file format")
 		}
 	}
@@ -434,6 +451,10 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string, 
 			}
 		}
 
+		if err = c.secretsFromEnv(); err != nil {
+			return err
+		}
+
 		// attempts to load the service account credentials if a path is given
 		if analyticsSecretPath != "" {
 			svc := path.Join(analyticsSecretPath, ServiceAccount)
@@ -449,16 +470,56 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string, 
 				}
 			} else {
 				// overwrites the credentials if read from the config
-				c.Analytics.CredentialsJSON = sa
-				c.Analytics.Credentials, err = google.CredentialsFromJSON(context.Background(), sa, ApigeeAPIScope)
-				if err != nil {
+				if err = c.analyticsCredentialsFromBytes(sa); err != nil {
 					return err
 				}
+			}
+		}
+
+		if val := viper.GetString(AnalyticsCredentials); val != "" {
+			if err = c.analyticsCredentialsFromBytes([]byte(val)); err != nil {
+				return err
 			}
 		}
 	}
 
 	return c.Validate(requireAnalyticsCredentials)
+}
+
+// unmarshalWithConfig uses viper to read the config bytes and unmarshal values into the config struct
+// such that environment variables take precedence over what's in the config bytes
+func (c *Config) unmarshalWithConfig(b []byte) error {
+	if err := viper.ReadConfig(bytes.NewBuffer(b)); err != nil {
+		return err
+	}
+	return viper.Unmarshal(c)
+}
+
+func (c *Config) secretsFromEnv() error {
+	var err error
+	if val := viper.GetString(RemoteServiceKeyID); val != "" {
+		c.Tenant.PrivateKeyID = val
+	}
+	if val := viper.GetString(RemoteServiceJWKS); val != "" {
+		jwks := jwk.NewSet()
+		if err = json.Unmarshal([]byte(val), jwks); err != nil {
+			return err
+		}
+		c.Tenant.JWKS = jwks
+	}
+	if val := viper.GetString(RemoteServiceKey); val != "" {
+		if c.Tenant.PrivateKey, err = util.LoadPrivateKey([]byte(val)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *Config) analyticsCredentialsFromBytes(b []byte) error {
+	var err error
+	c.Analytics.CredentialsJSON = b
+	c.Analytics.Credentials, err = google.CredentialsFromJSON(context.Background(), b, ApigeeAPIScope)
+	return err
 }
 
 // IsGCPManaged is true for hybrid and NG SaaS
