@@ -131,14 +131,14 @@ func DefaultConfig() *Config {
 }
 
 // Config is all config
-// Auth and EnvConfigs are mutually exclusive
 type Config struct {
-	Global     GlobalConfig    `yaml:"global,omitempty" json:"global,omitempty" mapstructure:"global,omitempty"`
-	Tenant     TenantConfig    `yaml:"tenant,omitempty" json:"tenant,omitempty" mapstructure:"tenant,omitempty"`
-	Products   ProductsConfig  `yaml:"products,omitempty" json:"products,omitempty" mapstructure:"products,omitempty"`
-	Analytics  AnalyticsConfig `yaml:"analytics,omitempty" json:"analytics,omitempty" mapstructure:"analytics,omitempty"`
-	Auth       AuthConfig      `yaml:"auth,omitempty" json:"auth,omitempty" mapstructure:"auth,omitempty"`
-	EnvConfigs EnvConfigs      `yaml:"env_configs,omitempty" json:"env_configs,omitempty" mapstructure:"env_configs,omitempty"`
+	Global    GlobalConfig    `yaml:"global,omitempty" json:"global,omitempty"`
+	Tenant    TenantConfig    `yaml:"tenant,omitempty" json:"tenant,omitempty"`
+	Products  ProductsConfig  `yaml:"products,omitempty" json:"products,omitempty"`
+	Analytics AnalyticsConfig `yaml:"analytics,omitempty" json:"analytics,omitempty"`
+	// If EnvConfigs is specified, APIKeyHeader, APIKeyClaim, JWTProviderKey in AuthConfig will be ineffectual.
+	Auth       AuthConfig `yaml:"auth,omitempty" json:"auth,omitempty"`
+	EnvConfigs EnvConfigs `yaml:"env_configs,omitempty" json:"env_configs,omitempty"`
 }
 
 // GlobalConfig is global configuration for the server
@@ -279,14 +279,14 @@ type AuthenticationRequirement interface {
 	authenticationRequirement()
 }
 
-// AnyAuthenticationRequirements requires any of emclosed requirements to be satisfied for a successful authentication.
+// AnyAuthenticationRequirements requires any of enclosed requirements to be satisfied for a successful authentication.
 type AnyAuthenticationRequirements struct {
 	Any []AuthenticationRequirement
 }
 
 func (AnyAuthenticationRequirements) authenticationRequirement() {}
 
-// AllAuthenticationRequirements requires all of emclosed requirements to be satisfied for a successful authentication.
+// AllAuthenticationRequirements requires all of enclosed requirements to be satisfied for a successful authentication.
 type AllAuthenticationRequirements struct {
 	All []AuthenticationRequirement
 }
@@ -335,6 +335,8 @@ func (RemoteJWKS) jwksSource() {}
 
 // ConsumerAuthorization is the configuration of API consumer authorization.
 type ConsumerAuthorization struct {
+	// Allow requests to be forwarded even if the consumer credential cannot be
+	// verified by the API Key provider due to service unavailability.
 	FailOpen bool `yaml:"fail_open,omitempty" json:"fail_open,omitempty"`
 
 	// Locations of API consumer credential (API Key). First match wins.
@@ -400,7 +402,29 @@ type StringTransformation struct {
 	Substitution string `yaml:"substitution,omitempty" json:"substitution,omitempty"`
 }
 
-// Load config
+// Load config with the given config file, secret paths and a flag specifying whether analytics credentials must be present.
+// Fields with mapstructure annotations will support loading from the following sources with descending precedence:
+//   * Environment variables - all upper cases with prefix APIGEE_ and annotations in different structs are delimited with ".", e.g.
+//     APIGEE_GLOBAL.API_ADDRESS=<addr> will assign Global.APIAddress to <addr>
+//   * Config file in yaml format, e.g., the config below
+//     global:
+//       api_address: <addr>
+//     will assign Global.APIAddress to <addr>
+// The following fields do not have mapstructure annotations but support similar ways of loading as described below:
+//   * Tenant.JWKS will be unmarshalled from APIGEE_TENANT.JWKS if such an environment variable exists. If not and policySecretPath is
+//     given, it will unmarshalled from the content of file {{policySecretPath}}/remote-service.crt. Lastly, if the given config file
+//     is multiple yaml files with secret CRD named "policy", the secret data with key "remote-service.crt" will be looked for and unmarshalled.
+//   * Tenant.PrivateKey will be unmarshalled from APIGEE_TENANT.PRIVATE_KEY if such an environment variable exists. If not and policySecretPath is
+//     given, it will unmarshalled from the content of file {{policySecretPath}}/remote-service.key. Lastly, if the given config file
+//     is multiple yaml files with secret CRDs named "policy", the secret data with key "remote-service.key" will be looked for and unmarshalled.
+//   * Tenant.PrivateKeyID will be given by APIGEE_TENANT.PRIVATE_KEY_ID if such an environment variable exists. If not and policySecretPath is
+//     given, the value of the key "kid" will be looked for from the property maps in {{policySecretPath}}/remote-service.properties.
+//     Lastly, if the given config file is multiple yaml files with secret CRDs named "policy", the secret data with key "remote-service.props"
+//     will be looked for and unmarshalled into a map where the value of the key "kid" will be looked for and used.
+//   * Analytics.CredentialsJSON will be given by APIGEE_ANALYTICS.CREDENTIALS_JSON if such an environment variable exists. If not and
+//     analyticsSecretPath is given, the file content of {{analyticsSecretPath}}/client_secret.json will be used. If such file does not
+//     exist but analyticsSecretPath is equal to DefaultAnalyticsSecretPath, the secret CRD named "analytics" in the config file will be looked
+//     for, in which the data with key "client_secret.json" will be used.
 func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string, requireAnalyticsCredentials bool) error {
 	log.Debugf("reading config from: %s", configFile)
 	yamlFile, err := os.ReadFile(configFile)
