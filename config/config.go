@@ -85,14 +85,14 @@ func DefaultConfig() *Config {
 }
 
 // Config is all config
-// Auth and EnvConfigs are mutually exclusive
 type Config struct {
-	Global     GlobalConfig    `yaml:"global,omitempty" json:"global,omitempty"`
-	Tenant     TenantConfig    `yaml:"tenant,omitempty" json:"tenant,omitempty"`
-	Products   ProductsConfig  `yaml:"products,omitempty" json:"products,omitempty"`
-	Analytics  AnalyticsConfig `yaml:"analytics,omitempty" json:"analytics,omitempty"`
-	Auth       AuthConfig      `yaml:"auth,omitempty" json:"auth,omitempty"`
-	EnvConfigs EnvConfigs      `yaml:"env_configs,omitempty" json:"env_configs,omitempty"`
+	Global    GlobalConfig    `yaml:"global,omitempty" json:"global,omitempty"`
+	Tenant    TenantConfig    `yaml:"tenant,omitempty" json:"tenant,omitempty"`
+	Products  ProductsConfig  `yaml:"products,omitempty" json:"products,omitempty"`
+	Analytics AnalyticsConfig `yaml:"analytics,omitempty" json:"analytics,omitempty"`
+	// If EnvConfigs is specified, APIKeyHeader, APIKeyClaim, JWTProviderKey in AuthConfig will be ineffectual.
+	Auth       AuthConfig `yaml:"auth,omitempty" json:"auth,omitempty"`
+	EnvConfigs EnvConfigs `yaml:"env_configs,omitempty" json:"env_configs,omitempty"`
 }
 
 // GlobalConfig is global configuration for the server
@@ -295,9 +295,6 @@ type ConsumerAuthorization struct {
 
 	// Locations of API consumer credential (API Key). First match wins.
 	In []HTTPParameter `yaml:"in" json:"in"`
-
-	// Cache duration of the API consumer credential
-	CacheDuration time.Duration `yaml:"cache_duration,omitempty" json:"cache_duration,omitempty"`
 }
 
 // HTTPMatch is an HTTP request matching rule.
