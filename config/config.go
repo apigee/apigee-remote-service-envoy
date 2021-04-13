@@ -233,14 +233,14 @@ type AuthenticationRequirement interface {
 	authenticationRequirement()
 }
 
-// AnyAuthenticationRequirements requires any of emclosed requirements to be satisfied for a successful authentication.
+// AnyAuthenticationRequirements requires any of enclosed requirements to be satisfied for a successful authentication.
 type AnyAuthenticationRequirements struct {
 	Any []AuthenticationRequirement
 }
 
 func (AnyAuthenticationRequirements) authenticationRequirement() {}
 
-// AllAuthenticationRequirements requires all of emclosed requirements to be satisfied for a successful authentication.
+// AllAuthenticationRequirements requires all of enclosed requirements to be satisfied for a successful authentication.
 type AllAuthenticationRequirements struct {
 	All []AuthenticationRequirement
 }
