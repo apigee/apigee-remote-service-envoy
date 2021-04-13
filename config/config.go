@@ -132,13 +132,13 @@ func DefaultConfig() *Config {
 
 // Config is all config
 type Config struct {
-	Global    GlobalConfig    `yaml:"global,omitempty" json:"global,omitempty"`
-	Tenant    TenantConfig    `yaml:"tenant,omitempty" json:"tenant,omitempty"`
-	Products  ProductsConfig  `yaml:"products,omitempty" json:"products,omitempty"`
-	Analytics AnalyticsConfig `yaml:"analytics,omitempty" json:"analytics,omitempty"`
+	Global    GlobalConfig    `yaml:"global,omitempty" json:"global,omitempty" mapstructure:"global,omitempty"`
+	Tenant    TenantConfig    `yaml:"tenant,omitempty" json:"tenant,omitempty" mapstructure:"tenant,omitempty"`
+	Products  ProductsConfig  `yaml:"products,omitempty" json:"products,omitempty" mapstructure:"products,omitempty"`
+	Analytics AnalyticsConfig `yaml:"analytics,omitempty" json:"analytics,omitempty" mapstructure:"analytics,omitempty"`
 	// If EnvConfigs is specified, APIKeyHeader, APIKeyClaim, JWTProviderKey in AuthConfig will be ineffectual.
-	Auth       AuthConfig `yaml:"auth,omitempty" json:"auth,omitempty"`
-	EnvConfigs EnvConfigs `yaml:"env_configs,omitempty" json:"env_configs,omitempty"`
+	Auth       AuthConfig `yaml:"auth,omitempty" json:"auth,omitempty" mapstructure:"auth,omitempty"`
+	EnvConfigs EnvConfigs `yaml:"env_configs,omitempty" json:"env_configs,omitempty" mapstructure:"env_configs,omitempty"`
 }
 
 // GlobalConfig is global configuration for the server

@@ -613,10 +613,10 @@ func TestLoadFromEnvironmentVariables(t *testing.T) {
 		t.Errorf("c.Tenant.PrivateKeyID = %s, want %s", c.Tenant.PrivateKeyID, kid)
 	}
 	if c.Tenant.OrgName != "test-org" {
-		t.Errorf("c.Tenant.OrgName = %s, want %s", c.Global.Namespace, "test-org")
+		t.Errorf("c.Tenant.OrgName = %s, want %s", c.Tenant.OrgName, "test-org")
 	}
 	if c.Global.Namespace != "test-namespace" {
-		t.Errorf("c.Gloabal.Namespace = %s, want %s", c.Global.Namespace, "test-namespace")
+		t.Errorf("c.Global.Namespace = %s, want %s", c.Global.Namespace, "test-namespace")
 	}
 
 	if s := string(c.Analytics.CredentialsJSON); s != fakeSA {
