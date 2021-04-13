@@ -574,6 +574,12 @@ func TestLoadFromEnvironmentVariables(t *testing.T) {
 	os.Setenv(envVarKey(AnalyticsCredentials), fakeSA)
 	defer os.Setenv(envVarKey(AnalyticsCredentials), "")
 
+	os.Setenv(envVarKey("GLOBAL.NAMESPACE"), "test-namespace")
+	defer os.Setenv(envVarKey("GLOBAL.NAMESPACE"), "")
+
+	os.Setenv(envVarKey("TENANT.ORG_NAME"), "test-org")
+	defer os.Setenv(envVarKey("TENANT.ORG_NAME"), "")
+
 	configCRD, policySecretCRD, _, err := makeCRDs()
 	if err != nil {
 		t.Fatal(err)
@@ -602,9 +608,15 @@ func TestLoadFromEnvironmentVariables(t *testing.T) {
 	if err := c.Load(tf.Name(), "", DefaultAnalyticsSecretPath, true); err != nil {
 		t.Errorf("want no error got %v", err)
 	}
-	// should be the kid from the environment variable
+	// should be from the environment variables
 	if c.Tenant.PrivateKeyID != kid {
 		t.Errorf("c.Tenant.PrivateKeyID = %s, want %s", c.Tenant.PrivateKeyID, kid)
+	}
+	if c.Tenant.OrgName != "test-org" {
+		t.Errorf("c.Tenant.OrgName = %s, want %s", c.Global.Namespace, "test-org")
+	}
+	if c.Global.Namespace != "test-namespace" {
+		t.Errorf("c.Gloabal.Namespace = %s, want %s", c.Global.Namespace, "test-namespace")
 	}
 
 	if s := string(c.Analytics.CredentialsJSON); s != fakeSA {

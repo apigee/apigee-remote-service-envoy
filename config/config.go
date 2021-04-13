@@ -26,6 +26,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"reflect"
 	"strings"
 	"time"
 
@@ -63,6 +64,41 @@ const (
 	RemoteServiceJWKS    = "TENANT.JWKS"
 	AnalyticsCredentials = "ANALYTICS.CREDENTIALS_JSON"
 )
+
+func init() {
+	// enable automatic environment variable check + the prefix
+	viper.AutomaticEnv()
+	viper.SetEnvPrefix(EnvironmentVariablePrefix)
+
+	// set config to yaml
+	viper.SetConfigType("yaml")
+
+	// bind environment variables to those derived from the config struct
+	bindEnvs(Config{}, "")
+}
+
+func bindEnvs(raw interface{}, prefix string) {
+	rv := reflect.ValueOf(raw)
+	rt := reflect.TypeOf(raw)
+	if prefix != "" {
+		prefix = prefix + "."
+	}
+	for i := 0; i < rt.NumField(); i++ {
+		v := rv.Field(i)
+		t := rt.Field(i)
+		tv, ok := t.Tag.Lookup("mapstructure")
+		if !ok {
+			continue
+		}
+		tv = strings.Split(tv, ",")[0]
+		switch v.Kind() {
+		case reflect.Struct:
+			bindEnvs(v.Interface(), prefix+tv)
+		default:
+			_ = viper.BindEnv(prefix + tv)
+		}
+	}
+}
 
 // DefaultConfig returns a config with defaults set
 func DefaultConfig() *Config {
@@ -112,7 +148,7 @@ type GlobalConfig struct {
 	TempDir                   string            `yaml:"temp_dir,omitempty" json:"temp_dir,omitempty" mapstructure:"temp_dir,omitempty"`
 	KeepAliveMaxConnectionAge time.Duration     `yaml:"keep_alive_max_connection_age,omitempty" json:"keep_alive_max_connection_age,omitempty" mapstructure:"keep_alive_max_connection_age,omitempty"`
 	TLS                       TLSListenerConfig `yaml:"tls,omitempty" json:"tls,omitempty" mapstructure:"tls,omitempty"`
-	Namespace                 string            `yaml:"-" json:"-"`
+	Namespace                 string            `yaml:"-" json:"-" mapstructure:"namespace,omitempty"`
 }
 
 // TLSListenerConfig is tls configuration
@@ -366,13 +402,6 @@ type StringTransformation struct {
 
 // Load config
 func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string, requireAnalyticsCredentials bool) error {
-	// enable automatic environment variable check + the prefix
-	viper.AutomaticEnv()
-	viper.SetEnvPrefix(EnvironmentVariablePrefix)
-
-	// set config to yaml
-	viper.SetConfigType("yaml")
-
 	log.Debugf("reading config from: %s", configFile)
 	yamlFile, err := os.ReadFile(configFile)
 	if err != nil {
