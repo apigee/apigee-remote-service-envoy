@@ -289,10 +289,14 @@ func (RemoteJWKS) jwksSource() {}
 
 // ConsumerAuthorization is the configuration of API consumer authorization.
 type ConsumerAuthorization struct {
+	// FailOpen indicates whether to allow the request on an authorization failure
 	FailOpen bool `yaml:"fail_open,omitempty" json:"fail_open,omitempty"`
 
 	// Locations of API consumer credential (API Key). First match wins.
 	In []HTTPParameter `yaml:"in" json:"in"`
+
+	// Cache duration of the API consumer credential
+	CacheDuration time.Duration `yaml:"cache_duration,omitempty" json:"cache_duration,omitempty"`
 }
 
 // HTTPMatch is an HTTP request matching rule.
