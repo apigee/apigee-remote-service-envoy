@@ -289,7 +289,8 @@ func (RemoteJWKS) jwksSource() {}
 
 // ConsumerAuthorization is the configuration of API consumer authorization.
 type ConsumerAuthorization struct {
-	// FailOpen indicates whether to allow the request on an authorization failure
+	// Allow requests to be forwarded even if the consumer credential cannot be
+	// verified by the API Key provider due to service unavailability.
 	FailOpen bool `yaml:"fail_open,omitempty" json:"fail_open,omitempty"`
 
 	// Locations of API consumer credential (API Key). First match wins.
