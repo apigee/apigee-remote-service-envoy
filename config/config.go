@@ -101,7 +101,6 @@ func bindEnvs(raw interface{}, prefix string) {
 		case reflect.Struct:
 			bindEnvs(v.Interface(), k)
 		default:
-			fmt.Println(k + " " + envVarKey(k))
 			_ = viper.BindEnv(k, envVarKey(k))
 		}
 	}
@@ -221,6 +220,7 @@ type AuthConfig struct {
 	AllowUnauthorized     bool          `yaml:"allow_unauthorized,omitempty" json:"allow_unauthorized,omitempty" mapstructure:"allow_unauthorized,omitempty"`
 	JWTProviderKey        string        `yaml:"jwt_provider_key,omitempty" json:"jwt_provider_key,omitempty" mapstructure:"jwt_provider_key,omitempty"`
 	AppendMetadataHeaders bool          `yaml:"append_metadata_headers,omitempty" json:"append_metadata_headers,omitempty" mapstructure:"append_metadata_headers,omitempty"`
+
 }
 
 // EnvConfigs contains environment configs or URIs to them.
@@ -255,9 +255,7 @@ type ProxyConfig struct {
 	// ConsumerAuthorization defines the proxy-level consumer authorization
 	ConsumerAuthorization ConsumerAuthorization `yaml:"consumer_authorization,omitempty" json:"consumer_authorization,omitempty"`
 
-	// Name of the target server for this proxy. This will be sent to Envoy
-	// for routing to the corresponding upstream cluster upon a successful
-	// authorization.
+	// Name of the target server for this proxy.
 	Target string `yaml:"target" json:"target"`
 
 	// A list of Operations, names of which must be unique within the proxy config.
@@ -267,7 +265,7 @@ type ProxyConfig struct {
 // An APIOperation associates a set of rules with a set of request matching
 // settings.
 type APIOperation struct {
-	// Name of the operation. Unique within a APIRuntimeControlConfig.
+	// Name of the operation. Unique within a proxy config.
 	Name string `yaml:"name" json:"name"`
 
 	// Authentication defines the operation-level authentication requirement and overrides whatever in the proxy level
@@ -276,12 +274,10 @@ type APIOperation struct {
 	// ConsumerAuthorization defines the operation-level consumer authorization and overrides whatever in the proxy level
 	ConsumerAuthorization ConsumerAuthorization `yaml:"consumer_authorization,omitempty" json:"consumer_authorization,omitempty"`
 
-	// HTTP matching rules for this operation.
+	// HTTP matching rules for this operation. If omitted, this will match all requests.
 	HTTPMatches []HTTPMatch `yaml:"http_match,omitempty" json:"http_match,omitempty"`
 
-	// Name of the target server for this operation. This will be sent to Envoy
-	// for routing to the corresponding upstream cluster upon a successful
-	// authorization of the operation.
+	// Name of the target server for this operation.
 	Target string `yaml:"target" json:"target"`
 }
 
@@ -291,16 +287,12 @@ type AuthenticationRequirement interface {
 }
 
 // AnyAuthenticationRequirements requires any of enclosed requirements to be satisfied for a successful authentication.
-type AnyAuthenticationRequirements struct {
-	Any []AuthenticationRequirement
-}
+type AnyAuthenticationRequirements []AuthenticationRequirement
 
 func (AnyAuthenticationRequirements) authenticationRequirement() {}
 
 // AllAuthenticationRequirements requires all of enclosed requirements to be satisfied for a successful authentication.
-type AllAuthenticationRequirements struct {
-	All []AuthenticationRequirement
-}
+type AllAuthenticationRequirements []AuthenticationRequirement
 
 func (AllAuthenticationRequirements) authenticationRequirement() {}
 
