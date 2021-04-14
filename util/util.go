@@ -12,15 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package server
+package util
 
 import (
 	"bufio"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"strings"
 
 	pb "github.com/golang/protobuf/ptypes/struct"
+)
+
+const (
+	// PEMKeyType is the type of privateKey in the PEM file
+	PEMKeyType = "RSA PRIVATE KEY"
 )
 
 // DecodeToMap converts a pb.Struct to a map from strings to Go types.
@@ -89,4 +97,30 @@ func WriteProperties(writer io.Writer, props map[string]string) error {
 	}
 
 	return nil
+}
+
+// LoadPrivateKey load private key bytes into rsa.PrivateKey
+func LoadPrivateKey(privateKeyBytes []byte) (*rsa.PrivateKey, error) {
+
+	var err error
+	privPem, _ := pem.Decode(privateKeyBytes)
+	if PEMKeyType != privPem.Type {
+		return nil, fmt.Errorf("%s required, found: %s", PEMKeyType, privPem.Type)
+	}
+
+	var parsedKey interface{}
+	if parsedKey, err = x509.ParsePKCS1PrivateKey(privPem.Bytes); err != nil {
+		if parsedKey, err = x509.ParsePKCS8PrivateKey(privPem.Bytes); err != nil {
+			return nil, err
+		}
+	}
+
+	var privateKey *rsa.PrivateKey
+	var ok bool
+	privateKey, ok = parsedKey.(*rsa.PrivateKey)
+	if !ok {
+		return nil, err
+	}
+
+	return privateKey, nil
 }

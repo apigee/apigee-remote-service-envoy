@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2021 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package server
+// Package config defines the API Runtime Control config and provides
+// the config loading and validation functions.
+package config
 
 import (
 	"bytes"
@@ -27,6 +29,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/apigee/apigee-remote-service-envoy/v2/util"
 	"github.com/apigee/apigee-remote-service-golib/v2/errorset"
 	"github.com/apigee/apigee-remote-service-golib/v2/log"
 	"github.com/lestrrat-go/jwx/jwk"
@@ -87,7 +90,9 @@ type Config struct {
 	Tenant    TenantConfig    `yaml:"tenant,omitempty" json:"tenant,omitempty"`
 	Products  ProductsConfig  `yaml:"products,omitempty" json:"products,omitempty"`
 	Analytics AnalyticsConfig `yaml:"analytics,omitempty" json:"analytics,omitempty"`
-	Auth      AuthConfig      `yaml:"auth,omitempty" json:"auth,omitempty"`
+	// If EnvConfigs is specified, APIKeyHeader, APIKeyClaim, JWTProviderKey in AuthConfig will be ineffectual.
+	Auth       AuthConfig `yaml:"auth,omitempty" json:"auth,omitempty"`
+	EnvConfigs EnvConfigs `yaml:"env_configs,omitempty" json:"env_configs,omitempty"`
 }
 
 // GlobalConfig is global configuration for the server
@@ -161,6 +166,188 @@ type AuthConfig struct {
 	AppendMetadataHeaders bool          `yaml:"append_metadata_headers,omitempty" json:"append_metadata_headers,omitempty"`
 }
 
+// EnvConfigs contains environment configs or URIs to them.
+type EnvConfigs struct {
+	// A list of strings containing environment config URIs
+	// Only the local file system is supported currently, e.g., file://path/to/config.yaml
+	ConfigURIs []string `yaml:"config_uris,omitempty" json:"config_uris,omitempty"`
+
+	// A list of environment configs
+	Inline []EnvironmentConfig `yaml:"inline,omitempty" json:"inline,omitempty"`
+}
+
+// EnvironmentConfig is an Apigee Environment-level config for
+// Envoy Adapter. It contains a list of operations for the adapter to
+// perform request authentication and authorization.
+type EnvironmentConfig struct {
+	// Unique ID of the environment config
+	ID string `yaml:"id" json:"id"`
+
+	// A list of proxy configs
+	ProxyConfigs []ProxyConfig `yaml:"proxy_configs" json:"proxy_configs"`
+}
+
+// ProxyConfig has the proxy configuration.
+type ProxyConfig struct {
+	// Top-level basepath for the proxy config
+	Basepath string `yaml:"basepath,omitempty" json:"basepath,omitempty"`
+
+	// Authentication defines the proxy-level authentication requirement
+	Authentication AuthenticationRequirement `yaml:"authentication,omitempty" json:"authentication,omitempty"`
+
+	// ConsumerAuthorization defines the proxy-level consumer authorization
+	ConsumerAuthorization ConsumerAuthorization `yaml:"consumer_authorization,omitempty" json:"consumer_authorization,omitempty"`
+
+	// Name of the target server for this proxy.
+	Target string `yaml:"target" json:"target"`
+
+	// A list of Operations, names of which must be unique within the proxy config.
+	Operations []APIOperation `yaml:"operations,omitempty" json:"operations,omitempty"`
+}
+
+// An APIOperation associates a set of rules with a set of request matching
+// settings.
+type APIOperation struct {
+	// Name of the operation. Unique within a proxy config.
+	Name string `yaml:"name" json:"name"`
+
+	// Authentication defines the operation-level authentication requirement and overrides whatever in the proxy level
+	Authentication AuthenticationRequirement `yaml:"authentication,omitempty" json:"authentication,omitempty"`
+
+	// ConsumerAuthorization defines the operation-level consumer authorization and overrides whatever in the proxy level
+	ConsumerAuthorization ConsumerAuthorization `yaml:"consumer_authorization,omitempty" json:"consumer_authorization,omitempty"`
+
+	// HTTP matching rules for this operation. If omitted, this will match all requests.
+	HTTPMatches []HTTPMatch `yaml:"http_match,omitempty" json:"http_match,omitempty"`
+
+	// Name of the target server for this operation.
+	Target string `yaml:"target" json:"target"`
+}
+
+// AuthenticationRequirement is the interface defining the authentication requirement.
+type AuthenticationRequirement interface {
+	authenticationRequirement()
+}
+
+// AnyAuthenticationRequirements requires any of enclosed requirements to be satisfied for a successful authentication.
+type AnyAuthenticationRequirements []AuthenticationRequirement
+
+func (AnyAuthenticationRequirements) authenticationRequirement() {}
+
+// AllAuthenticationRequirements requires all of enclosed requirements to be satisfied for a successful authentication.
+type AllAuthenticationRequirements []AuthenticationRequirement
+
+func (AllAuthenticationRequirements) authenticationRequirement() {}
+
+// JWTAuthentication defines the JWT authentication.
+type JWTAuthentication struct {
+	// Name of this JWT requirement, unique within the Proxy.
+	Name string `yaml:"name" json:"name"`
+
+	// JWT issuer ("iss" claim)
+	Issuer string `yaml:"issuer" json:"issuer"`
+
+	// The JWKS source
+	JWKSSource JWKSSource
+
+	// Audiences contains a list of audiences
+	Audiences []string `yaml:"audiences,omitempty" json:"audiences,omitempty"`
+
+	// Header name that will contain decoded JWT payload in requests forwarded to
+	// target.
+	ForwardPayloadHeader string `yaml:"forward_payload_header,omitempty" json:"forward_payload_header,omitempty"`
+
+	// Locations where JWT may be found. First match wins.
+	In []HTTPParameter `yaml:"in" json:"in"`
+}
+
+func (JWTAuthentication) authenticationRequirement() {}
+
+// JWKSSource is the JWKS source.
+type JWKSSource interface {
+	jwksSource()
+}
+
+// RemoteJWKS contains information for remote JWKS.
+type RemoteJWKS struct {
+	// URL of the JWKS
+	URL string `yaml:"url" json:"url"`
+
+	// CacheDuration of the JWKS
+	CacheDuration time.Duration `yaml:"cache_duration,omitempty" json:"cache_duration,omitempty"`
+}
+
+func (RemoteJWKS) jwksSource() {}
+
+// ConsumerAuthorization is the configuration of API consumer authorization.
+type ConsumerAuthorization struct {
+	// Allow requests to be forwarded even if the consumer credential cannot be
+	// verified by the API Key provider due to service unavailability.
+	FailOpen bool `yaml:"fail_open,omitempty" json:"fail_open,omitempty"`
+
+	// Locations of API consumer credential (API Key). First match wins.
+	In []HTTPParameter `yaml:"in" json:"in"`
+}
+
+// HTTPMatch is an HTTP request matching rule.
+type HTTPMatch struct {
+	// URL path template using to match incoming requests and optionally identify
+	// path variables.
+	PathTemplate string `yaml:"path_template" json:"path_template"`
+
+	// HTTP method (e.g. GET, POST, PUT, etc.)
+	Method string `yaml:"method,omitempty" json:"method,omitempty"`
+}
+
+// HTTPParameter defines an HTTP paramter.
+type HTTPParameter struct {
+	// Query, Header and JWTClaim are supported.
+	Match ParamMatch
+
+	// Optional transformation of the parameter value (e.g. "Bearer " for Authorization tokens).
+	Transformation StringTransformation `yaml:"transformation,omitempty" json:"transformation,omitempty"`
+}
+
+// ParamMatch tells the location of the HTTP paramter.
+type ParamMatch interface {
+	paramMatch()
+}
+
+// Name of a query paramter
+type Query string
+
+func (Query) paramMatch() {}
+
+// Name of a header
+type Header string
+
+func (Header) paramMatch() {}
+
+// JWTClaim is reference to a JWT claim.
+type JWTClaim struct {
+	// Name of the JWT requirement
+	Requirement string `yaml:"requirement" json:"requirement"`
+
+	// Name of the claim
+	Name string `yaml:"name" json:"name"`
+}
+
+func (JWTClaim) paramMatch() {}
+
+// StringTransformation uses simple template syntax.
+// e.g. template: "prefix-{foo}-{bar}-suffix"
+//      substitution: "{foo}_{bar}"
+//      -->
+//      input: "prefix-hello-world-suffix"
+//      output: "hello_world"
+type StringTransformation struct {
+	// String template, optionally containing variable declarations.
+	Template string `yaml:"template,omitempty" json:"template,omitempty"`
+
+	// Substitution string, optionally using variables declared in the template.
+	Substitution string `yaml:"substitution,omitempty" json:"substitution,omitempty"`
+}
+
 // Load config
 func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string, requireAnalyticsCredentials bool) error {
 	log.Debugf("reading config from: %s", configFile)
@@ -227,7 +414,7 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string, 
 			return err
 		}
 
-		props, err := ReadProperties(bytes.NewReader(kidProps))
+		props, err := util.ReadProperties(bytes.NewReader(kidProps))
 		if err != nil {
 			return err
 		}
@@ -236,7 +423,7 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string, 
 		jwks := jwk.NewSet()
 		if err = json.Unmarshal(jwksBytes, jwks); err == nil {
 			c.Tenant.JWKS = jwks
-			if c.Tenant.PrivateKey, err = LoadPrivateKey(key); err != nil {
+			if c.Tenant.PrivateKey, err = util.LoadPrivateKey(key); err != nil {
 				return err
 			}
 		}

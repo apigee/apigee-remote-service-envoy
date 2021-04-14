@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/apigee/apigee-remote-service-envoy/v2/util"
 	"github.com/apigee/apigee-remote-service-golib/v2/analytics"
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
 	"github.com/apigee/apigee-remote-service-golib/v2/context"
@@ -99,14 +100,14 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.Check
 		claimsStruct, ok := fieldsMap[a.handler.jwtProviderKey]
 		if ok {
 			log.Debugf("Using JWT at provider key: %s", a.handler.jwtProviderKey)
-			claims = DecodeToMap(claimsStruct.GetStructValue())
+			claims = util.DecodeToMap(claimsStruct.GetStructValue())
 		}
 	} else { // otherwise iterate over apiKeyClaim loop
 		for k, v := range fieldsMap {
 			vFields := v.GetStructValue().GetFields()
 			if vFields[a.handler.apiKeyClaim] != nil || vFields["api_product_list"] != nil {
 				log.Debugf("Using JWT with provider key: %s", k)
-				claims = DecodeToMap(v.GetStructValue())
+				claims = util.DecodeToMap(v.GetStructValue())
 			}
 		}
 	}

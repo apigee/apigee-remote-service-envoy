@@ -24,18 +24,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/apigee/apigee-remote-service-envoy/v2/config"
 	"github.com/apigee/apigee-remote-service-envoy/v2/testutil"
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/lestrrat-go/jwx/jws"
 )
 
 func TestStaticAuthManager(t *testing.T) {
-	config := &Config{
-		Tenant: TenantConfig{
+	cfg := &config.Config{
+		Tenant: config.TenantConfig{
 			InternalAPI: "x",
 		},
 	}
-	m, err := NewAuthManager(config)
+	m, err := NewAuthManager(cfg)
 	if err != nil {
 		t.Fatalf("expected nil error, got: %s", err)
 	}
@@ -43,7 +44,7 @@ func TestStaticAuthManager(t *testing.T) {
 		t.Fatalf("expected StaticAuthManager, got: %s", m)
 	}
 
-	auth := fmt.Sprintf("%s:%s", config.Tenant.Key, config.Tenant.Secret)
+	auth := fmt.Sprintf("%s:%s", cfg.Tenant.Key, cfg.Tenant.Secret)
 	encodedAuth := base64.StdEncoding.EncodeToString([]byte(auth))
 	want := fmt.Sprintf("Basic %s", encodedAuth)
 
@@ -60,18 +61,18 @@ func TestJWTAuthManager(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	config := &Config{
-		Tenant: TenantConfig{
+	cfg := &config.Config{
+		Tenant: config.TenantConfig{
 			PrivateKeyID:        kid,
 			PrivateKey:          privateKey,
 			InternalJWTDuration: time.Second,
 			InternalJWTRefresh:  0,
 		},
 	}
-	if !config.IsGCPManaged() {
+	if !cfg.IsGCPManaged() {
 		t.Fatalf("expected config.isGCPExperience")
 	}
-	m, err := NewAuthManager(config)
+	m, err := NewAuthManager(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}

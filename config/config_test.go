@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package server
+package config
 
 import (
 	"bytes"
@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/apigee/apigee-remote-service-envoy/v2/testutil"
+	"github.com/apigee/apigee-remote-service-envoy/v2/util"
 	"github.com/apigee/apigee-remote-service-golib/v2/errorset"
 	"gopkg.in/yaml.v3"
 )
@@ -413,7 +414,7 @@ tenant:
 		t.Fatalf("%v", err)
 	}
 	credFile := path.Join(credDir, ServiceAccount)
-	if err := os.WriteFile(credFile, fakeServiceAccount(), 0644); err != nil {
+	if err := os.WriteFile(credFile, testutil.FakeServiceAccount(), 0644); err != nil {
 		t.Fatalf("%v", err)
 	}
 	defer os.RemoveAll(credDir)
@@ -665,17 +666,73 @@ func TestValidateTLS(t *testing.T) {
 	}
 }
 
+func TestAuthenticationRequirementTypes(t *testing.T) {
+	j := JWTAuthentication{}
+	j.authenticationRequirement()
+
+	any := AnyAuthenticationRequirements{}
+	any.authenticationRequirement()
+
+	all := AllAuthenticationRequirements{}
+	all.authenticationRequirement()
+}
+
+func TestJWKSSourceTypes(t *testing.T) {
+	j := RemoteJWKS{}
+	j.jwksSource()
+}
+
+func TestParamMatchTypes(t *testing.T) {
+	h := Header("header")
+	h.paramMatch()
+
+	q := Query("query")
+	q.paramMatch()
+
+	j := JWTClaim{}
+	j.paramMatch()
+}
+
+func TestMultitenant(t *testing.T) {
+	tests := []struct {
+		desc string
+		tc   TenantConfig
+		want bool
+	}{
+		{
+			desc: "multitenant",
+			tc: TenantConfig{
+				EnvName: "*",
+			},
+			want: true,
+		},
+		{
+			desc: "not multitenant",
+			tc: TenantConfig{
+				EnvName: "env",
+			},
+			want: false,
+		},
+	}
+
+	for _, test := range tests {
+		if got := test.tc.IsMultitenant(); got != test.want {
+			t.Errorf("tc.IsMultitenant() = %v, want = %v", got, test.want)
+		}
+	}
+}
+
 func makePolicySecretCRD() (*SecretCRD, error) {
 	kid := "my kid"
 	privateKey, jwksBuf, err := testutil.GenerateKeyAndJWKs(kid)
 	if err != nil {
 		return nil, err
 	}
-	pkBytes := pem.EncodeToMemory(&pem.Block{Type: PEMKeyType, Bytes: x509.MarshalPKCS1PrivateKey(privateKey)})
+	pkBytes := pem.EncodeToMemory(&pem.Block{Type: util.PEMKeyType, Bytes: x509.MarshalPKCS1PrivateKey(privateKey)})
 
 	props := map[string]string{SecretPropsKIDKey: kid}
 	propsBuf := new(bytes.Buffer)
-	if err := WriteProperties(propsBuf, props); err != nil {
+	if err := util.WriteProperties(propsBuf, props); err != nil {
 		return nil, err
 	}
 

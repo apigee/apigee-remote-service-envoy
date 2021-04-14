@@ -13,16 +13,70 @@
 // limitations under the License.
 
 // Package protostruct supports operations on the protocol buffer Struct message.
-package server
+package util
 
 import (
 	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"reflect"
 	"testing"
 
 	"github.com/apigee/apigee-remote-service-envoy/v2/testutil"
 	pb "github.com/golang/protobuf/ptypes/struct"
 )
+
+func TestLoadPrivateKey(t *testing.T) {
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	privateKeyBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	goodKeyBuf := &bytes.Buffer{}
+	if err := pem.Encode(goodKeyBuf, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: privateKeyBytes}); err != nil {
+		t.Fatal(err)
+	}
+	badKeyBuf1 := &bytes.Buffer{}
+	if err := pem.Encode(badKeyBuf1, &pem.Block{Type: "UNKNOWN PRIVATE KEY", Bytes: privateKeyBytes}); err != nil {
+		t.Fatal(err)
+	}
+	badKeyBuf2 := &bytes.Buffer{}
+	if err := pem.Encode(badKeyBuf2, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: []byte("not a private key")}); err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		desc    string
+		pkBytes []byte
+		wantErr bool
+	}{
+		{
+			desc:    "good private key bytes",
+			pkBytes: goodKeyBuf.Bytes(),
+		},
+		{
+			desc:    "private key bytes with bad pem type",
+			pkBytes: badKeyBuf1.Bytes(),
+			wantErr: true,
+		},
+		{
+			desc:    "bad private key bytes",
+			pkBytes: badKeyBuf2.Bytes(),
+			wantErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		if _, err := LoadPrivateKey(test.pkBytes); (err != nil) != test.wantErr {
+			t.Errorf("LoadPrivateKey() error = %v, wantErr? %t", err, test.wantErr)
+		}
+	}
+}
 
 func TestDecodeToMap(t *testing.T) {
 	if got := DecodeToMap(nil); !testutil.Equal(got, map[string]interface{}(nil)) {
