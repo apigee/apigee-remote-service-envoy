@@ -19,7 +19,6 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
-	"fmt"
 	"os"
 	"path"
 	"testing"
@@ -561,18 +560,18 @@ func TestLoadFromEnvironmentVariables(t *testing.T) {
 	}
 	pkBytes := pem.EncodeToMemory(&pem.Block{Type: util.PEMKeyType, Bytes: x509.MarshalPKCS1PrivateKey(privateKey)})
 
-	os.Setenv(envVarKey(RemoteServiceKey), string(pkBytes))
-	defer os.Setenv(envVarKey(RemoteServiceKey), "")
+	os.Setenv(RemoteServiceKey, string(pkBytes))
+	defer os.Setenv(RemoteServiceKey, "")
 
-	os.Setenv(envVarKey(RemoteServiceJWKS), string(jwksBuf))
-	defer os.Setenv(envVarKey(RemoteServiceJWKS), "")
+	os.Setenv(RemoteServiceJWKS, string(jwksBuf))
+	defer os.Setenv(RemoteServiceJWKS, "")
 
-	os.Setenv(envVarKey(RemoteServiceKeyID), kid)
-	defer os.Setenv(envVarKey(RemoteServiceKeyID), "")
+	os.Setenv(RemoteServiceKeyID, kid)
+	defer os.Setenv(RemoteServiceKeyID, "")
 
 	fakeSA := string(testutil.FakeServiceAccount())
-	os.Setenv(envVarKey(AnalyticsCredentials), fakeSA)
-	defer os.Setenv(envVarKey(AnalyticsCredentials), "")
+	os.Setenv(AnalyticsCredentials, fakeSA)
+	defer os.Setenv(AnalyticsCredentials, "")
 
 	os.Setenv(envVarKey("GLOBAL.NAMESPACE"), "test-namespace")
 	defer os.Setenv(envVarKey("GLOBAL.NAMESPACE"), "")
@@ -623,14 +622,14 @@ func TestLoadFromEnvironmentVariables(t *testing.T) {
 		t.Errorf("string(c.Analytics.CredentialsJSON) = %s, want %s", s, fakeSA)
 	}
 
-	os.Setenv(envVarKey(RemoteServiceKey), "not a private key")
+	os.Setenv(RemoteServiceKey, "not a private key")
 	c = DefaultConfig()
 	if err := c.Load(tf.Name(), "", DefaultAnalyticsSecretPath, true); err == nil {
 		t.Errorf("c.Load() should have given error on bad private key")
 	}
 
-	os.Setenv(envVarKey(RemoteServiceKey), string(pkBytes))
-	os.Setenv(envVarKey(RemoteServiceJWKS), "not a jwks")
+	os.Setenv(RemoteServiceKey, string(pkBytes))
+	os.Setenv(RemoteServiceJWKS, "not a jwks")
 	c = DefaultConfig()
 	if err := c.Load(tf.Name(), "", DefaultAnalyticsSecretPath, true); err == nil {
 		t.Errorf("c.Load() should have given error on bad jwks")
@@ -890,8 +889,4 @@ func equal(t *testing.T, got, want string) {
 	if got != want {
 		t.Errorf("got: '%s', want: '%s'", got, want)
 	}
-}
-
-func envVarKey(key string) string {
-	return fmt.Sprintf("%s_%s", EnvironmentVariablePrefix, key)
 }

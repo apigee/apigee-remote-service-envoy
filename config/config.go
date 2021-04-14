@@ -59,24 +59,29 @@ const (
 	// EnvironmentVairiablePrefix is the prefix of the env vars that can override given config
 	EnvironmentVariablePrefix = "APIGEE"
 
-	RemoteServiceKey     = "TENANT.PRIVATE_KEY"
-	RemoteServiceKeyID   = "TENANT.PRIVATE_KEY_ID"
-	RemoteServiceJWKS    = "TENANT.JWKS"
-	AnalyticsCredentials = "ANALYTICS.CREDENTIALS_JSON"
+	RemoteServiceKey     = "APIGEE.TENANT.PRIVATE_KEY"
+	RemoteServiceKeyID   = "APIGEE.TENANT.PRIVATE_KEY_ID"
+	RemoteServiceJWKS    = "APIGEE.TENANT.JWKS"
+	AnalyticsCredentials = "APIGEE.ANALYTICS.CREDENTIALS_JSON"
 )
 
 func init() {
-	// enable automatic environment variable check + the prefix
+	// Enable automatic environment variable check
 	viper.AutomaticEnv()
-	viper.SetEnvPrefix(EnvironmentVariablePrefix)
 
-	// set config to yaml
+	// Set config to yaml
 	viper.SetConfigType("yaml")
 
-	// bind environment variables to those derived from the config struct
+	// Bind environment variables to those derived from the config struct.
+	// This is needed because viper.Unmarshall() does not automatically
+	// check environment variables for the keys corresponding to the struct
+	// fields.
 	bindEnvs(Config{}, "")
 }
 
+// bindEnvs extracts mapstructure annotations of any struct into a key
+// with delimiter "." and bind the key with environment variable with
+// prefix "APIGEE." and all upper cases.
 func bindEnvs(raw interface{}, prefix string) {
 	rv := reflect.ValueOf(raw)
 	rt := reflect.TypeOf(raw)
@@ -91,13 +96,19 @@ func bindEnvs(raw interface{}, prefix string) {
 			continue
 		}
 		tv = strings.Split(tv, ",")[0]
+		k := prefix + tv
 		switch v.Kind() {
 		case reflect.Struct:
-			bindEnvs(v.Interface(), prefix+tv)
+			bindEnvs(v.Interface(), k)
 		default:
-			_ = viper.BindEnv(prefix + tv)
+			fmt.Println(k + " " + envVarKey(k))
+			_ = viper.BindEnv(k, envVarKey(k))
 		}
 	}
+}
+
+func envVarKey(key string) string {
+	return fmt.Sprintf("%s.%s", EnvironmentVariablePrefix, strings.ToUpper(key))
 }
 
 // DefaultConfig returns a config with defaults set
@@ -404,24 +415,24 @@ type StringTransformation struct {
 
 // Load config with the given config file, secret paths and a flag specifying whether analytics credentials must be present.
 // Fields with mapstructure annotations will support loading from the following sources with descending precedence:
-//   * Environment variables - all upper cases with prefix APIGEE_ and annotations in different structs are delimited with ".", e.g.
-//     APIGEE_GLOBAL.API_ADDRESS=<addr> will assign Global.APIAddress to <addr>
+//   * Environment variables - all upper cases with prefix "APIGEE." and annotations in different structs are delimited with ".",
+//     e.g., APIGEE.GLOBAL.API_ADDRESS=<addr> will assign Global.APIAddress to <addr>
 //   * Config file in yaml format, e.g., the config below
 //     global:
 //       api_address: <addr>
 //     will assign Global.APIAddress to <addr>
 // The following fields do not have mapstructure annotations but support similar ways of loading as described below:
-//   * Tenant.JWKS will be unmarshalled from APIGEE_TENANT.JWKS if such an environment variable exists. If not and policySecretPath is
+//   * Tenant.JWKS will be unmarshalled from APIGEE.TENANT.JWKS if such an environment variable exists. If not and policySecretPath is
 //     given, it will unmarshalled from the content of file {{policySecretPath}}/remote-service.crt. Lastly, if the given config file
 //     is multiple yaml files with secret CRD named "policy", the secret data with key "remote-service.crt" will be looked for and unmarshalled.
-//   * Tenant.PrivateKey will be unmarshalled from APIGEE_TENANT.PRIVATE_KEY if such an environment variable exists. If not and policySecretPath is
+//   * Tenant.PrivateKey will be unmarshalled from APIGEE.TENANT.PRIVATE_KEY if such an environment variable exists. If not and policySecretPath is
 //     given, it will unmarshalled from the content of file {{policySecretPath}}/remote-service.key. Lastly, if the given config file
 //     is multiple yaml files with secret CRDs named "policy", the secret data with key "remote-service.key" will be looked for and unmarshalled.
-//   * Tenant.PrivateKeyID will be given by APIGEE_TENANT.PRIVATE_KEY_ID if such an environment variable exists. If not and policySecretPath is
+//   * Tenant.PrivateKeyID will be given by APIGEE.TENANT.PRIVATE_KEY_ID if such an environment variable exists. If not and policySecretPath is
 //     given, the value of the key "kid" will be looked for from the property maps in {{policySecretPath}}/remote-service.properties.
 //     Lastly, if the given config file is multiple yaml files with secret CRDs named "policy", the secret data with key "remote-service.props"
 //     will be looked for and unmarshalled into a map where the value of the key "kid" will be looked for and used.
-//   * Analytics.CredentialsJSON will be given by APIGEE_ANALYTICS.CREDENTIALS_JSON if such an environment variable exists. If not and
+//   * Analytics.CredentialsJSON will be given by APIGEE.ANALYTICS.CREDENTIALS_JSON if such an environment variable exists. If not and
 //     analyticsSecretPath is given, the file content of {{analyticsSecretPath}}/client_secret.json will be used. If such file does not
 //     exist but analyticsSecretPath is equal to DefaultAnalyticsSecretPath, the secret CRD named "analytics" in the config file will be looked
 //     for, in which the data with key "client_secret.json" will be used.
