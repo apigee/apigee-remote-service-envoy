@@ -246,6 +246,9 @@ type EnvironmentConfig struct {
 
 // ProxyConfig has the proxy configuration.
 type ProxyConfig struct {
+	// Name of the Proxy, used to match the api_source of API Product Operations.
+	Name string `yaml:"name,omitempty" json:"name,omitempty"`
+	
 	// Top-level basepath for the proxy config
 	Basepath string `yaml:"basepath,omitempty" json:"basepath,omitempty"`
 
