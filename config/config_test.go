@@ -552,16 +552,87 @@ func TestInvalidConfig(t *testing.T) {
 	}
 }
 
-func makeConfigCRD(config string) *ConfigMapCRD {
-	data := map[string]string{configMapConfigKey: config}
-	return &ConfigMapCRD{
-		APIVersion: "v1",
-		Kind:       "ConfigMap",
-		Metadata: Metadata{
-			Name:      "apigee-remote-service-envoy",
-			Namespace: "apigee",
-		},
-		Data: data,
+func TestLoadFromEnvironmentVariables(t *testing.T) {
+	kid := "another kid"
+	privateKey, jwksBuf, err := testutil.GenerateKeyAndJWKs(kid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pkBytes := pem.EncodeToMemory(&pem.Block{Type: util.PEMKeyType, Bytes: x509.MarshalPKCS1PrivateKey(privateKey)})
+
+	os.Setenv(RemoteServiceKey, string(pkBytes))
+	defer os.Setenv(RemoteServiceKey, "")
+
+	os.Setenv(RemoteServiceJWKS, string(jwksBuf))
+	defer os.Setenv(RemoteServiceJWKS, "")
+
+	os.Setenv(RemoteServiceKeyID, kid)
+	defer os.Setenv(RemoteServiceKeyID, "")
+
+	fakeSA := string(testutil.FakeServiceAccount())
+	os.Setenv(AnalyticsCredentials, fakeSA)
+	defer os.Setenv(AnalyticsCredentials, "")
+
+	os.Setenv(envVarKey("GLOBAL.NAMESPACE"), "test-namespace")
+	defer os.Setenv(envVarKey("GLOBAL.NAMESPACE"), "")
+
+	os.Setenv(envVarKey("TENANT.ORG_NAME"), "test-org")
+	defer os.Setenv(envVarKey("TENANT.ORG_NAME"), "")
+
+	configCRD, policySecretCRD, _, err := makeCRDs()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tf, err := os.CreateTemp("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tf.Name())
+
+	// put ConfigMap in the end
+	configMapYAML, err := makeYAML(configCRD, policySecretCRD)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := tf.WriteString(configMapYAML); err != nil {
+		t.Fatal(err)
+	}
+	if err := tf.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	c := DefaultConfig()
+	if err := c.Load(tf.Name(), "", DefaultAnalyticsSecretPath, true); err != nil {
+		t.Errorf("want no error got %v", err)
+	}
+	// should be from the environment variables
+	if c.Tenant.PrivateKeyID != kid {
+		t.Errorf("c.Tenant.PrivateKeyID = %s, want %s", c.Tenant.PrivateKeyID, kid)
+	}
+	if c.Tenant.OrgName != "test-org" {
+		t.Errorf("c.Tenant.OrgName = %s, want %s", c.Tenant.OrgName, "test-org")
+	}
+	if c.Global.Namespace != "test-namespace" {
+		t.Errorf("c.Global.Namespace = %s, want %s", c.Global.Namespace, "test-namespace")
+	}
+
+	if s := string(c.Analytics.CredentialsJSON); s != fakeSA {
+		t.Errorf("string(c.Analytics.CredentialsJSON) = %s, want %s", s, fakeSA)
+	}
+
+	os.Setenv(RemoteServiceKey, "not a private key")
+	c = DefaultConfig()
+	if err := c.Load(tf.Name(), "", DefaultAnalyticsSecretPath, true); err == nil {
+		t.Errorf("c.Load() should have given error on bad private key")
+	}
+
+	os.Setenv(RemoteServiceKey, string(pkBytes))
+	os.Setenv(RemoteServiceJWKS, "not a jwks")
+	c = DefaultConfig()
+	if err := c.Load(tf.Name(), "", DefaultAnalyticsSecretPath, true); err == nil {
+		t.Errorf("c.Load() should have given error on bad jwks")
 	}
 }
 
@@ -719,6 +790,19 @@ func TestMultitenant(t *testing.T) {
 		if got := test.tc.IsMultitenant(); got != test.want {
 			t.Errorf("tc.IsMultitenant() = %v, want = %v", got, test.want)
 		}
+	}
+}
+
+func makeConfigCRD(config string) *ConfigMapCRD {
+	data := map[string]string{configMapConfigKey: config}
+	return &ConfigMapCRD{
+		APIVersion: "v1",
+		Kind:       "ConfigMap",
+		Metadata: Metadata{
+			Name:      "apigee-remote-service-envoy",
+			Namespace: "apigee",
+		},
+		Data: data,
 	}
 }
 

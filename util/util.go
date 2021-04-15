@@ -104,6 +104,9 @@ func LoadPrivateKey(privateKeyBytes []byte) (*rsa.PrivateKey, error) {
 
 	var err error
 	privPem, _ := pem.Decode(privateKeyBytes)
+	if privPem == nil {
+		return nil, fmt.Errorf("bytes in bad format")
+	}
 	if PEMKeyType != privPem.Type {
 		return nil, fmt.Errorf("%s required, found: %s", PEMKeyType, privPem.Type)
 	}
