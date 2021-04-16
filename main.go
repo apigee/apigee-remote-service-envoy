@@ -32,6 +32,7 @@ import (
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
@@ -58,7 +59,6 @@ var (
 	configFile          string
 	policySecretPath    string
 	analyticsSecretPath string
-	envConfigFiles      []string
 )
 
 func main() {
@@ -102,7 +102,7 @@ func main() {
 			fmt.Printf("apigee-remote-service-envoy version %s %s [%s]\n", version, date, commit)
 
 			cfg := config.DefaultConfig()
-			if err := cfg.Load(configFile, policySecretPath, analyticsSecretPath, true, envConfigFiles...); err != nil {
+			if err := cfg.Load(configFile, policySecretPath, analyticsSecretPath, true); err != nil {
 				log.Errorf("Unable to load config: %s:\n%v", configFile, err)
 				os.Exit(1)
 			}
@@ -119,7 +119,13 @@ func main() {
 	rootCmd.Flags().StringVarP(&configFile, "config", "c", "config.yaml", "Config file")
 	rootCmd.Flags().StringVarP(&policySecretPath, "policy-secret", "p", "/policy-secret", "Policy secret mount point")
 	rootCmd.Flags().StringVarP(&analyticsSecretPath, "analytics-secret", "a", config.DefaultAnalyticsSecretPath, "Analytics secret mount point")
-	envConfigFiles = *rootCmd.Flags().StringSlice("environment-configs", nil, "Environment-level config files")
+
+	// Take env config files from the command line flag and bind it to the corresponding field in the config
+	rootCmd.Flags().StringSlice("environment-configs", nil, "Environment-level config files")
+	if err := viper.BindPFlag(config.EnvConfigsURIs, rootCmd.Flags().Lookup("environment-configs")); err != nil {
+		log.Errorf("%v", err)
+		os.Exit(1)
+	}
 
 	rootCmd.SetArgs(os.Args[1:])
 	if err := rootCmd.Execute(); err != nil {
