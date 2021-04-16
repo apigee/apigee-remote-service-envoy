@@ -992,7 +992,7 @@ all:
     remote_jwks:
       url: url1
       cache_duration: 1h
-all:
+any:
 - jwt:
     name: foo
     issuer: bar
