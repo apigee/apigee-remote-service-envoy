@@ -58,6 +58,7 @@ var (
 	configFile          string
 	policySecretPath    string
 	analyticsSecretPath string
+	envConfigFiles      []string
 )
 
 func main() {
@@ -101,7 +102,7 @@ func main() {
 			fmt.Printf("apigee-remote-service-envoy version %s %s [%s]\n", version, date, commit)
 
 			cfg := config.DefaultConfig()
-			if err := cfg.Load(configFile, policySecretPath, analyticsSecretPath, true); err != nil {
+			if err := cfg.Load(configFile, policySecretPath, analyticsSecretPath, true, envConfigFiles...); err != nil {
 				log.Errorf("Unable to load config: %s:\n%v", configFile, err)
 				os.Exit(1)
 			}
@@ -118,6 +119,7 @@ func main() {
 	rootCmd.Flags().StringVarP(&configFile, "config", "c", "config.yaml", "Config file")
 	rootCmd.Flags().StringVarP(&policySecretPath, "policy-secret", "p", "/policy-secret", "Policy secret mount point")
 	rootCmd.Flags().StringVarP(&analyticsSecretPath, "analytics-secret", "a", config.DefaultAnalyticsSecretPath, "Analytics secret mount point")
+	envConfigFiles = *rootCmd.Flags().StringSlice("environment-configs", nil, "Environment-level config files")
 
 	rootCmd.SetArgs(os.Args[1:])
 	if err := rootCmd.Execute(); err != nil {

@@ -220,7 +220,6 @@ type AuthConfig struct {
 	AllowUnauthorized     bool          `yaml:"allow_unauthorized,omitempty" json:"allow_unauthorized,omitempty" mapstructure:"allow_unauthorized,omitempty"`
 	JWTProviderKey        string        `yaml:"jwt_provider_key,omitempty" json:"jwt_provider_key,omitempty" mapstructure:"jwt_provider_key,omitempty"`
 	AppendMetadataHeaders bool          `yaml:"append_metadata_headers,omitempty" json:"append_metadata_headers,omitempty" mapstructure:"append_metadata_headers,omitempty"`
-
 }
 
 // EnvConfigs contains environment configs or URIs to them.
@@ -281,20 +280,59 @@ type APIOperation struct {
 	Target string `yaml:"target" json:"target"`
 }
 
+// AuthenticationRequirement defines the authentication requirement. It can be jwt, any or all.
+type AuthenticationRequirement struct {
+	AuthenticationRequirements AuthenticationRequirements `yaml:"-" json:"-"`
+}
+
+type authenticationRequirementsWrapper struct {
+	JWT *JWTAuthentication             `yaml:"jwt,omitempty" json:"jwt,omitempty"`
+	Any *AnyAuthenticationRequirements `yaml:"any,omitempty" json:"any,omitempty"`
+	All *AllAuthenticationRequirements `yaml:"all,omitempty" json:"all,omitempty"`
+}
+
+// UnmarshalYAML implements the custom unmarshal method for
+// AuthenticationRequirement with input yaml bytes
+func (a *AuthenticationRequirement) UnmarshalYAML(node *yaml.Node) error {
+	w := &authenticationRequirementsWrapper{}
+	if err := node.Decode(w); err != nil {
+		return err
+	}
+
+	ctr := 0
+	if w.JWT != nil {
+		a.AuthenticationRequirements = *w.JWT
+		ctr += 1
+	}
+	if w.Any != nil {
+		a.AuthenticationRequirements = *w.Any
+		ctr += 1
+	}
+	if w.All != nil {
+		a.AuthenticationRequirements = *w.All
+		ctr += 1
+	}
+	if ctr != 1 {
+		return fmt.Errorf("precisely one of jwt, any or all should be set")
+	}
+
+	return nil
+}
+
 // AuthenticationRequirement is the interface defining the authentication requirement.
-type AuthenticationRequirement interface {
-	authenticationRequirement()
+type AuthenticationRequirements interface {
+	authenticationRequirements()
 }
 
 // AnyAuthenticationRequirements requires any of enclosed requirements to be satisfied for a successful authentication.
 type AnyAuthenticationRequirements []AuthenticationRequirement
 
-func (AnyAuthenticationRequirements) authenticationRequirement() {}
+func (AnyAuthenticationRequirements) authenticationRequirements() {}
 
 // AllAuthenticationRequirements requires all of enclosed requirements to be satisfied for a successful authentication.
 type AllAuthenticationRequirements []AuthenticationRequirement
 
-func (AllAuthenticationRequirements) authenticationRequirement() {}
+func (AllAuthenticationRequirements) authenticationRequirements() {}
 
 // JWTAuthentication defines the JWT authentication.
 type JWTAuthentication struct {
@@ -305,7 +343,7 @@ type JWTAuthentication struct {
 	Issuer string `yaml:"issuer" json:"issuer"`
 
 	// The JWKS source
-	JWKSSource JWKSSource
+	JWKSSource JWKSSource `yaml:"-" json:"-"`
 
 	// Audiences contains a list of audiences
 	Audiences []string `yaml:"audiences,omitempty" json:"audiences,omitempty"`
@@ -318,7 +356,32 @@ type JWTAuthentication struct {
 	In []HTTPParameter `yaml:"in" json:"in"`
 }
 
-func (JWTAuthentication) authenticationRequirement() {}
+type jwksSourceWrapper struct {
+	RemoteJWKS *RemoteJWKS `yaml:"remote_jwks,omitempty" json:"remote_jwks,omitempty"`
+}
+
+// UnmarshalYAML implements the custom unmarshal method for
+// JWTAuthentication with yaml bytes
+func (j *JWTAuthentication) UnmarshalYAML(node *yaml.Node) error {
+	type Unmarsh JWTAuthentication
+	if err := node.Decode((*Unmarsh)(j)); err != nil {
+		return err
+	}
+
+	w := &jwksSourceWrapper{}
+	if err := node.Decode(w); err != nil {
+		return err
+	}
+
+	if w.RemoteJWKS == nil {
+		return fmt.Errorf("remote jwks not found")
+	}
+	j.JWKSSource = *w.RemoteJWKS
+
+	return nil
+}
+
+func (JWTAuthentication) authenticationRequirements() {}
 
 // JWKSSource is the JWKS source.
 type JWKSSource interface {
@@ -359,10 +422,80 @@ type HTTPMatch struct {
 // HTTPParameter defines an HTTP paramter.
 type HTTPParameter struct {
 	// Query, Header and JWTClaim are supported.
-	Match ParamMatch
+	Match ParamMatch `yaml:"-" json:"-"`
 
 	// Optional transformation of the parameter value (e.g. "Bearer " for Authorization tokens).
 	Transformation StringTransformation `yaml:"transformation,omitempty" json:"transformation,omitempty"`
+}
+
+type httpParameterWrapper struct {
+	Header   *Header   `yaml:"header,omitempty" json:"header,omitempty"`
+	Query    *Query    `yaml:"query,omitempty" json:"query,omitempty"`
+	JWTClaim *JWTClaim `yaml:"jwt_claim,omitempty" json:"jwt_claim,omitempty"`
+}
+
+// UnmarshalYAML implements the custom unmarshal method
+// for HTTPParamter with input yaml bytes
+func (p *HTTPParameter) UnmarshalYAML(node *yaml.Node) error {
+	type Unmarsh HTTPParameter
+	if err := node.Decode((*Unmarsh)(p)); err != nil {
+		return err
+	}
+
+	h := &httpParameterWrapper{}
+	if err := node.Decode(h); err != nil {
+		return err
+	}
+	ctr := 0
+	if h.Header != nil {
+		ctr += 1
+		p.Match = *h.Header
+	}
+	if h.Query != nil {
+		ctr += 1
+		p.Match = *h.Query
+	}
+	if h.JWTClaim != nil {
+		ctr += 1
+		p.Match = *h.JWTClaim
+	}
+	if ctr != 1 {
+		return fmt.Errorf("precisely one header, query or jwt_claim should be set")
+	}
+
+	return nil
+}
+
+// UnmarshalJSON implements the custom unmarshal method
+// for HTTPParamter with input json bytes
+func (p *HTTPParameter) UnmarshalJSON(b []byte) error {
+	type Unmarsh HTTPParameter
+	if err := json.Unmarshal(b, (*Unmarsh)(p)); err != nil {
+		return err
+	}
+
+	h := &httpParameterWrapper{}
+	if err := json.Unmarshal(b, h); err != nil {
+		return err
+	}
+	ctr := 0
+	if h.Header != nil {
+		ctr += 1
+		p.Match = *h.Header
+	}
+	if h.Query != nil {
+		ctr += 1
+		p.Match = *h.Query
+	}
+	if h.JWTClaim != nil {
+		ctr += 1
+		p.Match = *h.JWTClaim
+	}
+	if ctr != 1 {
+		return fmt.Errorf("precisely one header, query or jwt_claim should be set")
+	}
+
+	return nil
 }
 
 // ParamMatch tells the location of the HTTP paramter.
@@ -428,7 +561,7 @@ type StringTransformation struct {
 //     analyticsSecretPath is given, the file content of {{analyticsSecretPath}}/client_secret.json will be used. If such file does not
 //     exist but analyticsSecretPath is equal to DefaultAnalyticsSecretPath, the secret CRD named "analytics" in the config file will be looked
 //     for, in which the data with key "client_secret.json" will be used.
-func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string, requireAnalyticsCredentials bool) error {
+func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string, requireAnalyticsCredentials bool, envConfigFiles ...string) error {
 	log.Debugf("reading config from: %s", configFile)
 	yamlFile, err := os.ReadFile(configFile)
 	if err != nil {
