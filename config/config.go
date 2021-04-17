@@ -259,7 +259,7 @@ type ProxyConfig struct {
 	ConsumerAuthorization ConsumerAuthorization `yaml:"consumer_authorization,omitempty" json:"consumer_authorization,omitempty"`
 
 	// The default value for the `x-apigee-target` header that will be appended to all allowed requests. 
-	Target string `yaml:"target" json:"target"`
+	TargetID string `yaml:"target" json:"target"`
 
 	// A list of API Operations, names of which must be unique within the Proxy.
 	Operations []APIOperation `yaml:"operations,omitempty" json:"operations,omitempty"`
@@ -280,7 +280,7 @@ type APIOperation struct {
 	HTTPMatches []HTTPMatch `yaml:"http_match,omitempty" json:"http_match,omitempty"`
 
 	// The value for the `x-apigee-target` header for this Operation that will be appended to all allowed requests. 
-	Target string `yaml:"target,omitempty" json:"target,omitempty"`
+	TargetID string `yaml:"target,omitempty" json:"target,omitempty"`
 }
 
 // AuthenticationRequirement is the interface defining the authentication requirement.
