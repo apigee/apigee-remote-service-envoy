@@ -258,7 +258,7 @@ type ProxyConfig struct {
 	// The default consumer authorization requirements for this Proxy.
 	ConsumerAuthorization ConsumerAuthorization `yaml:"consumer_authorization,omitempty" json:"consumer_authorization,omitempty"`
 
-	// The default target for this Proxy.
+	// The default value for the `x-apigee-target` header that will be appended to all allowed requests. 
 	Target string `yaml:"target" json:"target"`
 
 	// A list of API Operations, names of which must be unique within the Proxy.
@@ -279,7 +279,7 @@ type APIOperation struct {
 	// HTTP matching rules for this Operation. If omitted, this API Operation will match all HTTP requests not matched by another API Operation.
 	HTTPMatches []HTTPMatch `yaml:"http_match,omitempty" json:"http_match,omitempty"`
 
-	// The target for this Operation. If specified, this overrides the default Target specified at the Proxy level.
+	// The value for the `x-apigee-target` header for this Operation that will be appended to all allowed requests. 
 	Target string `yaml:"target,omitempty" json:"target,omitempty"`
 }
 
@@ -317,7 +317,7 @@ type JWTAuthentication struct {
 	ForwardPayloadHeader string `yaml:"forward_payload_header,omitempty" json:"forward_payload_header,omitempty"`
 
 	// Locations where JWT may be found. First match wins.
-	In []HTTPParameter `yaml:"in" json:"in"`
+	In []APIOperationParameter `yaml:"in" json:"in"`
 }
 
 func (JWTAuthentication) authenticationRequirement() {}
@@ -345,7 +345,7 @@ type ConsumerAuthorization struct {
 	FailOpen bool `yaml:"fail_open,omitempty" json:"fail_open,omitempty"`
 
 	// Locations of API consumer credential (API Key). First match wins.
-	In []HTTPParameter `yaml:"in" json:"in"`
+	In []APIOperationParameter `yaml:"in" json:"in"`
 }
 
 // HTTPMatch is an HTTP request matching rule.
@@ -358,9 +358,9 @@ type HTTPMatch struct {
 	Method string `yaml:"method,omitempty" json:"method,omitempty"`
 }
 
-// HTTPParameter defines an HTTP paramter.
-type HTTPParameter struct {
-	// Query, Header and JWTClaim are supported.
+// APIOperationParameter describes an input value to an API Operation.
+type APIOperationParameter struct {
+	// One of Query, Header, or JWTClaim.
 	Match ParamMatch
 
 	// Optional transformation of the parameter value.
@@ -372,12 +372,12 @@ type ParamMatch interface {
 	paramMatch()
 }
 
-// Name of a query paramter
+// Name of an HTTP query string parameter.
 type Query string
 
 func (Query) paramMatch() {}
 
-// Name of a header
+// Name of an HTTP header.
 type Header string
 
 func (Header) paramMatch() {}
