@@ -148,7 +148,7 @@ type Config struct {
 	Analytics AnalyticsConfig `yaml:"analytics,omitempty" json:"analytics,omitempty" mapstructure:"analytics,omitempty"`
 	// If EnvConfigs is specified, APIKeyHeader, APIKeyClaim, JWTProviderKey in AuthConfig will be ineffectual.
 	Auth       AuthConfig `yaml:"auth,omitempty" json:"auth,omitempty" mapstructure:"auth,omitempty"`
-	EnvConfigs EnvConfigs `yaml:"env_configs,omitempty" json:"env_configs,omitempty" mapstructure:"env_configs,omitempty"`
+	Environments EnvironmentConfigs `yaml:"environments,omitempty" json:"environments,omitempty" mapstructure:"environments,omitempty"`
 }
 
 // GlobalConfig is global configuration for the server
@@ -223,13 +223,13 @@ type AuthConfig struct {
 
 }
 
-// EnvConfigs contains environment configs or URIs to them.
-type EnvConfigs struct {
-	// A list of strings containing environment config URIs
-	// Only the local file system is supported currently, e.g., file://path/to/config.yaml
-	ConfigURIs []string `yaml:"config_uris,omitempty" json:"config_uris,omitempty"`
+// EnvironmentConfigs contains directly inlined Environment configs and references to Environment configs.
+type EnvironmentConfigs struct {
+	// A list of URIs referencing Environment configurations. Supported schemes:
+	// - `file`: An RFC 8089 file path where the configuration is stored on the local file system, e.g. `file://path/to/config.yaml`. 
+	References []string `yaml:"references,omitempty" json:"references,omitempty"`
 
-	// A list of environment configs
+	// A list of environment configs.
 	Inline []EnvironmentConfig `yaml:"inline,omitempty" json:"inline,omitempty"`
 }
 
@@ -241,7 +241,7 @@ type EnvironmentConfig struct {
 	ID string `yaml:"id" json:"id"`
 
 	// A list of proxy configs
-	ProxyConfigs []ProxyConfig `yaml:"proxy_configs" json:"proxy_configs"`
+	Proxies []ProxyConfig `yaml:"proxies" json:"proxies"`
 }
 
 // ProxyConfig has the proxy configuration.
@@ -249,39 +249,38 @@ type ProxyConfig struct {
 	// Name of the Proxy, used to match the api_source of API Product Operations.
 	Name string `yaml:"name" json:"name"`
 	
-	// Top-level basepath for the proxy config
-	Basepath string `yaml:"basepath,omitempty" json:"basepath,omitempty"`
+	// Base path for this Proxy.
+	BasePath string `yaml:"base_path,omitempty" json:"base_path,omitempty"`
 
-	// Authentication defines the proxy-level authentication requirement
+	// The default authentication requirements for this Proxy.
 	Authentication AuthenticationRequirement `yaml:"authentication,omitempty" json:"authentication,omitempty"`
 
-	// ConsumerAuthorization defines the proxy-level consumer authorization
+	// The default consumer authorization requirements for this Proxy.
 	ConsumerAuthorization ConsumerAuthorization `yaml:"consumer_authorization,omitempty" json:"consumer_authorization,omitempty"`
 
-	// Name of the target server for this proxy.
+	// The default target for this Proxy.
 	Target string `yaml:"target" json:"target"`
 
-	// A list of Operations, names of which must be unique within the proxy config.
+	// A list of API Operations, names of which must be unique within the Proxy.
 	Operations []APIOperation `yaml:"operations,omitempty" json:"operations,omitempty"`
 }
 
-// An APIOperation associates a set of rules with a set of request matching
-// settings.
+// An APIOperation associates a set of rules with a set of request matching settings.
 type APIOperation struct {
-	// Name of the operation. Unique within a proxy config.
+	// Name of the API Operation. Unique within a Proxy.
 	Name string `yaml:"name" json:"name"`
 
-	// Authentication defines the operation-level authentication requirement and overrides whatever in the proxy level
+	// The authentication requirements for thie Operation. If specified, this overrides the default AuthenticationRequirement specified at the Proxy level.
 	Authentication AuthenticationRequirement `yaml:"authentication,omitempty" json:"authentication,omitempty"`
 
-	// ConsumerAuthorization defines the operation-level consumer authorization and overrides whatever in the proxy level
+	// The consumer authorization requirement for this Operation. If specified, this overrides the default ConsumerAuthorization specified at the Proxy level.
 	ConsumerAuthorization ConsumerAuthorization `yaml:"consumer_authorization,omitempty" json:"consumer_authorization,omitempty"`
 
-	// HTTP matching rules for this operation. If omitted, this will match all requests.
+	// HTTP matching rules for this Operation. If omitted, this API Operation will match all HTTP requests not matched by another API Operation.
 	HTTPMatches []HTTPMatch `yaml:"http_match,omitempty" json:"http_match,omitempty"`
 
-	// Name of the target server for this operation.
-	Target string `yaml:"target" json:"target"`
+	// The target for this Operation. If specified, this overrides the default Target specified at the Proxy level.
+	Target string `yaml:"target,omitempty" json:"target,omitempty"`
 }
 
 // AuthenticationRequirement is the interface defining the authentication requirement.
@@ -299,7 +298,7 @@ type AllAuthenticationRequirements []AuthenticationRequirement
 
 func (AllAuthenticationRequirements) authenticationRequirement() {}
 
-// JWTAuthentication defines the JWT authentication.
+// JWTAuthentication defines a JWT authentication requirement.
 type JWTAuthentication struct {
 	// Name of this JWT requirement, unique within the Proxy.
 	Name string `yaml:"name" json:"name"`
@@ -364,7 +363,7 @@ type HTTPParameter struct {
 	// Query, Header and JWTClaim are supported.
 	Match ParamMatch
 
-	// Optional transformation of the parameter value (e.g. "Bearer " for Authorization tokens).
+	// Optional transformation of the parameter value.
 	Transformation StringTransformation `yaml:"transformation,omitempty" json:"transformation,omitempty"`
 }
 
