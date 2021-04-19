@@ -255,8 +255,8 @@ type ProxyConfig struct {
 	// ConsumerAuthorization defines the proxy-level consumer authorization
 	ConsumerAuthorization ConsumerAuthorization `yaml:"consumer_authorization,omitempty" json:"consumer_authorization,omitempty"`
 
-	// Name of the target server for this proxy.
-	Target string `yaml:"target" json:"target"`
+	// Transformation rules applied to HTTP request headers.
+	RequestHeaderTransforms RequestHeaderTransformations `yaml:"request_header_transforms,omitempty" json:"request_header_transforms,omitempty"`
 
 	// A list of Operations, names of which must be unique within the proxy config.
 	Operations []APIOperation `yaml:"operations,omitempty" json:"operations,omitempty"`
@@ -277,8 +277,20 @@ type APIOperation struct {
 	// HTTP matching rules for this operation. If omitted, this will match all requests.
 	HTTPMatches []HTTPMatch `yaml:"http_match,omitempty" json:"http_match,omitempty"`
 
-	// Name of the target server for this operation.
-	Target string `yaml:"target" json:"target"`
+	// Transformation rules applied to HTTP request headers for this Operation. Overrides the rules set at the Proxy level.
+	RequestHeaderTransforms RequestHeaderTransformations `yaml:"request_header_transforms,omitempty" json:"request_header_transforms,omitempty"`
+}
+
+// RequestHeaderTransformations are rules for modifying HTTP request headers.
+type RequestHeaderTransformations struct {
+	// Header values to append. If a specified header is already present in the request, an additional value is added.
+	Append map[string]string
+
+	// Header values to set. If a specified header is already present, the value here will overwrite it.
+	Set map[string]string
+
+	// Headers to remove. Supports single wildcard globbing e.g. `x-apigee-*`.
+	Remove []string
 }
 
 // AuthenticationRequirement is the interface defining the authentication requirement.
