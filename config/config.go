@@ -300,17 +300,16 @@ func (AllAuthenticationRequirements) authenticationRequirement() {}
 
 // JWTAuthentication defines a JWT authentication requirement.
 type JWTAuthentication struct {
-	// Name of this JWT requirement, unique within the 
-	.
+	// Name of this JWT requirement, unique within the API.
 	Name string `yaml:"name" json:"name"`
 
-	// JWT issuer ("iss" claim)
+	// JWT issuer ("iss" claim).
 	Issuer string `yaml:"issuer" json:"issuer"`
 
-	// The JWKS source
+	// The JWKS source.
 	JWKSSource JWKSSource
 
-	// Audiences contains a list of audiences
+	// Audiences contains a list of audiences.
 	Audiences []string `yaml:"audiences,omitempty" json:"audiences,omitempty"`
 
 	// Header name that will contain decoded JWT payload in requests forwarded to
