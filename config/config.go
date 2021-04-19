@@ -406,7 +406,7 @@ func (c *Config) analyticsCredentialsFromBytes(b []byte) error {
 // loadEnvConfig unmarshals the given file content into an EnvConfig
 // and appends it to c.EnvConfigs.Inline
 func (c *Config) loadEnvConfig(f string) error {
-	log.Debugf("reading config from: %s", f)
+	log.Debugf("reading environment config from: %s", f)
 	data, err := os.ReadFile(f)
 	if err != nil {
 		return err

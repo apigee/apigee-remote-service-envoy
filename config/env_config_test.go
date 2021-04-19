@@ -25,6 +25,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+func TestLoadEnvironmentConfigs(t *testing.T) {
+	//TODO
+}
+
 func TestUnmarshalAuthenticationRequirementYAML(t *testing.T) {
 	tests := []struct {
 		desc string
@@ -420,58 +424,6 @@ transformation:
 	}
 }
 
-func TestUnmarshalHTTPParameterJSON(t *testing.T) {
-	tests := []struct {
-		desc string
-		data []byte
-		want *HTTPParameter
-	}{
-		{
-			desc: "valid http parameter with header",
-			data: []byte(`{"header": "header"}`),
-			want: &HTTPParameter{
-				Match: Header("header"),
-			},
-		},
-		{
-			desc: "valid http parameter with query",
-			data: []byte(`{"query": "query"}`),
-			want: &HTTPParameter{
-				Match: Query("query"),
-			},
-		},
-		{
-			desc: "valid http parameter with jwt claim",
-			data: []byte(`
-{
-	"jwt_claim": {
-		"requirement": "foo",
-		"name": "bar"
-	}
-}
-`),
-			want: &HTTPParameter{
-				Match: JWTClaim{
-					Requirement: "foo",
-					Name:        "bar",
-				},
-			},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.desc, func(t *testing.T) {
-			p := &HTTPParameter{}
-			if err := p.UnmarshalJSON(test.data); err != nil {
-				t.Errorf("p.UnmarshalJSON() returns unexpected: %v", err)
-			}
-			if diff := cmp.Diff(test.want, p); diff != "" {
-				t.Errorf("p.UnmarshalJSON() results in unexpected HTTPParamter diff (-want +got):\n%s", diff)
-			}
-		})
-	}
-}
-
 func TestUnmarshalHTTPParameterYAMLError(t *testing.T) {
 	tests := []struct {
 		desc    string
@@ -528,79 +480,6 @@ query: query
 				t.Errorf("yaml.Unmarshal() returns no error, want %s", test.wantErr)
 			} else if test.wantErr != "" && err.Error() != test.wantErr {
 				t.Errorf("yaml.Unmarshal() returns error %v, want %s", err, test.wantErr)
-			}
-		})
-	}
-}
-
-func TestUnmarshalHTTPParameterJSONError(t *testing.T) {
-	tests := []struct {
-		desc    string
-		data    []byte
-		wantErr string
-	}{
-		{
-			desc:    "no match",
-			data:    []byte(`{}`),
-			wantErr: "precisely one header, query or jwt_claim should be set",
-		},
-		{
-			desc: "transformation in bad format",
-			data: []byte(`
-{
-	"header": "header",
-	"transformation": "bad"
-}`),
-		},
-		{
-			desc: "jwt_claim in bad format",
-			data: []byte(`
-{
-	"jwt_claim": "bad"
-}`),
-		},
-		{
-			desc: "jwt claim and header coexist",
-			data: []byte(`
-{
-	"jwt_claim": {
-		"requirement": "foo",
-		"name": "bar"
-	},
-	"header": "header"
-}`),
-			wantErr: "precisely one header, query or jwt_claim should be set",
-		},
-		{
-			desc: "jwt claim and query coexist",
-			data: []byte(`
-{
-	"jwt_claim": {
-		"requirement": "foo",
-		"name": "bar"
-	},
-	"query": "query"
-}`),
-			wantErr: "precisely one header, query or jwt_claim should be set",
-		},
-		{
-			desc: "header and query coexist",
-			data: []byte(`
-{
-	"header": "header",
-	"query": "query"
-}`),
-			wantErr: "precisely one header, query or jwt_claim should be set",
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.desc, func(t *testing.T) {
-			p := &HTTPParameter{}
-			if err := p.UnmarshalJSON(test.data); err == nil {
-				t.Errorf("p.UnmarshalJSON() returns no error, want %s", test.wantErr)
-			} else if test.wantErr != "" && err.Error() != test.wantErr {
-				t.Errorf("p.UnmarshalJSON() returns error %v, want %s", err, test.wantErr)
 			}
 		})
 	}

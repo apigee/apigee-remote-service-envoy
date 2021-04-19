@@ -18,7 +18,6 @@
 package config
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -29,7 +28,7 @@ import (
 type EnvConfigs struct {
 	// A list of strings containing environment config URIs
 	// Only the local file system is supported currently, e.g., file://path/to/config.yaml
-	ConfigURIs []string `yaml:"config_uris,omitempty" json:"config_uris,omitempty" mapstructure:"config_uris,omitempty"`
+	ConfigURIs []string `yaml:"config_uris,omitempty" mapstructure:"config_uris,omitempty"`
 
 	// A list of environment configs
 	// TODO: Support unmarshal inline configs into this
@@ -270,36 +269,10 @@ func (p *HTTPParameter) UnmarshalYAML(node *yaml.Node) error {
 	return nil
 }
 
-// UnmarshalJSON implements the custom unmarshal method
-// for HTTPParamter with input json bytes
-func (p *HTTPParameter) UnmarshalJSON(b []byte) error {
-	type Unmarsh HTTPParameter
-	if err := json.Unmarshal(b, (*Unmarsh)(p)); err != nil {
-		return err
-	}
+func (p *HTTPParameter) MarshalYAML() (interface{}, error) {
+	var b []byte
 
-	h := &httpParameterWrapper{}
-	if err := json.Unmarshal(b, h); err != nil {
-		return err
-	}
-	ctr := 0
-	if h.Header != nil {
-		ctr += 1
-		p.Match = *h.Header
-	}
-	if h.Query != nil {
-		ctr += 1
-		p.Match = *h.Query
-	}
-	if h.JWTClaim != nil {
-		ctr += 1
-		p.Match = *h.JWTClaim
-	}
-	if ctr != 1 {
-		return fmt.Errorf("precisely one header, query or jwt_claim should be set")
-	}
-
-	return nil
+	return b, nil
 }
 
 // ParamMatch tells the location of the HTTP paramter.

@@ -1,0 +1,21 @@
+id: env-config-2
+proxy_configs:
+- basepath: /v1
+  authentication:
+    jwt:
+      name: foo
+      issuer: bar
+      in:
+      - header: header
+      remote_jwks:
+        url: url
+        cache_duration: 1h
+  consumer_authorization:
+    in:
+      header: x-api-key
+  target: a-target
+  operations:
+  - name: op-2
+    http_match:
+    - path_template: /bookstore
+      method: GET
