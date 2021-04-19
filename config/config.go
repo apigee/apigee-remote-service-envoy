@@ -240,40 +240,40 @@ type EnvironmentConfig struct {
 	// Unique ID of the environment config
 	ID string `yaml:"id" json:"id"`
 
-	// A list of proxy configs
-	Proxies []ProxyConfig `yaml:"proxies" json:"proxies"`
+	// A list of API configs
+	API []APIConfig `yaml:"proxies" json:"proxies"`
 }
 
-// ProxyConfig has the proxy configuration.
-type ProxyConfig struct {
-	// Name of the Proxy, used to match the api_source of API Product Operations.
-	Name string `yaml:"name" json:"name"`
+// APIConfig contains settings for an individual API.
+type APIConfig struct {
+	// ID of the API, used to match the api_source of API Product Operations.
+	ID string `yaml:"name" json:"name"`
 	
-	// Base path for this Proxy.
+	// Base path for this API.
 	BasePath string `yaml:"base_path,omitempty" json:"base_path,omitempty"`
 
-	// The default authentication requirements for this Proxy.
+	// The default authentication requirements for this API.
 	Authentication AuthenticationRequirement `yaml:"authentication,omitempty" json:"authentication,omitempty"`
 
-	// The default consumer authorization requirements for this Proxy.
+	// The default consumer authorization requirements for this API.
 	ConsumerAuthorization ConsumerAuthorization `yaml:"consumer_authorization,omitempty" json:"consumer_authorization,omitempty"`
 
 	// The default value for the `x-apigee-target` header that will be appended to all allowed requests. 
 	TargetID string `yaml:"target" json:"target"`
 
-	// A list of API Operations, names of which must be unique within the Proxy.
+	// A list of API Operations, names of which must be unique within the API.
 	Operations []APIOperation `yaml:"operations,omitempty" json:"operations,omitempty"`
 }
 
 // An APIOperation associates a set of rules with a set of request matching settings.
 type APIOperation struct {
-	// Name of the API Operation. Unique within a Proxy.
+	// Name of the API Operation. Unique within a API.
 	Name string `yaml:"name" json:"name"`
 
-	// The authentication requirements for thie Operation. If specified, this overrides the default AuthenticationRequirement specified at the Proxy level.
+	// The authentication requirements for thie Operation. If specified, this overrides the default AuthenticationRequirement specified at the API level.
 	Authentication AuthenticationRequirement `yaml:"authentication,omitempty" json:"authentication,omitempty"`
 
-	// The consumer authorization requirement for this Operation. If specified, this overrides the default ConsumerAuthorization specified at the Proxy level.
+	// The consumer authorization requirement for this Operation. If specified, this overrides the default ConsumerAuthorization specified at the API level.
 	ConsumerAuthorization ConsumerAuthorization `yaml:"consumer_authorization,omitempty" json:"consumer_authorization,omitempty"`
 
 	// HTTP matching rules for this Operation. If omitted, this API Operation will match all HTTP requests not matched by another API Operation.
@@ -300,7 +300,8 @@ func (AllAuthenticationRequirements) authenticationRequirement() {}
 
 // JWTAuthentication defines a JWT authentication requirement.
 type JWTAuthentication struct {
-	// Name of this JWT requirement, unique within the Proxy.
+	// Name of this JWT requirement, unique within the 
+	.
 	Name string `yaml:"name" json:"name"`
 
 	// JWT issuer ("iss" claim)
