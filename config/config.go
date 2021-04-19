@@ -148,9 +148,10 @@ type Config struct {
 	Tenant    TenantConfig    `yaml:"tenant,omitempty" json:"tenant,omitempty" mapstructure:"tenant,omitempty"`
 	Products  ProductsConfig  `yaml:"products,omitempty" json:"products,omitempty" mapstructure:"products,omitempty"`
 	Analytics AnalyticsConfig `yaml:"analytics,omitempty" json:"analytics,omitempty" mapstructure:"analytics,omitempty"`
-	// If EnvConfigs is specified, APIKeyHeader, APIKeyClaim, JWTProviderKey in AuthConfig will be ineffectual.
-	Auth       AuthConfig `yaml:"auth,omitempty" json:"auth,omitempty" mapstructure:"auth,omitempty"`
-	EnvConfigs EnvConfigs `yaml:"env_configs,omitempty" json:"env_configs,omitempty" mapstructure:"env_configs,omitempty"`
+	// If EnvironmentConfigs is specified, APIKeyHeader, APIKeyClaim, JWTProviderKey in AuthConfig will be ineffectual.
+	Auth AuthConfig `yaml:"auth,omitempty" json:"auth,omitempty" mapstructure:"auth,omitempty"`
+	// Apigee Environment configurations.
+	EnvironmentConfigs EnvironmentConfigs `yaml:"environment_configs,omitempty" json:"environment_configs,omitempty" mapstructure:"environment_configs,omitempty"`
 }
 
 // GlobalConfig is global configuration for the server
@@ -358,7 +359,7 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string, 
 		}
 	}
 
-	for _, f := range c.EnvConfigs.ConfigURIs {
+	for _, f := range c.EnvironmentConfigs.References {
 		if err := c.loadEnvConfig(f); err != nil {
 			return err
 		}
@@ -416,7 +417,7 @@ func (c *Config) loadEnvConfig(f string) error {
 	if err := yaml.Unmarshal(data, &ec); err != nil {
 		return err
 	}
-	c.EnvConfigs.Inline = append(c.EnvConfigs.Inline, ec)
+	c.EnvironmentConfigs.Inline = append(c.EnvironmentConfigs.Inline, ec)
 
 	return nil
 }

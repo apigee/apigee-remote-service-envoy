@@ -51,7 +51,7 @@ jwt:
 				AuthenticationRequirements: JWTAuthentication{
 					Name:       "foo",
 					Issuer:     "bar",
-					In:         []HTTPParameter{{Match: Header("header")}},
+					In:         []APIOperationParameter{{Match: Header("header")}},
 					JWKSSource: RemoteJWKS{URL: "url", CacheDuration: time.Hour},
 				},
 			},
@@ -83,7 +83,7 @@ any:
 						AuthenticationRequirements: JWTAuthentication{
 							Name:       "foo",
 							Issuer:     "bar",
-							In:         []HTTPParameter{{Match: Header("header")}},
+							In:         []APIOperationParameter{{Match: Header("header")}},
 							JWKSSource: RemoteJWKS{URL: "url1", CacheDuration: time.Hour},
 						},
 					},
@@ -91,7 +91,7 @@ any:
 						AuthenticationRequirements: JWTAuthentication{
 							Name:       "bar",
 							Issuer:     "foo",
-							In:         []HTTPParameter{{Match: Query("query")}},
+							In:         []APIOperationParameter{{Match: Query("query")}},
 							JWKSSource: RemoteJWKS{URL: "url2", CacheDuration: time.Hour},
 						},
 					},
@@ -125,7 +125,7 @@ all:
 						AuthenticationRequirements: JWTAuthentication{
 							Name:       "foo",
 							Issuer:     "bar",
-							In:         []HTTPParameter{{Match: Header("header")}},
+							In:         []APIOperationParameter{{Match: Header("header")}},
 							JWKSSource: RemoteJWKS{URL: "url1", CacheDuration: time.Hour},
 						},
 					},
@@ -133,7 +133,7 @@ all:
 						AuthenticationRequirements: JWTAuthentication{
 							Name:       "bar",
 							Issuer:     "foo",
-							In:         []HTTPParameter{{Match: Query("query")}},
+							In:         []APIOperationParameter{{Match: Query("query")}},
 							JWKSSource: RemoteJWKS{URL: "url2", CacheDuration: time.Hour},
 						},
 					},
@@ -178,7 +178,7 @@ any:
 								AuthenticationRequirements: JWTAuthentication{
 									Name:       "foo",
 									Issuer:     "bar",
-									In:         []HTTPParameter{{Match: Header("header")}},
+									In:         []APIOperationParameter{{Match: Header("header")}},
 									JWKSSource: RemoteJWKS{URL: "url1", CacheDuration: time.Hour},
 								},
 							},
@@ -186,7 +186,7 @@ any:
 								AuthenticationRequirements: JWTAuthentication{
 									Name:       "bar",
 									Issuer:     "foo",
-									In:         []HTTPParameter{{Match: Query("query")}},
+									In:         []APIOperationParameter{{Match: Query("query")}},
 									JWKSSource: RemoteJWKS{URL: "url2", CacheDuration: time.Hour},
 								},
 							},
@@ -196,7 +196,7 @@ any:
 						AuthenticationRequirements: JWTAuthentication{
 							Name:       "bac",
 							Issuer:     "foo",
-							In:         []HTTPParameter{{Match: Query("query")}},
+							In:         []APIOperationParameter{{Match: Query("query")}},
 							JWKSSource: RemoteJWKS{URL: "url3", CacheDuration: 2 * time.Hour},
 						},
 					},
@@ -328,7 +328,7 @@ remote_jwks:
 			want: &JWTAuthentication{
 				Name:   "foo",
 				Issuer: "bar",
-				In: []HTTPParameter{
+				In: []APIOperationParameter{
 					{
 						Match: Header("header"),
 					},
@@ -354,23 +354,23 @@ remote_jwks:
 	}
 }
 
-func TestUnmarshalHTTPParameterYAML(t *testing.T) {
+func TestUnmarshalAPIOperationParameterYAML(t *testing.T) {
 	tests := []struct {
 		desc string
 		data []byte
-		want *HTTPParameter
+		want *APIOperationParameter
 	}{
 		{
 			desc: "valid http parameter with header",
 			data: []byte(`header: header`),
-			want: &HTTPParameter{
+			want: &APIOperationParameter{
 				Match: Header("header"),
 			},
 		},
 		{
 			desc: "valid http parameter with query",
 			data: []byte(`query: query`),
-			want: &HTTPParameter{
+			want: &APIOperationParameter{
 				Match: Query("query"),
 			},
 		},
@@ -381,7 +381,7 @@ jwt_claim:
   requirement: foo
   name: bar
 `),
-			want: &HTTPParameter{
+			want: &APIOperationParameter{
 				Match: JWTClaim{
 					Requirement: "foo",
 					Name:        "bar",
@@ -398,7 +398,7 @@ transformation:
   template: temp
   substitution: sub
 `),
-			want: &HTTPParameter{
+			want: &APIOperationParameter{
 				Match: JWTClaim{
 					Requirement: "foo",
 					Name:        "bar",
@@ -413,7 +413,7 @@ transformation:
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			p := &HTTPParameter{}
+			p := &APIOperationParameter{}
 			if err := yaml.Unmarshal(test.data, p); err != nil {
 				t.Errorf("yaml.Unmarshal() returns unexpected: %v", err)
 			}
@@ -424,7 +424,7 @@ transformation:
 	}
 }
 
-func TestUnmarshalHTTPParameterYAMLError(t *testing.T) {
+func TestUnmarshalAPIOperationParameterYAMLError(t *testing.T) {
 	tests := []struct {
 		desc    string
 		data    []byte
@@ -475,7 +475,7 @@ query: query
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			p := &HTTPParameter{}
+			p := &APIOperationParameter{}
 			if err := yaml.Unmarshal(test.data, p); err == nil {
 				t.Errorf("yaml.Unmarshal() returns no error, want %s", test.wantErr)
 			} else if test.wantErr != "" && err.Error() != test.wantErr {
