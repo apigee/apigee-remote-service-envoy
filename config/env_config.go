@@ -282,9 +282,28 @@ func (p *HTTPParameter) UnmarshalYAML(node *yaml.Node) error {
 }
 
 func (p *HTTPParameter) MarshalYAML() (interface{}, error) {
-	var b []byte
+	type Marsh HTTPParameter
+	out, err := yaml.Marshal((*Marsh)(p))
+	if err != nil {
+		return nil, err
+	}
+	w := &httpParameterWrapper{}
+	switch p.Match.(type) {
+	case Header:
+		w.Header = p.Match.(*Header)
+	case Query:
+		w.Query = p.Match.(*Query)
+	case JWTClaim:
+		w.JWTClaim = p.Match.(*JWTClaim)
+	default:
+		return nil, fmt.Errorf("unknown match type")
+	}
+	b, err := yaml.Marshal(w)
+	if err != nil {
+		return nil, err
+	}
 
-	return b, nil
+	return append(out, b...), nil
 }
 
 // ParamMatch tells the location of the HTTP paramter.
