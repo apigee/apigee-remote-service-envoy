@@ -146,9 +146,10 @@ type Config struct {
 	Tenant    TenantConfig    `yaml:"tenant,omitempty" json:"tenant,omitempty" mapstructure:"tenant,omitempty"`
 	Products  ProductsConfig  `yaml:"products,omitempty" json:"products,omitempty" mapstructure:"products,omitempty"`
 	Analytics AnalyticsConfig `yaml:"analytics,omitempty" json:"analytics,omitempty" mapstructure:"analytics,omitempty"`
-	// If EnvConfigs is specified, APIKeyHeader, APIKeyClaim, JWTProviderKey in AuthConfig will be ineffectual.
+	// If EnvironmentConfigs is specified, APIKeyHeader, APIKeyClaim, JWTProviderKey in AuthConfig will be ineffectual.
 	Auth       AuthConfig `yaml:"auth,omitempty" json:"auth,omitempty" mapstructure:"auth,omitempty"`
-	EnvConfigs EnvConfigs `yaml:"env_configs,omitempty" json:"env_configs,omitempty" mapstructure:"env_configs,omitempty"`
+	// Apigee Environment configurations.
+	EnvironmentConfigs EnvironmentConfigs `yaml:"environment_configs,omitempty" json:"environment_configs,omitempty" mapstructure:"environment_configs,omitempty"`
 }
 
 // GlobalConfig is global configuration for the server
@@ -223,61 +224,61 @@ type AuthConfig struct {
 
 }
 
-// EnvConfigs contains environment configs or URIs to them.
-type EnvConfigs struct {
-	// A list of strings containing environment config URIs
-	// Only the local file system is supported currently, e.g., file://path/to/config.yaml
-	ConfigURIs []string `yaml:"config_uris,omitempty" json:"config_uris,omitempty"`
+// EnvironmentConfigs contains directly inlined Environment configs and references to Environment configs.
+type EnvironmentConfigs struct {
+	// A list of URIs referencing Environment configurations. Supported schemes:
+	// - `file`: An RFC 8089 file path where the configuration is stored on the local file system, e.g. `file://path/to/config.yaml`. 
+	References []string `yaml:"references,omitempty" json:"references,omitempty"`
 
-	// A list of environment configs
+	// A list of environment configs.
 	Inline []EnvironmentConfig `yaml:"inline,omitempty" json:"inline,omitempty"`
 }
 
-// EnvironmentConfig is an Apigee Environment-level config for
-// Envoy Adapter. It contains a list of operations for the adapter to
-// perform request authentication and authorization.
+// EnvironmentConfig contains a snapshot of the set of API configurations associated with an Apigee Environment.
 type EnvironmentConfig struct {
 	// Unique ID of the environment config
 	ID string `yaml:"id" json:"id"`
 
-	// A list of proxy configs
-	ProxyConfigs []ProxyConfig `yaml:"proxy_configs" json:"proxy_configs"`
+	// A list of API configs.
+	APIs []APIConfig `yaml:"apis" json:"apis"`
 }
 
-// ProxyConfig has the proxy configuration.
-type ProxyConfig struct {
-	// Top-level basepath for the proxy config
-	Basepath string `yaml:"basepath,omitempty" json:"basepath,omitempty"`
+// APIConfig contains authentication, authorization, and transformation settings for a group of API Operations.
+type APIConfig struct {
+	// ID of the API, used to match the api_source of API Product Operations.
+	ID string `yaml:"id" json:"id"`
+	
+	// Base path for this API.
+	BasePath string `yaml:"base_path,omitempty" json:"base_path,omitempty"`
 
-	// Authentication defines the proxy-level authentication requirement
+	// The default authentication requirements for this API.
 	Authentication AuthenticationRequirement `yaml:"authentication,omitempty" json:"authentication,omitempty"`
 
-	// ConsumerAuthorization defines the proxy-level consumer authorization
+	// The default consumer authorization requirements for this API.
 	ConsumerAuthorization ConsumerAuthorization `yaml:"consumer_authorization,omitempty" json:"consumer_authorization,omitempty"`
 
 	// Transformation rules applied to HTTP requests.
 	HTTPRequestTransforms HTTPRequestTransformations `yaml:"http_request_transforms,omitempty" json:"http_request_transforms,omitempty"`
 
-	// A list of Operations, names of which must be unique within the proxy config.
-	Operations []APIOperation `yaml:"operations,omitempty" json:"operations,omitempty"`
+	// A list of API Operations, names of which must be unique within the API.
+	Operations []APIOperation `yaml:"operations" json:"operations"`
 }
 
-// An APIOperation associates a set of rules with a set of request matching
-// settings.
+// An APIOperation associates a set of rules with a set of request matching settings.
 type APIOperation struct {
-	// Name of the operation. Unique within a proxy config.
+	// Name of the API Operation. Unique within a API.
 	Name string `yaml:"name" json:"name"`
 
-	// Authentication defines the operation-level authentication requirement and overrides whatever in the proxy level
+	// The authentication requirements for thie Operation. If specified, this overrides the default AuthenticationRequirement specified at the API level.
 	Authentication AuthenticationRequirement `yaml:"authentication,omitempty" json:"authentication,omitempty"`
 
-	// ConsumerAuthorization defines the operation-level consumer authorization and overrides whatever in the proxy level
+	// The consumer authorization requirement for this Operation. If specified, this overrides the default ConsumerAuthorization specified at the API level.
 	ConsumerAuthorization ConsumerAuthorization `yaml:"consumer_authorization,omitempty" json:"consumer_authorization,omitempty"`
 
-	// HTTP matching rules for this operation. If omitted, this will match all requests.
+	// HTTP matching rules for this Operation. If omitted, this API Operation will match all HTTP requests not matched by another API Operation.
 	HTTPMatches []HTTPMatch `yaml:"http_match,omitempty" json:"http_match,omitempty"`
 
-	// Transformation rules applied to HTTP requests for this Operation. Overrides the rules set at the Proxy level.
+	// Transformation rules applied to HTTP requests for this Operation. Overrides the rules set at the API level.
 	HTTPRequestTransforms HTTPRequestTransformations `yaml:"http_request_transforms,omitempty" json:"http_request_transforms,omitempty"`
 }
 
@@ -308,18 +309,18 @@ type AllAuthenticationRequirements []AuthenticationRequirement
 
 func (AllAuthenticationRequirements) authenticationRequirement() {}
 
-// JWTAuthentication defines the JWT authentication.
+// JWTAuthentication defines a JWT authentication requirement.
 type JWTAuthentication struct {
-	// Name of this JWT requirement, unique within the Proxy.
+	// Name of this JWT requirement, unique within the API.
 	Name string `yaml:"name" json:"name"`
 
-	// JWT issuer ("iss" claim)
+	// JWT issuer ("iss" claim).
 	Issuer string `yaml:"issuer" json:"issuer"`
 
-	// The JWKS source
+	// The JWKS source.
 	JWKSSource JWKSSource
 
-	// Audiences contains a list of audiences
+	// Audiences contains a list of audiences.
 	Audiences []string `yaml:"audiences,omitempty" json:"audiences,omitempty"`
 
 	// Header name that will contain decoded JWT payload in requests forwarded to
@@ -327,7 +328,7 @@ type JWTAuthentication struct {
 	ForwardPayloadHeader string `yaml:"forward_payload_header,omitempty" json:"forward_payload_header,omitempty"`
 
 	// Locations where JWT may be found. First match wins.
-	In []HTTPParameter `yaml:"in" json:"in"`
+	In []APIOperationParameter `yaml:"in" json:"in"`
 }
 
 func (JWTAuthentication) authenticationRequirement() {}
@@ -355,7 +356,7 @@ type ConsumerAuthorization struct {
 	FailOpen bool `yaml:"fail_open,omitempty" json:"fail_open,omitempty"`
 
 	// Locations of API consumer credential (API Key). First match wins.
-	In []HTTPParameter `yaml:"in" json:"in"`
+	In []APIOperationParameter `yaml:"in" json:"in"`
 }
 
 // HTTPMatch is an HTTP request matching rule.
@@ -368,12 +369,12 @@ type HTTPMatch struct {
 	Method string `yaml:"method,omitempty" json:"method,omitempty"`
 }
 
-// HTTPParameter defines an HTTP paramter.
-type HTTPParameter struct {
-	// Query, Header and JWTClaim are supported.
+// APIOperationParameter describes an input value to an API Operation.
+type APIOperationParameter struct {
+	// One of Query, Header, or JWTClaim.
 	Match ParamMatch
 
-	// Optional transformation of the parameter value (e.g. "Bearer " for Authorization tokens).
+	// Optional transformation of the parameter value.
 	Transformation StringTransformation `yaml:"transformation,omitempty" json:"transformation,omitempty"`
 }
 
@@ -382,12 +383,12 @@ type ParamMatch interface {
 	paramMatch()
 }
 
-// Name of a query paramter
+// Name of an HTTP query string parameter.
 type Query string
 
 func (Query) paramMatch() {}
 
-// Name of a header
+// Name of an HTTP header.
 type Header string
 
 func (Header) paramMatch() {}
