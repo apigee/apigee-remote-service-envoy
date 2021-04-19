@@ -57,8 +57,8 @@ type ProxyConfig struct {
 	// ConsumerAuthorization defines the proxy-level consumer authorization
 	ConsumerAuthorization ConsumerAuthorization `yaml:"consumer_authorization,omitempty" json:"consumer_authorization,omitempty"`
 
-	// Name of the target server for this proxy.
-	Target string `yaml:"target" json:"target"`
+	// Transformation rules applied to HTTP requests.
+	HTTPRequestTransforms HTTPRequestTransformations `yaml:"http_request_transforms,omitempty" json:"http_request_transforms,omitempty"`
 
 	// A list of Operations, names of which must be unique within the proxy config.
 	Operations []APIOperation `yaml:"operations,omitempty" json:"operations,omitempty"`
@@ -79,8 +79,20 @@ type APIOperation struct {
 	// HTTP matching rules for this operation. If omitted, this will match all requests.
 	HTTPMatches []HTTPMatch `yaml:"http_match,omitempty" json:"http_match,omitempty"`
 
-	// Name of the target server for this operation.
-	Target string `yaml:"target" json:"target"`
+	// Transformation rules applied to HTTP requests for this Operation. Overrides the rules set at the Proxy level.
+	HTTPRequestTransforms HTTPRequestTransformations `yaml:"http_request_transforms,omitempty" json:"http_request_transforms,omitempty"`
+}
+
+// HTTPRequestTransformations are rules for modifying HTTP requests.
+type HTTPRequestTransformations struct {
+	// Header values to append. If a specified header is already present in the request, an additional value is added.
+	AppendHeaders map[string]string `yaml:"append_headers,omitempty" json:"append_headers,omitempty"`
+
+	// Header values to set. If a specified header is already present, the value here will overwrite it.
+	SetHeaders map[string]string `yaml:"set_headers,omitempty" json:"set_headers,omitempty"`
+
+	// Headers to remove. Supports single wildcard globbing e.g. `x-apigee-*`.
+	RemoveHeaders []string `yaml:"remove_headers,omitempty" json:"remove_headers,omitempty"`
 }
 
 // AuthenticationRequirement defines the authentication requirement. It can be jwt, any or all.
