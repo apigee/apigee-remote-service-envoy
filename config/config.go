@@ -257,8 +257,8 @@ type APIConfig struct {
 	// The default consumer authorization requirements for this API.
 	ConsumerAuthorization ConsumerAuthorization `yaml:"consumer_authorization,omitempty" json:"consumer_authorization,omitempty"`
 
-	// The default value for the `x-apigee-target` header that will be appended to all allowed requests. 
-	TargetID string `yaml:"target,omitempty" json:"target,omitempty"`
+	// Transformation rules applied to HTTP requests.
+	HTTPRequestTransforms HTTPRequestTransformations `yaml:"http_request_transforms,omitempty" json:"http_request_transforms,omitempty"`
 
 	// A list of API Operations, names of which must be unique within the API.
 	Operations []APIOperation `yaml:"operations" json:"operations"`
@@ -278,8 +278,20 @@ type APIOperation struct {
 	// HTTP matching rules for this Operation. If omitted, this API Operation will match all HTTP requests not matched by another API Operation.
 	HTTPMatches []HTTPMatch `yaml:"http_match,omitempty" json:"http_match,omitempty"`
 
-	// The value for the `x-apigee-target` header for this Operation that will be appended to all allowed requests. 
-	TargetID string `yaml:"target,omitempty" json:"target,omitempty"`
+	// Transformation rules applied to HTTP requests for this Operation. Overrides the rules set at the API level.
+	HTTPRequestTransforms HTTPRequestTransformations `yaml:"http_request_transforms,omitempty" json:"http_request_transforms,omitempty"`
+}
+
+// HTTPRequestTransformations are rules for modifying HTTP requests.
+type HTTPRequestTransformations struct {
+	// Header values to append. If a specified header is already present in the request, an additional value is added.
+	AppendHeaders map[string]string `yaml:"append_headers,omitempty" json:"append_headers,omitempty"`
+
+	// Header values to set. If a specified header is already present, the value here will overwrite it.
+	SetHeaders map[string]string `yaml:"set_headers,omitempty" json:"set_headers,omitempty"`
+
+	// Headers to remove. Supports single wildcard globbing e.g. `x-apigee-*`.
+	RemoveHeaders []string `yaml:"remove_headers,omitempty" json:"remove_headers,omitempty"`
 }
 
 // AuthenticationRequirement is the interface defining the authentication requirement.
