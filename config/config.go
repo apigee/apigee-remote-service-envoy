@@ -146,7 +146,7 @@ type Config struct {
 	Tenant    TenantConfig    `yaml:"tenant,omitempty" json:"tenant,omitempty" mapstructure:"tenant,omitempty"`
 	Products  ProductsConfig  `yaml:"products,omitempty" json:"products,omitempty" mapstructure:"products,omitempty"`
 	Analytics AnalyticsConfig `yaml:"analytics,omitempty" json:"analytics,omitempty" mapstructure:"analytics,omitempty"`
-	// If EnvConfigs is specified, APIKeyHeader, APIKeyClaim, JWTProviderKey in AuthConfig will be ineffectual.
+	// If Environments is specified, APIKeyHeader, APIKeyClaim, JWTProviderKey in AuthConfig will be ineffectual.
 	Auth       AuthConfig `yaml:"auth,omitempty" json:"auth,omitempty" mapstructure:"auth,omitempty"`
 	Environments EnvironmentConfigs `yaml:"environments,omitempty" json:"environments,omitempty" mapstructure:"environments,omitempty"`
 }
@@ -259,10 +259,10 @@ type APIConfig struct {
 	ConsumerAuthorization ConsumerAuthorization `yaml:"consumer_authorization,omitempty" json:"consumer_authorization,omitempty"`
 
 	// The default value for the `x-apigee-target` header that will be appended to all allowed requests. 
-	TargetID string `yaml:"target" json:"target"`
+	TargetID string `yaml:"target,omitempty" json:"target,omitempty"`
 
 	// A list of API Operations, names of which must be unique within the API.
-	Operations []APIOperation `yaml:"operations,omitempty" json:"operations,omitempty"`
+	Operations []APIOperation `yaml:"operations" json:"operations"`
 }
 
 // An APIOperation associates a set of rules with a set of request matching settings.
