@@ -146,9 +146,10 @@ type Config struct {
 	Tenant    TenantConfig    `yaml:"tenant,omitempty" json:"tenant,omitempty" mapstructure:"tenant,omitempty"`
 	Products  ProductsConfig  `yaml:"products,omitempty" json:"products,omitempty" mapstructure:"products,omitempty"`
 	Analytics AnalyticsConfig `yaml:"analytics,omitempty" json:"analytics,omitempty" mapstructure:"analytics,omitempty"`
-	// If Environments is specified, APIKeyHeader, APIKeyClaim, JWTProviderKey in AuthConfig will be ineffectual.
+	// If EnvironmentConfigs is specified, APIKeyHeader, APIKeyClaim, JWTProviderKey in AuthConfig will be ineffectual.
 	Auth       AuthConfig `yaml:"auth,omitempty" json:"auth,omitempty" mapstructure:"auth,omitempty"`
-	Environments EnvironmentConfigs `yaml:"environments,omitempty" json:"environments,omitempty" mapstructure:"environments,omitempty"`
+	// Apigee Environment configurations.
+	EnvironmentConfigs EnvironmentConfigs `yaml:"environment_configs,omitempty" json:"environment_configs,omitempty" mapstructure:"environment_configs,omitempty"`
 }
 
 // GlobalConfig is global configuration for the server
@@ -233,9 +234,7 @@ type EnvironmentConfigs struct {
 	Inline []EnvironmentConfig `yaml:"inline,omitempty" json:"inline,omitempty"`
 }
 
-// EnvironmentConfig is an Apigee Environment-level config for
-// Envoy Adapter. It contains a list of operations for the adapter to
-// perform request authentication and authorization.
+// EnvironmentConfig contains a snapshot of the set of API configurations associated with an Apigee Environment.
 type EnvironmentConfig struct {
 	// Unique ID of the environment config
 	ID string `yaml:"id" json:"id"`
@@ -244,7 +243,7 @@ type EnvironmentConfig struct {
 	APIs []APIConfig `yaml:"apis" json:"apis"`
 }
 
-// APIConfig contains settings for an individual API.
+// APIConfig contains authentication, authorization, and transformation settings for a group of API Operations.
 type APIConfig struct {
 	// ID of the API, used to match the api_source of API Product Operations.
 	ID string `yaml:"id" json:"id"`
