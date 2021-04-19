@@ -255,8 +255,8 @@ type ProxyConfig struct {
 	// ConsumerAuthorization defines the proxy-level consumer authorization
 	ConsumerAuthorization ConsumerAuthorization `yaml:"consumer_authorization,omitempty" json:"consumer_authorization,omitempty"`
 
-	// Transformation rules applied to HTTP request headers.
-	RequestHeaderTransforms RequestHeaderTransformations `yaml:"request_header_transforms,omitempty" json:"request_header_transforms,omitempty"`
+	// Transformation rules applied to HTTP requests.
+	HTTPRequestTransforms HTTPRequestTransformations `yaml:"http_request_transforms,omitempty" json:"http_request_transforms,omitempty"`
 
 	// A list of Operations, names of which must be unique within the proxy config.
 	Operations []APIOperation `yaml:"operations,omitempty" json:"operations,omitempty"`
@@ -277,20 +277,20 @@ type APIOperation struct {
 	// HTTP matching rules for this operation. If omitted, this will match all requests.
 	HTTPMatches []HTTPMatch `yaml:"http_match,omitempty" json:"http_match,omitempty"`
 
-	// Transformation rules applied to HTTP request headers for this Operation. Overrides the rules set at the Proxy level.
-	RequestHeaderTransforms RequestHeaderTransformations `yaml:"request_header_transforms,omitempty" json:"request_header_transforms,omitempty"`
+	// Transformation rules applied to HTTP requests for this Operation. Overrides the rules set at the Proxy level.
+	HTTPRequestTransforms HTTPRequestTransformations `yaml:"http_request_transforms,omitempty" json:"http_request_transforms,omitempty"`
 }
 
-// RequestHeaderTransformations are rules for modifying HTTP request headers.
-type RequestHeaderTransformations struct {
+// HTTPRequestTransformations are rules for modifying HTTP requests.
+type HTTPRequestTransformations struct {
 	// Header values to append. If a specified header is already present in the request, an additional value is added.
-	Append map[string]string
+	AppendHeaders map[string]string `yaml:"append_headers,omitempty" json:"append_headers,omitempty"`
 
 	// Header values to set. If a specified header is already present, the value here will overwrite it.
-	Set map[string]string
+	SetHeaders map[string]string `yaml:"set_headers,omitempty" json:"set_headers,omitempty"`
 
 	// Headers to remove. Supports single wildcard globbing e.g. `x-apigee-*`.
-	Remove []string
+	RemoveHeaders []string `yaml:"remove_headers,omitempty" json:"remove_headers,omitempty"`
 }
 
 // AuthenticationRequirement is the interface defining the authentication requirement.
