@@ -240,14 +240,14 @@ type EnvironmentConfig struct {
 	// Unique ID of the environment config
 	ID string `yaml:"id" json:"id"`
 
-	// A list of API configs
-	API []APIConfig `yaml:"proxies" json:"proxies"`
+	// A list of API configs.
+	APIs []APIConfig `yaml:"apis" json:"apis"`
 }
 
 // APIConfig contains settings for an individual API.
 type APIConfig struct {
 	// ID of the API, used to match the api_source of API Product Operations.
-	ID string `yaml:"name" json:"name"`
+	ID string `yaml:"id" json:"id"`
 	
 	// Base path for this API.
 	BasePath string `yaml:"base_path,omitempty" json:"base_path,omitempty"`
