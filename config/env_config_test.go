@@ -18,35 +18,279 @@
 package config
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
+	"github.com/apigee/apigee-remote-service-golib/v2/errorset"
 	"github.com/google/go-cmp/cmp"
 	"gopkg.in/yaml.v3"
 )
 
 func TestLoadEnvironmentConfigs(t *testing.T) {
-	//TODO
+	tests := []struct {
+		desc          string
+		filename      string
+		wantEnvConfig EnvironmentConfig
+	}{
+		{
+			desc:     "good config file with references to env config files",
+			filename: "./testdata/good_config.yaml",
+			wantEnvConfig: EnvironmentConfig{
+				ID: "good-env-config",
+				APIs: []APIConfig{
+					{
+						BasePath: "/v1",
+						Authentication: AuthenticationRequirement{
+							AuthenticationRequirements: JWTAuthentication{
+								Name:       "foo",
+								Issuer:     "bar",
+								JWKSSource: RemoteJWKS{URL: "url", CacheDuration: time.Hour},
+								In:         []APIOperationParameter{{Match: Header("header")}},
+							},
+						},
+						ConsumerAuthorization: ConsumerAuthorization{
+							In: []APIOperationParameter{{Match: Header("x-api-key")}},
+						},
+						Operations: []APIOperation{
+							{
+								Name: "op-1",
+								HTTPMatches: []HTTPMatch{
+									{
+										PathTemplate: "/petstore",
+										Method:       "GET",
+									},
+								},
+							},
+							{
+								Name: "op-2",
+								HTTPMatches: []HTTPMatch{
+									{
+										PathTemplate: "/bookshop",
+										Method:       "POST",
+									},
+								},
+							},
+						},
+						HTTPRequestTransforms: HTTPRequestTransformations{
+							SetHeaders: map[string]string{
+								"x-apigee-target": "target",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			c := &Config{}
+			if err := c.Load(test.filename, "", "", false); err != nil {
+				t.Errorf("c.Load() returns unexpected: %v", err)
+			}
+			if l := len(c.EnvironmentConfigs.Inline); l != 1 {
+				t.Fatalf("c.Load() results in %d EnvironmentConfig, wanted 1", l)
+			}
+			if diff := cmp.Diff(test.wantEnvConfig, c.EnvironmentConfigs.Inline[0]); diff != "" {
+				t.Errorf("c.Load() results in unexpected EnvironmentConfig diff (-want +got):\n%s", diff)
+			}
+		})
+	}
 }
 
-func TestUnmarshalAuthenticationRequirementYAML(t *testing.T) {
+func TestLoadEnvironmentConfigsError(t *testing.T) {
+	tests := []struct {
+		desc     string
+		filename string
+	}{
+		{
+			desc:     "bad env config files",
+			filename: "./testdata/bad_config_1.yaml",
+		},
+		{
+			desc:     "non-existent env config files",
+			filename: "./testdata/bad_config_2.yaml",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			c := &Config{}
+			if err := c.Load(test.filename, "", "", false); err == nil {
+				t.Errorf("c.Load() returns no error, should have got error")
+			}
+		})
+	}
+}
+
+func TestValidateEnvironmentConfigs(t *testing.T) {
+	tests := []struct {
+		desc    string
+		cfg     *Config
+		hasErr  bool
+		wantErr error
+	}{
+		{
+			desc: "good environment configs",
+			cfg: &Config{
+				EnvironmentConfigs: EnvironmentConfigs{
+					Inline: []EnvironmentConfig{
+						{
+							ID: "good-env-config",
+							APIs: []APIConfig{
+								{
+									BasePath: "/v1",
+									Authentication: AuthenticationRequirement{
+										AuthenticationRequirements: JWTAuthentication{
+											Name:       "foo",
+											Issuer:     "bar",
+											JWKSSource: RemoteJWKS{URL: "url", CacheDuration: time.Hour},
+											In:         []APIOperationParameter{{Match: Header("header")}},
+										},
+									},
+									ConsumerAuthorization: ConsumerAuthorization{
+										In: []APIOperationParameter{{Match: Header("x-api-key")}},
+									},
+									Operations: []APIOperation{
+										{
+											Name: "op-1",
+											HTTPMatches: []HTTPMatch{
+												{
+													PathTemplate: "/petstore",
+													Method:       "GET",
+												},
+											},
+										},
+										{
+											Name: "op-2",
+											HTTPMatches: []HTTPMatch{
+												{
+													PathTemplate: "/bookshop",
+													Method:       "POST",
+												},
+											},
+										},
+									},
+									HTTPRequestTransforms: HTTPRequestTransformations{
+										SetHeaders: map[string]string{
+											"x-apigee-target": "target",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "duplicate environment config ids",
+			cfg: &Config{
+				EnvironmentConfigs: EnvironmentConfigs{
+					Inline: []EnvironmentConfig{
+						{
+							ID: "duplicate-config",
+						},
+						{
+							ID: "duplicate-config",
+						},
+					},
+				},
+			},
+			hasErr: true,
+			wantErr: &errorset.Error{
+				Errors: []error{
+					fmt.Errorf("environment config IDs must be unique, got multiple duplicate-config"),
+				},
+			},
+		},
+		{
+			desc: "duplicate operation names",
+			cfg: &Config{
+				EnvironmentConfigs: EnvironmentConfigs{
+					Inline: []EnvironmentConfig{
+						{
+							ID: "config",
+							APIs: []APIConfig{
+								{
+									Operations: []APIOperation{
+										{
+											Name: "duplicate-op",
+										},
+										{
+											Name: "duplicate-op",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			hasErr: true,
+			wantErr: &errorset.Error{
+				Errors: []error{
+					fmt.Errorf("operation names within each API must be unique, got multiple duplicate-op"),
+				},
+			},
+		},
+		{
+			desc: "duplicate jwt authentication requirement names",
+			cfg: &Config{
+				EnvironmentConfigs: EnvironmentConfigs{
+					Inline: []EnvironmentConfig{
+						{
+							ID: "config",
+							APIs: []APIConfig{
+								{
+									Authentication: AuthenticationRequirement{
+										AuthenticationRequirements: AllAuthenticationRequirements([]AuthenticationRequirement{
+											{
+												AuthenticationRequirements: JWTAuthentication{Name: "duplicate-jwt"},
+											},
+											{
+												AuthenticationRequirements: AnyAuthenticationRequirements([]AuthenticationRequirement{
+													{
+														AuthenticationRequirements: JWTAuthentication{Name: "duplicate-jwt"},
+													},
+												}),
+											},
+										}),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			hasErr: true,
+			wantErr: &errorset.Error{
+				Errors: []error{
+					fmt.Errorf("JWT authentication requirement names within each API or operation must be unique, got multiple duplicate-jwt"),
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			if err := test.cfg.validateEnvConfigs(); (err != nil) != test.hasErr {
+				t.Errorf("c.validateEnvConfigs() returns no error, should have got error")
+			} else if test.wantErr != nil && test.wantErr.Error() != err.Error() {
+				t.Errorf("c.validateEnvConfigs() returns error %v, want %s", err, test.wantErr)
+			}
+		})
+	}
+}
+
+func TestMarshalAndUnmarshalAuthenticationRequirement(t *testing.T) {
 	tests := []struct {
 		desc string
-		data []byte
 		want *AuthenticationRequirement
 	}{
 		{
 			desc: "valid jwt",
-			data: []byte(`
-jwt:
-  name: foo
-  issuer: bar
-  in:
-  - header: header
-  remote_jwks:
-    url: url
-    cache_duration: 1h
-`),
 			want: &AuthenticationRequirement{
 				AuthenticationRequirements: JWTAuthentication{
 					Name:       "foo",
@@ -58,25 +302,6 @@ jwt:
 		},
 		{
 			desc: "valid any enclosing jwt",
-			data: []byte(`
-any:
-- jwt:
-    name: foo
-    issuer: bar
-    in:
-    - header: header
-    remote_jwks:
-      url: url1
-      cache_duration: 1h
-- jwt:
-    name: bar
-    issuer: foo
-    in:
-    - query: query
-    remote_jwks:
-      url: url2
-      cache_duration: 1h
-`),
 			want: &AuthenticationRequirement{
 				AuthenticationRequirements: AnyAuthenticationRequirements([]AuthenticationRequirement{
 					{
@@ -100,25 +325,6 @@ any:
 		},
 		{
 			desc: "valid all enclosing jwt",
-			data: []byte(`
-all:
-- jwt:
-    name: foo
-    issuer: bar
-    in:
-    - header: header
-    remote_jwks:
-      url: url1
-      cache_duration: 1h
-- jwt:
-    name: bar
-    issuer: foo
-    in:
-    - query: query
-    remote_jwks:
-      url: url2
-      cache_duration: 1h
-`),
 			want: &AuthenticationRequirement{
 				AuthenticationRequirements: AllAuthenticationRequirements([]AuthenticationRequirement{
 					{
@@ -142,34 +348,6 @@ all:
 		},
 		{
 			desc: "valid any enclosing all and jwt",
-			data: []byte(`
-any:
-- all:
-  - jwt:
-      name: foo
-      issuer: bar
-      in:
-      - header: header
-      remote_jwks:
-        url: url1
-        cache_duration: 1h
-  - jwt:
-      name: bar
-      issuer: foo
-      in:
-      - query: query
-      remote_jwks:
-        url: url2
-        cache_duration: 1h
-- jwt:
-    name: bac
-    issuer: foo
-    in:
-    - query: query
-    remote_jwks:
-      url: url3
-      cache_duration: 2h
-`),
 			want: &AuthenticationRequirement{
 				AuthenticationRequirements: AnyAuthenticationRequirements([]AuthenticationRequirement{
 					{
@@ -207,23 +385,31 @@ any:
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			a := &AuthenticationRequirement{}
-			if err := yaml.Unmarshal(test.data, a); err != nil {
+			out, err := yaml.Marshal(test.want)
+			if err != nil {
+				t.Fatalf("yaml.Marshal() returns unexpected: %v", err)
+			}
+			got := &AuthenticationRequirement{}
+			if err := yaml.Unmarshal(out, got); err != nil {
 				t.Errorf("yaml.Unmarshal() returns unexpected: %v", err)
 			}
-			if diff := cmp.Diff(test.want, a); diff != "" {
-				t.Errorf("yaml.Unmarshal() results in unexpected AuthenticationRequirement diff (-want +got):\n%s", diff)
+			if diff := cmp.Diff(test.want, got); diff != "" {
+				t.Errorf("Marshal and unmarshal results in unexpected AuthenticationRequirement diff (-want +got):\n%s", diff)
 			}
 		})
 	}
 }
 
-func TestUnmarshalAuthenticationRequirementYAMLError(t *testing.T) {
+func TestUnmarshalAuthenticationRequirementError(t *testing.T) {
 	tests := []struct {
 		desc    string
 		data    []byte
 		wantErr string
 	}{
+		{
+			desc: "bad jwt format",
+			data: []byte(`jwt: bad`),
+		},
 		{
 			desc: "any and jwt coexist",
 			data: []byte(`
@@ -300,7 +486,7 @@ any:
 		t.Run(test.desc, func(t *testing.T) {
 			a := &AuthenticationRequirement{}
 			if err := yaml.Unmarshal(test.data, a); err == nil {
-				t.Errorf("yaml.Unmarshal() returns no error, want %s", test.wantErr)
+				t.Errorf("yaml.Unmarshal() returns no error, should have got error")
 			} else if test.wantErr != "" && err.Error() != test.wantErr {
 				t.Errorf("yaml.Unmarshal() returns error %v, want %s", err, test.wantErr)
 			}
@@ -308,123 +494,157 @@ any:
 	}
 }
 
-func TestUnmarshalJWTAuthenticationYAML(t *testing.T) {
+func TestMarshalAndUnmarshalJWTAuthentication(t *testing.T) {
 	tests := []struct {
 		desc string
-		data []byte
 		want *JWTAuthentication
 	}{
 		{
 			desc: "valid remote_jwks",
+			want: &JWTAuthentication{
+				Name:       "foo",
+				Issuer:     "bar",
+				In:         []APIOperationParameter{{Match: Header("header")}, {Match: Query("query")}},
+				JWKSSource: RemoteJWKS{URL: "url", CacheDuration: time.Hour},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			out, err := yaml.Marshal(test.want)
+			t.Log(string(out))
+			if err != nil {
+				t.Fatalf("yaml.Marshal() returns unexpected: %v", err)
+			}
+			got := &JWTAuthentication{}
+			if err := yaml.Unmarshal(out, got); err != nil {
+				t.Errorf("yaml.Unmarshal() returns unexpected: %v", err)
+			}
+			if diff := cmp.Diff(test.want, got); diff != "" {
+				t.Errorf("Marshal and unmarshal results in unexpected JWTAuthentication diff (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestUnmarshalJWTAuthenticationError(t *testing.T) {
+	tests := []struct {
+		desc    string
+		data    []byte
+		wantErr string
+	}{
+		{
+			desc: "no jwks source",
 			data: []byte(`
 name: foo
 issuer: bar
 in:
 - header: header
+`),
+			wantErr: "remote jwks not found",
+		},
+		{
+			desc: "bad audiences format",
+			data: []byte(`
+name: foo
+issuer: bar
+audiences: bad
 remote_jwks:
   url: url
-  cache_duration: 1h
+in:
+- header: header
 `),
-			want: &JWTAuthentication{
-				Name:   "foo",
-				Issuer: "bar",
-				In: []APIOperationParameter{
-					{
-						Match: Header("header"),
-					},
-				},
-				JWKSSource: RemoteJWKS{
-					URL:           "url",
-					CacheDuration: time.Hour,
-				},
-			},
+		},
+		{
+			desc: "bad jwks source format",
+			data: []byte(`
+name: foo
+issuer: bar
+remote_jwks: bad
+in:
+- header: header
+`),
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			j := &JWTAuthentication{}
-			if err := yaml.Unmarshal(test.data, j); err != nil {
-				t.Errorf("yaml.Unmarshal() returns unexpected: %v", err)
-			}
-			if diff := cmp.Diff(test.want, j); diff != "" {
-				t.Errorf("yaml.Unmarshal() results in unexpected JWTAuthentication diff (-want +got):\n%s", diff)
+			p := &JWTAuthentication{}
+			if err := yaml.Unmarshal(test.data, p); err == nil {
+				t.Errorf("yaml.Unmarshal() returns no error, should have got error")
+			} else if test.wantErr != "" && err.Error() != test.wantErr {
+				t.Errorf("yaml.Unmarshal() returns error %v, want %s", err, test.wantErr)
 			}
 		})
 	}
 }
 
-func TestUnmarshalAPIOperationParameterYAML(t *testing.T) {
+type testJWKSSource string
+
+func (testJWKSSource) jwksSource() {}
+
+func TestMarshalJWTAuthenticationError(t *testing.T) {
+
+	p := JWTAuthentication{
+		Name:       "foo",
+		Issuer:     "bar",
+		In:         []APIOperationParameter{{Match: Header("header")}},
+		JWKSSource: testJWKSSource("bad"),
+	}
+	wantErr := "unsupported jwks source"
+
+	if _, err := yaml.Marshal(p); err == nil {
+		t.Errorf("yaml.Marshal() returns no error, should have got error")
+	} else if err.Error() != wantErr {
+		t.Errorf("yaml.Marshal() returns error %v, want %s", err, wantErr)
+	}
+}
+
+func TestMarshalAndUnmarshalAPIOperationParameter(t *testing.T) {
 	tests := []struct {
 		desc string
-		data []byte
 		want *APIOperationParameter
 	}{
 		{
-			desc: "valid http parameter with header",
-			data: []byte(`header: header`),
-			want: &APIOperationParameter{
-				Match: Header("header"),
-			},
+			desc: "valid API operation parameter with header",
+			want: &APIOperationParameter{Match: Header("header")},
 		},
 		{
-			desc: "valid http parameter with query",
-			data: []byte(`query: query`),
-			want: &APIOperationParameter{
-				Match: Query("query"),
-			},
+			desc: "valid API operation parameter with query",
+			want: &APIOperationParameter{Match: Query("query")},
 		},
 		{
-			desc: "valid http parameter with jwt claim",
-			data: []byte(`
-jwt_claim:
-  requirement: foo
-  name: bar
-`),
-			want: &APIOperationParameter{
-				Match: JWTClaim{
-					Requirement: "foo",
-					Name:        "bar",
-				},
-			},
+			desc: "valid API operation parameter with jwt claim",
+			want: &APIOperationParameter{Match: JWTClaim{Requirement: "foo", Name: "bar"}},
 		},
 		{
-			desc: "valid http parameter with jwt claim and transformation",
-			data: []byte(`
-jwt_claim:
-  requirement: foo
-  name: bar
-transformation:
-  template: temp
-  substitution: sub
-`),
+			desc: "valid API operation parameter with jwt claim and transformation",
 			want: &APIOperationParameter{
-				Match: JWTClaim{
-					Requirement: "foo",
-					Name:        "bar",
-				},
-				Transformation: StringTransformation{
-					Template:     "temp",
-					Substitution: "sub",
-				},
+				Match:          JWTClaim{Requirement: "foo", Name: "bar"},
+				Transformation: StringTransformation{Template: "temp", Substitution: "sub"},
 			},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			p := &APIOperationParameter{}
-			if err := yaml.Unmarshal(test.data, p); err != nil {
+			out, err := yaml.Marshal(test.want)
+			if err != nil {
+				t.Fatalf("yaml.Marshal() returns unexpected: %v", err)
+			}
+			got := &APIOperationParameter{}
+			if err := yaml.Unmarshal(out, got); err != nil {
 				t.Errorf("yaml.Unmarshal() returns unexpected: %v", err)
 			}
-			if diff := cmp.Diff(test.want, p); diff != "" {
-				t.Errorf("yaml.Unmarshal() results in unexpected HTTPParamter diff (-want +got):\n%s", diff)
+			if diff := cmp.Diff(test.want, got); diff != "" {
+				t.Errorf("Marshal and unmarshal results in unexpected APIOperationParameter diff (-want +got):\n%s", diff)
 			}
 		})
 	}
 }
 
-func TestUnmarshalAPIOperationParameterYAMLError(t *testing.T) {
+func TestUnmarshalAPIOperationParameterError(t *testing.T) {
 	tests := []struct {
 		desc    string
 		data    []byte
@@ -451,7 +671,7 @@ jwt_claim:
   name: bar
 header: header
 `),
-			wantErr: "precisely one header, query or jwt_claim should be set",
+			wantErr: "precisely one header, query or jwt_claim should be set, got 2",
 		},
 		{
 			desc: "jwt claim and query coexist",
@@ -461,7 +681,7 @@ jwt_claim:
   name: bar
 query: query
 `),
-			wantErr: "precisely one header, query or jwt_claim should be set",
+			wantErr: "precisely one header, query or jwt_claim should be set, got 2",
 		},
 		{
 			desc: "header and query coexist",
@@ -469,7 +689,7 @@ query: query
 header: header
 query: query
 `),
-			wantErr: "precisely one header, query or jwt_claim should be set",
+			wantErr: "precisely one header, query or jwt_claim should be set, got 2",
 		},
 	}
 
@@ -477,11 +697,29 @@ query: query
 		t.Run(test.desc, func(t *testing.T) {
 			p := &APIOperationParameter{}
 			if err := yaml.Unmarshal(test.data, p); err == nil {
-				t.Errorf("yaml.Unmarshal() returns no error, want %s", test.wantErr)
+				t.Errorf("yaml.Unmarshal() returns no error, should have got error")
 			} else if test.wantErr != "" && err.Error() != test.wantErr {
 				t.Errorf("yaml.Unmarshal() returns error %v, want %s", err, test.wantErr)
 			}
 		})
+	}
+}
+
+type testParamMatch string
+
+func (testParamMatch) paramMatch() {}
+
+func TestMarshalAPIOperationParameterError(t *testing.T) {
+
+	p := APIOperationParameter{
+		Match: testParamMatch("bad"),
+	}
+	wantErr := "unsupported match type"
+
+	if _, err := yaml.Marshal(p); err == nil {
+		t.Errorf("yaml.Marshal() returns no error, should have got error")
+	} else if err.Error() != wantErr {
+		t.Errorf("yaml.Marshal() returns error %v, want %s", err, wantErr)
 	}
 }
 

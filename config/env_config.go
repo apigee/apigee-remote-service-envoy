@@ -21,94 +21,145 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/apigee/apigee-remote-service-golib/v2/errorset"
 	"gopkg.in/yaml.v3"
 )
+
+// validateEnvConfigs checks if there are
+//   * environment configs with the same ID,
+//   * API configs under the same environment config with the same ID,
+//   * JWT authentication requirement under the same API or operation with the same name
+// and report them as errors
+func (c *Config) validateEnvConfigs() error {
+	var err error
+	configIDSet := make(map[string]bool)
+	for _, ec := range c.EnvironmentConfigs.Inline {
+		if configIDSet[ec.ID] {
+			err = errorset.Append(err, fmt.Errorf("environment config IDs must be unique, got multiple %s", ec.ID))
+		}
+		configIDSet[ec.ID] = true
+		for _, api := range ec.APIs {
+			opNameSet := make(map[string]bool)
+			for _, op := range api.Operations {
+				if opNameSet[op.Name] {
+					err = errorset.Append(err, fmt.Errorf("operation names within each API must be unique, got multiple %s", op.Name))
+				}
+				opNameSet[op.Name] = true
+				err = errorset.Append(err, validateJWTAuthenticationName(&op.Authentication, map[string]bool{}))
+			}
+			err = errorset.Append(err, validateJWTAuthenticationName(&api.Authentication, map[string]bool{}))
+		}
+	}
+	return err
+}
+
+// validateJWTAuthenticationName checks if the JWTAuthentication within the given
+// AuthenticationRequirement
+func validateJWTAuthenticationName(a *AuthenticationRequirement, m map[string]bool) error {
+	var err error
+	switch v := a.AuthenticationRequirements.(type) {
+	case JWTAuthentication:
+		if m[v.Name] {
+			err = errorset.Append(err, fmt.Errorf("JWT authentication requirement names within each API or operation must be unique, got multiple %s", v.Name))
+		}
+		m[v.Name] = true
+	case AnyAuthenticationRequirements:
+		for _, val := range []AuthenticationRequirement(v) {
+			err = errorset.Append(err, validateJWTAuthenticationName(&val, m))
+		}
+	case AllAuthenticationRequirements:
+		for _, val := range []AuthenticationRequirement(v) {
+			err = errorset.Append(err, validateJWTAuthenticationName(&val, m))
+		}
+	}
+	return err
+}
 
 // EnvironmentConfigs contains directly inlined Environment configs and references to Environment configs.
 type EnvironmentConfigs struct {
 	// A list of URIs referencing Environment configurations. Supported schemes:
 	// - `file`: An RFC 8089 file path where the configuration is stored on the local file system, e.g. `file://path/to/config.yaml`.
-	References []string `yaml:"references,omitempty" json:"references,omitempty"`
+	References []string `yaml:"references,omitempty" mapstructure:"references,omitempty"`
 
 	// A list of environment configs.
-	Inline []EnvironmentConfig `yaml:"inline,omitempty" json:"inline,omitempty"`
+	// TODO: Support reading this via viper.Unmarshal()
+	Inline []EnvironmentConfig `yaml:"inline,omitempty"`
 }
 
 // EnvironmentConfig contains a snapshot of the set of API configurations associated with an Apigee Environment.
 type EnvironmentConfig struct {
 	// Unique ID of the environment config
-	ID string `yaml:"id" json:"id"`
+	ID string `yaml:"id" mapstructure:"id"`
 
 	// A list of API configs.
-	APIs []APIConfig `yaml:"apis" json:"apis"`
+	APIs []APIConfig `yaml:"apis" mapstructure:"apis"`
 }
 
 // APIConfig contains authentication, authorization, and transformation settings for a group of API Operations.
 type APIConfig struct {
 	// ID of the API, used to match the api_source of API Product Operations.
-	ID string `yaml:"id" json:"id"`
+	ID string `yaml:"id" mapstructure:"id"`
 
 	// Base path for this API.
-	BasePath string `yaml:"base_path,omitempty" json:"base_path,omitempty"`
+	BasePath string `yaml:"base_path,omitempty" mapstructure:"base_path,omitempty"`
 
 	// The default authentication requirements for this API.
-	Authentication AuthenticationRequirement `yaml:"authentication,omitempty" json:"authentication,omitempty"`
+	Authentication AuthenticationRequirement `yaml:"authentication,omitempty" mapstructure:"authentication,omitempty"`
 
 	// The default consumer authorization requirements for this API.
-	ConsumerAuthorization ConsumerAuthorization `yaml:"consumer_authorization,omitempty" json:"consumer_authorization,omitempty"`
+	ConsumerAuthorization ConsumerAuthorization `yaml:"consumer_authorization,omitempty" mapstructure:"consumer_authorization,omitempty"`
 
 	// Transformation rules applied to HTTP requests.
-	HTTPRequestTransforms HTTPRequestTransformations `yaml:"http_request_transforms,omitempty" json:"http_request_transforms,omitempty"`
+	HTTPRequestTransforms HTTPRequestTransformations `yaml:"http_request_transforms,omitempty" mapstructure:"http_request_transforms,omitempty"`
 
 	// A list of API Operations, names of which must be unique within the API.
-	Operations []APIOperation `yaml:"operations" json:"operations"`
+	Operations []APIOperation `yaml:"operations" mapstructure:"operations"`
 }
 
 // An APIOperation associates a set of rules with a set of request matching settings.
 type APIOperation struct {
 	// Name of the API Operation. Unique within a API.
-	Name string `yaml:"name" json:"name"`
+	Name string `yaml:"name" mapstructure:"name"`
 
 	// The authentication requirements for thie Operation. If specified, this overrides the default AuthenticationRequirement specified at the API level.
-	Authentication AuthenticationRequirement `yaml:"authentication,omitempty" json:"authentication,omitempty"`
+	Authentication AuthenticationRequirement `yaml:"authentication,omitempty" mapstructure:"authentication,omitempty"`
 
 	// The consumer authorization requirement for this Operation. If specified, this overrides the default ConsumerAuthorization specified at the API level.
-	ConsumerAuthorization ConsumerAuthorization `yaml:"consumer_authorization,omitempty" json:"consumer_authorization,omitempty"`
+	ConsumerAuthorization ConsumerAuthorization `yaml:"consumer_authorization,omitempty" mapstructure:"consumer_authorization,omitempty"`
 
 	// HTTP matching rules for this Operation. If omitted, this API Operation will match all HTTP requests not matched by another API Operation.
-	HTTPMatches []HTTPMatch `yaml:"http_match,omitempty" json:"http_match,omitempty"`
+	HTTPMatches []HTTPMatch `yaml:"http_match,omitempty" mapstructure:"http_match,omitempty"`
 
 	// Transformation rules applied to HTTP requests for this Operation. Overrides the rules set at the API level.
-	HTTPRequestTransforms HTTPRequestTransformations `yaml:"http_request_transforms,omitempty" json:"http_request_transforms,omitempty"`
+	HTTPRequestTransforms HTTPRequestTransformations `yaml:"http_request_transforms,omitempty" mapstructure:"http_request_transforms,omitempty"`
 }
 
 // HTTPRequestTransformations are rules for modifying HTTP requests.
 type HTTPRequestTransformations struct {
 	// Header values to append. If a specified header is already present in the request, an additional value is added.
-	AppendHeaders map[string]string `yaml:"append_headers,omitempty" json:"append_headers,omitempty"`
+	AppendHeaders map[string]string `yaml:"append_headers,omitempty" mapstructure:"append_headers,omitempty"`
 
 	// Header values to set. If a specified header is already present, the value here will overwrite it.
-	SetHeaders map[string]string `yaml:"set_headers,omitempty" json:"set_headers,omitempty"`
+	SetHeaders map[string]string `yaml:"set_headers,omitempty" mapstructure:"set_headers,omitempty"`
 
 	// Headers to remove. Supports single wildcard globbing e.g. `x-apigee-*`.
-	RemoveHeaders []string `yaml:"remove_headers,omitempty" json:"remove_headers,omitempty"`
+	RemoveHeaders []string `yaml:"remove_headers,omitempty" mapstructure:"remove_headers,omitempty"`
 }
 
 // AuthenticationRequirement defines the authentication requirement. It can be jwt, any or all.
 type AuthenticationRequirement struct {
-	AuthenticationRequirements AuthenticationRequirements `yaml:"-" json:"-"`
+	AuthenticationRequirements AuthenticationRequirements `yaml:"-"`
 }
 
-type authenticationRequirementsWrapper struct {
-	JWT *JWTAuthentication             `yaml:"jwt,omitempty" json:"jwt,omitempty"`
-	Any *AnyAuthenticationRequirements `yaml:"any,omitempty" json:"any,omitempty"`
-	All *AllAuthenticationRequirements `yaml:"all,omitempty" json:"all,omitempty"`
+type authenticationRequirementWrapper struct {
+	JWT *JWTAuthentication             `yaml:"jwt,omitempty" mapstructure:"jwt,omitempty"`
+	Any *AnyAuthenticationRequirements `yaml:"any,omitempty" mapstructure:"any,omitempty"`
+	All *AllAuthenticationRequirements `yaml:"all,omitempty" mapstructure:"all,omitempty"`
 }
 
-// UnmarshalYAML implements the custom unmarshal method for
-// AuthenticationRequirement with input yaml bytes
+// UnmarshalYAML implements the yaml.Unmarshaler interface
 func (a *AuthenticationRequirement) UnmarshalYAML(node *yaml.Node) error {
-	w := &authenticationRequirementsWrapper{}
+	w := &authenticationRequirementWrapper{}
 	if err := node.Decode(w); err != nil {
 		return err
 	}
@@ -133,6 +184,22 @@ func (a *AuthenticationRequirement) UnmarshalYAML(node *yaml.Node) error {
 	return nil
 }
 
+// MarshalYAML implements the yaml.Marshaler interface
+func (a AuthenticationRequirement) MarshalYAML() (interface{}, error) {
+	w := authenticationRequirementWrapper{}
+
+	switch v := a.AuthenticationRequirements.(type) {
+	case JWTAuthentication:
+		w.JWT = &v
+	case AnyAuthenticationRequirements:
+		w.Any = &v
+	case AllAuthenticationRequirements:
+		w.All = &v
+	}
+
+	return w, nil
+}
+
 // AuthenticationRequirement is the interface defining the authentication requirement.
 type AuthenticationRequirements interface {
 	authenticationRequirements()
@@ -151,40 +218,44 @@ func (AllAuthenticationRequirements) authenticationRequirements() {}
 // JWTAuthentication defines a JWT authentication requirement.
 type JWTAuthentication struct {
 	// Name of this JWT requirement, unique within the API.
-	Name string `yaml:"name" json:"name"`
+	Name string `yaml:"name" mapstructure:"name"`
 
 	// JWT issuer ("iss" claim)
-	Issuer string `yaml:"issuer" json:"issuer"`
+	Issuer string `yaml:"issuer" mapstructure:"issuer"`
 
 	// The JWKS source.
-	JWKSSource JWKSSource `yaml:"-" json:"-"`
+	JWKSSource JWKSSource `yaml:"-"`
 
 	// Audiences contains a list of audiences.
-	Audiences []string `yaml:"audiences,omitempty" json:"audiences,omitempty"`
+	Audiences []string `yaml:"audiences,omitempty" mapstructure:"audiences,omitempty"`
 
 	// Header name that will contain decoded JWT payload in requests forwarded to
 	// target.
-	ForwardPayloadHeader string `yaml:"forward_payload_header,omitempty" json:"forward_payload_header,omitempty"`
+	ForwardPayloadHeader string `yaml:"forward_payload_header,omitempty" mapstructure:"forward_payload_header,omitempty"`
 
 	// Locations where JWT may be found. First match wins.
-	In []APIOperationParameter `yaml:"in" json:"in"`
+	In []APIOperationParameter `yaml:"in" mapstructure:"in"`
 }
 
 func (JWTAuthentication) authenticationRequirements() {}
 
-type jwksSourceWrapper struct {
-	RemoteJWKS *RemoteJWKS `yaml:"remote_jwks,omitempty" json:"remote_jwks,omitempty"`
+type jwtAuthenticationWrapper struct {
+	Name                 string                  `yaml:"name" mapstructure:"name"`
+	Issuer               string                  `yaml:"issuer" mapstructure:"issuer"`
+	RemoteJWKS           *RemoteJWKS             `yaml:"remote_jwks,omitempty" mapstructure:"remote_jwks,omitempty"`
+	Audiences            []string                `yaml:"audiences,omitempty" mapstructure:"audiences,omitempty"`
+	ForwardPayloadHeader string                  `yaml:"forward_payload_header,omitempty" mapstructure:"forward_payload_header,omitempty"`
+	In                   []APIOperationParameter `yaml:"in" mapstructure:"in"`
 }
 
-// UnmarshalYAML implements the custom unmarshal method for
-// JWTAuthentication with yaml bytes
+// UnmarshalYAML implements the yaml.Unmarshaler interface
 func (j *JWTAuthentication) UnmarshalYAML(node *yaml.Node) error {
 	type Unmarsh JWTAuthentication
 	if err := node.Decode((*Unmarsh)(j)); err != nil {
 		return err
 	}
 
-	w := &jwksSourceWrapper{}
+	w := &jwtAuthenticationWrapper{}
 	if err := node.Decode(w); err != nil {
 		return err
 	}
@@ -197,6 +268,26 @@ func (j *JWTAuthentication) UnmarshalYAML(node *yaml.Node) error {
 	return nil
 }
 
+// MarshalYAML implements the yaml.Marshaler interface
+func (j JWTAuthentication) MarshalYAML() (interface{}, error) {
+	w := jwtAuthenticationWrapper{
+		Name:                 j.Name,
+		Issuer:               j.Issuer,
+		Audiences:            j.Audiences,
+		ForwardPayloadHeader: j.ForwardPayloadHeader,
+		In:                   j.In,
+	}
+
+	switch v := j.JWKSSource.(type) {
+	case RemoteJWKS:
+		w.RemoteJWKS = &v
+	default:
+		return nil, fmt.Errorf("unsupported jwks source")
+	}
+
+	return w, nil
+}
+
 // JWKSSource is the JWKS source.
 type JWKSSource interface {
 	jwksSource()
@@ -205,10 +296,10 @@ type JWKSSource interface {
 // RemoteJWKS contains information for remote JWKS.
 type RemoteJWKS struct {
 	// URL of the JWKS.
-	URL string `yaml:"url" json:"url"`
+	URL string `yaml:"url" mapstructure:"url"`
 
 	// CacheDuration of the JWKS.
-	CacheDuration time.Duration `yaml:"cache_duration,omitempty" json:"cache_duration,omitempty"`
+	CacheDuration time.Duration `yaml:"cache_duration,omitempty" mapstructure:"cache_duration,omitempty"`
 }
 
 func (RemoteJWKS) jwksSource() {}
@@ -217,39 +308,39 @@ func (RemoteJWKS) jwksSource() {}
 type ConsumerAuthorization struct {
 	// Allow requests to be forwarded even if the consumer credential cannot be
 	// verified by the API Key provider due to service unavailability.
-	FailOpen bool `yaml:"fail_open,omitempty" json:"fail_open,omitempty"`
+	FailOpen bool `yaml:"fail_open,omitempty" mapstructure:"fail_open,omitempty"`
 
 	// Locations of API consumer credential (API Key). First match wins.
-	In []APIOperationParameter `yaml:"in" json:"in"`
+	In []APIOperationParameter `yaml:"in" mapstructure:"in"`
 }
 
 // HTTPMatch is an HTTP request matching rule.
 type HTTPMatch struct {
 	// URL path template using to match incoming requests and optionally identify
 	// path variables.
-	PathTemplate string `yaml:"path_template" json:"path_template"`
+	PathTemplate string `yaml:"path_template" mapstructure:"path_template"`
 
 	// HTTP method (e.g. GET, POST, PUT, etc.)
-	Method string `yaml:"method,omitempty" json:"method,omitempty"`
+	Method string `yaml:"method,omitempty" mapstructure:"method,omitempty"`
 }
 
 // APIOperationParameter describes an input value to an API Operation.
 type APIOperationParameter struct {
 	// One of Query, Header, or JWTClaim.
-	Match ParamMatch `yaml:"-" json:"-"`
+	Match ParamMatch `yaml:"-"`
 
 	// Optional transformation of the parameter value (e.g. "Bearer " for Authorization tokens).
-	Transformation StringTransformation `yaml:"transformation,omitempty" json:"transformation,omitempty"`
+	Transformation StringTransformation `yaml:"transformation,omitempty" mapstructure:"transformation,omitempty"`
 }
 
 type apiOperationParameterWrapper struct {
-	Header   *Header   `yaml:"header,omitempty" json:"header,omitempty"`
-	Query    *Query    `yaml:"query,omitempty" json:"query,omitempty"`
-	JWTClaim *JWTClaim `yaml:"jwt_claim,omitempty" json:"jwt_claim,omitempty"`
+	Header         *Header              `yaml:"header,omitempty" mapstructure:"header,omitempty"`
+	Query          *Query               `yaml:"query,omitempty" mapstructure:"query,omitempty"`
+	JWTClaim       *JWTClaim            `yaml:"jwt_claim,omitempty" mapstructure:"jwt_claim,omitempty"`
+	Transformation StringTransformation `yaml:"transformation,omitempty" mapstructure:"transformation,omitempty"`
 }
 
-// UnmarshalYAML implements the custom unmarshal method
-// for HTTPParamter with input yaml bytes
+// UnmarshalYAML implements the yaml.Unmarshaler interface
 func (p *APIOperationParameter) UnmarshalYAML(node *yaml.Node) error {
 	type Unmarsh APIOperationParameter
 	if err := node.Decode((*Unmarsh)(p)); err != nil {
@@ -274,35 +365,29 @@ func (p *APIOperationParameter) UnmarshalYAML(node *yaml.Node) error {
 		p.Match = *w.JWTClaim
 	}
 	if ctr != 1 {
-		return fmt.Errorf("precisely one header, query or jwt_claim should be set")
+		return fmt.Errorf("precisely one header, query or jwt_claim should be set, got %d", ctr)
 	}
 
 	return nil
 }
 
-func (p *APIOperationParameter) MarshalYAML() (interface{}, error) {
-	type Marsh APIOperationParameter
-	out, err := yaml.Marshal((*Marsh)(p))
-	if err != nil {
-		return nil, err
-	}
-	w := &apiOperationParameterWrapper{}
-	switch p.Match.(type) {
+// MarshalYAML implements the yaml.Marshaler interface
+func (p APIOperationParameter) MarshalYAML() (interface{}, error) {
+	w := apiOperationParameterWrapper{}
+
+	switch v := p.Match.(type) {
 	case Header:
-		w.Header = p.Match.(*Header)
+		w.Header = &v
 	case Query:
-		w.Query = p.Match.(*Query)
+		w.Query = &v
 	case JWTClaim:
-		w.JWTClaim = p.Match.(*JWTClaim)
+		w.JWTClaim = &v
 	default:
-		return nil, fmt.Errorf("unknown match type")
-	}
-	b, err := yaml.Marshal(w)
-	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unsupported match type")
 	}
 
-	return append(out, b...), nil
+	w.Transformation = p.Transformation
+	return w, nil
 }
 
 // ParamMatch tells the location of the HTTP paramter.
@@ -323,10 +408,10 @@ func (Header) paramMatch() {}
 // JWTClaim is reference to a JWT claim.
 type JWTClaim struct {
 	// Name of the JWT requirement.
-	Requirement string `yaml:"requirement" json:"requirement"`
+	Requirement string `yaml:"requirement" mapstructure:"requirement"`
 
 	// Name of the claim.
-	Name string `yaml:"name" json:"name"`
+	Name string `yaml:"name" mapstructure:"name"`
 }
 
 func (JWTClaim) paramMatch() {}
@@ -339,8 +424,8 @@ func (JWTClaim) paramMatch() {}
 //      output: "hello_world"
 type StringTransformation struct {
 	// String template, optionally containing variable declarations.
-	Template string `yaml:"template,omitempty" json:"template,omitempty"`
+	Template string `yaml:"template,omitempty" mapstructure:"template,omitempty"`
 
 	// Substitution string, optionally using variables declared in the template.
-	Substitution string `yaml:"substitution,omitempty" json:"substitution,omitempty"`
+	Substitution string `yaml:"substitution,omitempty" mapstructure:"substitution,omitempty"`
 }

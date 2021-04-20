@@ -1,6 +1,6 @@
-id: env-config-1
-proxy_configs:
-- basepath: /v1
+id: good-env-config
+apis:
+- base_path: /v1
   authentication:
     jwt:
       name: foo
@@ -12,10 +12,16 @@ proxy_configs:
         cache_duration: 1h
   consumer_authorization:
     in:
-      header: x-api-key
-  target: my-target
+    - header: x-api-key
   operations:
   - name: op-1
     http_match:
     - path_template: /petstore
       method: GET
+  - name: op-2
+    http_match:
+    - path_template: /bookshop
+      method: POST
+  http_request_transforms:
+    set_headers:
+      x-apigee-target: target
