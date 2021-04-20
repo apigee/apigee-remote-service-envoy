@@ -81,7 +81,7 @@ type EnvironmentConfigs struct {
 	// - `file`: An RFC 8089 file path where the configuration is stored on the local file system, e.g. `file://path/to/config.yaml`.
 	References []string `yaml:"references,omitempty" mapstructure:"references,omitempty"`
 
-	// A list of environment configs.
+	// A list of environment configs. Not supported yet for inline loading.
 	// TODO: Support reading this via viper.Unmarshal()
 	Inline []EnvironmentConfig `yaml:"inline,omitempty"`
 }
