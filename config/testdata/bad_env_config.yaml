@@ -1,0 +1,20 @@
+id: env-config-2
+apis:
+- base_path: /v1
+  authentication:
+    jwt:
+      name: foo
+      issuer: bar
+      in:
+      - header: header
+      remote_jwks:
+        url: url
+        cache_duration: 1h
+  consumer_authorization:
+    in:
+      header: x-api-key
+  operations:
+  - name: op-2
+    http_match:
+    - path_template: /bookstore
+      method: GET

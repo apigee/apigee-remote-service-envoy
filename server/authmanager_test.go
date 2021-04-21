@@ -32,7 +32,7 @@ import (
 
 func TestStaticAuthManager(t *testing.T) {
 	cfg := &config.Config{
-		Tenant: config.TenantConfig{
+		Tenant: config.Tenant{
 			InternalAPI: "x",
 		},
 	}
@@ -62,7 +62,7 @@ func TestJWTAuthManager(t *testing.T) {
 	}
 
 	cfg := &config.Config{
-		Tenant: config.TenantConfig{
+		Tenant: config.Tenant{
 			PrivateKeyID:        kid,
 			PrivateKey:          privateKey,
 			InternalJWTDuration: time.Second,

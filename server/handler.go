@@ -176,7 +176,7 @@ func NewHandler(cfg *config.Config) (*Handler, error) {
 		internalAPI, _ = url.Parse(config.GCPExperienceBase)
 	} else {
 		log.Debugf("analytics http client not using GCP authorization")
-		tlsConfig := config.TLSClientConfig{ // only use AllowUnverifiedSSLCert first
+		tlsConfig := config.TLSClientSpec{ // only use AllowUnverifiedSSLCert first
 			AllowUnverifiedSSLCert: cfg.Tenant.TLS.AllowUnverifiedSSLCert,
 		}
 		if cfg.Analytics.LegacyEndpoint { // allow mTLS config for OPDK
@@ -259,7 +259,7 @@ func clientAuthorizedByCredentials(cfg *config.Config, api string, cred *google.
 
 // roundTripperWithTLS returns a http.RoundTripper with given TLSClientConfig
 // and the default http.Transport will be used given a default TLSClientConfig
-func roundTripperWithTLS(cfg config.TLSClientConfig) (http.RoundTripper, error) {
+func roundTripperWithTLS(cfg config.TLSClientSpec) (http.RoundTripper, error) {
 	tr := http.DefaultTransport.(*http.Transport).Clone()
 	if cfg.AllowUnverifiedSSLCert {
 		tr.TLSClientConfig.InsecureSkipVerify = true
