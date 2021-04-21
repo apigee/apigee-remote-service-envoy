@@ -63,6 +63,8 @@ const (
 	RemoteServiceKeyID   = "APIGEE.TENANT.PRIVATE_KEY_ID"
 	RemoteServiceJWKS    = "APIGEE.TENANT.JWKS"
 	AnalyticsCredentials = "APIGEE.ANALYTICS.CREDENTIALS_JSON"
+
+	EnvConfigsURIs = "ENVIRONMENT_CONFIGS.REFERENCES"
 )
 
 func init() {
@@ -110,29 +112,29 @@ func envVarKey(key string) string {
 	return fmt.Sprintf("%s.%s", EnvironmentVariablePrefix, strings.ToUpper(key))
 }
 
-// DefaultConfig returns a config with defaults set
-func DefaultConfig() *Config {
+// Default returns a config with defaults set
+func Default() *Config {
 	return &Config{
-		Global: GlobalConfig{
+		Global: Global{
 			TempDir:                   "/tmp/apigee-istio",
 			KeepAliveMaxConnectionAge: time.Minute,
 			APIAddress:                ":5000",
 			MetricsAddress:            ":5001",
 		},
-		Tenant: TenantConfig{
+		Tenant: Tenant{
 			ClientTimeout:       30 * time.Second,
 			InternalJWTDuration: 10 * time.Minute,
 			InternalJWTRefresh:  30 * time.Second,
 		},
-		Products: ProductsConfig{
+		Products: Products{
 			RefreshRate: 2 * time.Minute,
 		},
-		Analytics: AnalyticsConfig{
+		Analytics: Analytics{
 			FileLimit:          1024,
 			SendChannelSize:    10,
 			CollectionInterval: 2 * time.Minute,
 		},
-		Auth: AuthConfig{
+		Auth: Auth{
 			APIKeyCacheDuration: 30 * time.Minute,
 			APIKeyHeader:        "x-api-key",
 			APIHeader:           ":authority",
@@ -142,280 +144,85 @@ func DefaultConfig() *Config {
 
 // Config is all config
 type Config struct {
-	Global    GlobalConfig    `yaml:"global,omitempty" json:"global,omitempty" mapstructure:"global,omitempty"`
-	Tenant    TenantConfig    `yaml:"tenant,omitempty" json:"tenant,omitempty" mapstructure:"tenant,omitempty"`
-	Products  ProductsConfig  `yaml:"products,omitempty" json:"products,omitempty" mapstructure:"products,omitempty"`
-	Analytics AnalyticsConfig `yaml:"analytics,omitempty" json:"analytics,omitempty" mapstructure:"analytics,omitempty"`
+	Global    Global    `yaml:"global,omitempty" mapstructure:"global,omitempty"`
+	Tenant    Tenant    `yaml:"tenant,omitempty" mapstructure:"tenant,omitempty"`
+	Products  Products  `yaml:"products,omitempty" mapstructure:"products,omitempty"`
+	Analytics Analytics `yaml:"analytics,omitempty" mapstructure:"analytics,omitempty"`
 	// If EnvironmentConfigs is specified, APIKeyHeader, APIKeyClaim, JWTProviderKey in AuthConfig will be ineffectual.
-	Auth       AuthConfig `yaml:"auth,omitempty" json:"auth,omitempty" mapstructure:"auth,omitempty"`
+	Auth Auth `yaml:"auth,omitempty" mapstructure:"auth,omitempty"`
 	// Apigee Environment configurations.
-	EnvironmentConfigs EnvironmentConfigs `yaml:"environment_configs,omitempty" json:"environment_configs,omitempty" mapstructure:"environment_configs,omitempty"`
+	EnvironmentSpecs EnvironmentSpecs `yaml:"environment_specs,omitempty" mapstructure:"environment_specs,omitempty"`
 }
 
-// GlobalConfig is global configuration for the server
-type GlobalConfig struct {
-	APIAddress                string            `yaml:"api_address,omitempty" json:"api_address,omitempty" mapstructure:"api_address,omitempty"`
-	MetricsAddress            string            `yaml:"metrics_address,omitempty" json:"metrics_address,omitempty" mapstructure:"metrics_address,omitempty"`
-	TempDir                   string            `yaml:"temp_dir,omitempty" json:"temp_dir,omitempty" mapstructure:"temp_dir,omitempty"`
-	KeepAliveMaxConnectionAge time.Duration     `yaml:"keep_alive_max_connection_age,omitempty" json:"keep_alive_max_connection_age,omitempty" mapstructure:"keep_alive_max_connection_age,omitempty"`
-	TLS                       TLSListenerConfig `yaml:"tls,omitempty" json:"tls,omitempty" mapstructure:"tls,omitempty"`
-	Namespace                 string            `yaml:"-" json:"-" mapstructure:"namespace,omitempty"`
+// Global is global configuration for the server
+type Global struct {
+	APIAddress                string          `yaml:"api_address,omitempty" mapstructure:"api_address,omitempty"`
+	MetricsAddress            string          `yaml:"metrics_address,omitempty" mapstructure:"metrics_address,omitempty"`
+	TempDir                   string          `yaml:"temp_dir,omitempty" mapstructure:"temp_dir,omitempty"`
+	KeepAliveMaxConnectionAge time.Duration   `yaml:"keep_alive_max_connection_age,omitempty" mapstructure:"keep_alive_max_connection_age,omitempty"`
+	TLS                       TLSListenerSpec `yaml:"tls,omitempty" mapstructure:"tls,omitempty"`
+	Namespace                 string          `yaml:"-" mapstructure:"namespace,omitempty"`
 }
 
-// TLSListenerConfig is tls configuration
-type TLSListenerConfig struct {
-	KeyFile  string `yaml:"key_file,omitempty" json:"key_file,omitempty" mapstructure:"key_file,omitempty"`
-	CertFile string `yaml:"cert_file,omitempty" json:"cert_file,omitempty" mapstructure:"cert_file,omitempty"`
+// TLSListenerSpec is tls configuration
+type TLSListenerSpec struct {
+	KeyFile  string `yaml:"key_file,omitempty" mapstructure:"key_file,omitempty"`
+	CertFile string `yaml:"cert_file,omitempty" mapstructure:"cert_file,omitempty"`
 }
 
-// TLSClientConfig is mtls configuration
-type TLSClientConfig struct {
-	CAFile                 string `yaml:"ca_file,omitempty" json:"ca_file,omitempty" mapstructure:"ca_file,omitempty"`
-	KeyFile                string `yaml:"key_file,omitempty" json:"key_file,omitempty" mapstructure:"key_file,omitempty"`
-	CertFile               string `yaml:"cert_file,omitempty" json:"cert_file,omitempty" mapstructure:"cert_file,omitempty"`
-	AllowUnverifiedSSLCert bool   `yaml:"allow_unverified_ssl_cert,omitempty" json:"allow_unverified_ssl_cert,omitempty" mapstructure:"allow_unverified_ssl_cert,omitempty"`
+// TLSClientSpec is mtls configuration
+type TLSClientSpec struct {
+	CAFile                 string `yaml:"ca_file,omitempty" mapstructure:"ca_file,omitempty"`
+	KeyFile                string `yaml:"key_file,omitempty" mapstructure:"key_file,omitempty"`
+	CertFile               string `yaml:"cert_file,omitempty" mapstructure:"cert_file,omitempty"`
+	AllowUnverifiedSSLCert bool   `yaml:"allow_unverified_ssl_cert,omitempty" mapstructure:"allow_unverified_ssl_cert,omitempty"`
 }
 
-// TenantConfig is config relating to an Apigee tentant
-type TenantConfig struct {
-	InternalAPI         string          `yaml:"internal_api,omitempty" json:"internal_api,omitempty" mapstructure:"internal_api,omitempty"`
-	RemoteServiceAPI    string          `yaml:"remote_service_api" json:"remote_service_api" mapstructure:"remote_service_api"`
-	OrgName             string          `yaml:"org_name" json:"org_name" mapstructure:"org_name"`
-	EnvName             string          `yaml:"env_name" json:"env_name" mapstructure:"env_name"`
-	Key                 string          `yaml:"key,omitempty" json:"key,omitempty" mapstructure:"key,omitempty"`
-	Secret              string          `yaml:"secret,omitempty" json:"secret,omitempty" mapstructure:"secret,omitempty"`
-	ClientTimeout       time.Duration   `yaml:"client_timeout,omitempty" json:"client_timeout,omitempty" mapstructure:"client_timeout,omitempty"`
-	TLS                 TLSClientConfig `yaml:"tls,omitempty" json:"tls,omitempty" mapstructure:"tls,omitempty"`
-	PrivateKey          *rsa.PrivateKey `yaml:"-" json:"-"`
-	PrivateKeyID        string          `yaml:"-" json:"-"`
-	JWKS                jwk.Set         `yaml:"-" json:"-"`
-	InternalJWTDuration time.Duration   `yaml:"-" json:"-"`
-	InternalJWTRefresh  time.Duration   `yaml:"-" json:"-"`
+// Tenant is config relating to an Apigee tentant
+type Tenant struct {
+	InternalAPI         string          `yaml:"internal_api,omitempty" mapstructure:"internal_api,omitempty"`
+	RemoteServiceAPI    string          `yaml:"remote_service_api" mapstructure:"remote_service_api"`
+	OrgName             string          `yaml:"org_name" mapstructure:"org_name"`
+	EnvName             string          `yaml:"env_name" mapstructure:"env_name"`
+	Key                 string          `yaml:"key,omitempty" mapstructure:"key,omitempty"`
+	Secret              string          `yaml:"secret,omitempty" mapstructure:"secret,omitempty"`
+	ClientTimeout       time.Duration   `yaml:"client_timeout,omitempty" mapstructure:"client_timeout,omitempty"`
+	TLS                 TLSClientSpec   `yaml:"tls,omitempty" mapstructure:"tls,omitempty"`
+	PrivateKey          *rsa.PrivateKey `yaml:"-"`
+	PrivateKeyID        string          `yaml:"-"`
+	JWKS                jwk.Set         `yaml:"-"`
+	InternalJWTDuration time.Duration   `yaml:"-"`
+	InternalJWTRefresh  time.Duration   `yaml:"-"`
 }
 
-func (t *TenantConfig) IsMultitenant() bool {
+func (t *Tenant) IsMultitenant() bool {
 	return t.EnvName == "*"
 }
 
-// ProductsConfig is products-related config
-type ProductsConfig struct {
+// Products is products-related config
+type Products struct {
 	RefreshRate time.Duration `yaml:"refresh_rate,omitempty" json:"refresh_rate,omitempty" mapstructure:"refresh_rate,omitempty"`
 }
 
-// AnalyticsConfig is analytics-related config
-type AnalyticsConfig struct {
-	LegacyEndpoint     bool                `yaml:"legacy_endpoint,omitempty" json:"legacy_endpoint,omitempty" mapstructure:"legacy_endpoint,omitempty"`
-	FileLimit          int                 `yaml:"file_limit,omitempty" json:"file_limit,omitempty" mapstructure:"file_limit,omitempty"`
-	SendChannelSize    int                 `yaml:"send_channel_size,omitempty" json:"send_channel_size,omitempty" mapstructure:"send_channel_size,omitempty"`
-	CollectionInterval time.Duration       `yaml:"collection_interval,omitempty" json:"collection_interval,omitempty" mapstructure:"collection_interval,omitempty"`
-	CredentialsJSON    []byte              `yaml:"-" json:"-"`
-	Credentials        *google.Credentials `yaml:"-" json:"-"`
+// Analytics is analytics-related config
+type Analytics struct {
+	LegacyEndpoint     bool                `yaml:"legacy_endpoint,omitempty" mapstructure:"legacy_endpoint,omitempty"`
+	FileLimit          int                 `yaml:"file_limit,omitempty" mapstructure:"file_limit,omitempty"`
+	SendChannelSize    int                 `yaml:"send_channel_size,omitempty" mapstructure:"send_channel_size,omitempty"`
+	CollectionInterval time.Duration       `yaml:"collection_interval,omitempty" mapstructure:"collection_interval,omitempty"`
+	CredentialsJSON    []byte              `yaml:"-"`
+	Credentials        *google.Credentials `yaml:"-"`
 }
 
-// AuthConfig is auth-related config
-type AuthConfig struct {
-	APIKeyClaim           string        `yaml:"api_key_claim,omitempty" json:"api_key_claim,omitempty" mapstructure:"api_key_claim,omitempty"`
-	APIKeyCacheDuration   time.Duration `yaml:"api_key_cache_duration,omitempty" json:"api_key_cache_duration,omitempty" mapstructure:"api_key_cache_duration,omitempty"`
-	APIKeyHeader          string        `yaml:"api_key_header,omitempty" json:"api_key_header,omitempty" mapstructure:"api_key_header,omitempty"`
-	APIHeader             string        `yaml:"api_header,omitempty" json:"api_header,omitempty" mapstructure:"api_header,omitempty"`
-	AllowUnauthorized     bool          `yaml:"allow_unauthorized,omitempty" json:"allow_unauthorized,omitempty" mapstructure:"allow_unauthorized,omitempty"`
-	JWTProviderKey        string        `yaml:"jwt_provider_key,omitempty" json:"jwt_provider_key,omitempty" mapstructure:"jwt_provider_key,omitempty"`
-	AppendMetadataHeaders bool          `yaml:"append_metadata_headers,omitempty" json:"append_metadata_headers,omitempty" mapstructure:"append_metadata_headers,omitempty"`
-
-}
-
-// EnvironmentConfigs contains directly inlined Environment configs and references to Environment configs.
-type EnvironmentConfigs struct {
-	// A list of URIs referencing Environment configurations. Supported schemes:
-	// - `file`: An RFC 8089 file path where the configuration is stored on the local file system, e.g. `file://path/to/config.yaml`. 
-	References []string `yaml:"references,omitempty" json:"references,omitempty"`
-
-	// A list of environment configs.
-	Inline []EnvironmentConfig `yaml:"inline,omitempty" json:"inline,omitempty"`
-}
-
-// EnvironmentConfig contains a snapshot of the set of API configurations associated with an Apigee Environment.
-type EnvironmentConfig struct {
-	// Unique ID of the environment config
-	ID string `yaml:"id" json:"id"`
-
-	// A list of API configs.
-	APIs []APIConfig `yaml:"apis" json:"apis"`
-}
-
-// APIConfig contains authentication, authorization, and transformation settings for a group of API Operations.
-type APIConfig struct {
-	// ID of the API, used to match the api_source of API Product Operations.
-	ID string `yaml:"id" json:"id"`
-	
-	// Base path for this API.
-	BasePath string `yaml:"base_path,omitempty" json:"base_path,omitempty"`
-
-	// The default authentication requirements for this API.
-	Authentication AuthenticationRequirement `yaml:"authentication,omitempty" json:"authentication,omitempty"`
-
-	// The default consumer authorization requirements for this API.
-	ConsumerAuthorization ConsumerAuthorization `yaml:"consumer_authorization,omitempty" json:"consumer_authorization,omitempty"`
-
-	// Transformation rules applied to HTTP requests.
-	HTTPRequestTransforms HTTPRequestTransformations `yaml:"http_request_transforms,omitempty" json:"http_request_transforms,omitempty"`
-
-	// A list of API Operations, names of which must be unique within the API.
-	Operations []APIOperation `yaml:"operations" json:"operations"`
-}
-
-// An APIOperation associates a set of rules with a set of request matching settings.
-type APIOperation struct {
-	// Name of the API Operation. Unique within a API.
-	Name string `yaml:"name" json:"name"`
-
-	// The authentication requirements for thie Operation. If specified, this overrides the default AuthenticationRequirement specified at the API level.
-	Authentication AuthenticationRequirement `yaml:"authentication,omitempty" json:"authentication,omitempty"`
-
-	// The consumer authorization requirement for this Operation. If specified, this overrides the default ConsumerAuthorization specified at the API level.
-	ConsumerAuthorization ConsumerAuthorization `yaml:"consumer_authorization,omitempty" json:"consumer_authorization,omitempty"`
-
-	// HTTP matching rules for this Operation. If omitted, this API Operation will match all HTTP requests not matched by another API Operation.
-	HTTPMatches []HTTPMatch `yaml:"http_match,omitempty" json:"http_match,omitempty"`
-
-	// Transformation rules applied to HTTP requests for this Operation. Overrides the rules set at the API level.
-	HTTPRequestTransforms HTTPRequestTransformations `yaml:"http_request_transforms,omitempty" json:"http_request_transforms,omitempty"`
-}
-
-// HTTPRequestTransformations are rules for modifying HTTP requests.
-type HTTPRequestTransformations struct {
-	// Header values to append. If a specified header is already present in the request, an additional value is added.
-	AppendHeaders map[string]string `yaml:"append_headers,omitempty" json:"append_headers,omitempty"`
-
-	// Header values to set. If a specified header is already present, the value here will overwrite it.
-	SetHeaders map[string]string `yaml:"set_headers,omitempty" json:"set_headers,omitempty"`
-
-	// Headers to remove. Supports single wildcard globbing e.g. `x-apigee-*`.
-	RemoveHeaders []string `yaml:"remove_headers,omitempty" json:"remove_headers,omitempty"`
-}
-
-// AuthenticationRequirement is the interface defining the authentication requirement.
-type AuthenticationRequirement interface {
-	authenticationRequirement()
-}
-
-// AnyAuthenticationRequirements requires any of enclosed requirements to be satisfied for a successful authentication.
-type AnyAuthenticationRequirements []AuthenticationRequirement
-
-func (AnyAuthenticationRequirements) authenticationRequirement() {}
-
-// AllAuthenticationRequirements requires all of enclosed requirements to be satisfied for a successful authentication.
-type AllAuthenticationRequirements []AuthenticationRequirement
-
-func (AllAuthenticationRequirements) authenticationRequirement() {}
-
-// JWTAuthentication defines a JWT authentication requirement.
-type JWTAuthentication struct {
-	// Name of this JWT requirement, unique within the API.
-	Name string `yaml:"name" json:"name"`
-
-	// JWT issuer ("iss" claim).
-	Issuer string `yaml:"issuer" json:"issuer"`
-
-	// The JWKS source.
-	JWKSSource JWKSSource
-
-	// Audiences contains a list of audiences.
-	Audiences []string `yaml:"audiences,omitempty" json:"audiences,omitempty"`
-
-	// Header name that will contain decoded JWT payload in requests forwarded to
-	// target.
-	ForwardPayloadHeader string `yaml:"forward_payload_header,omitempty" json:"forward_payload_header,omitempty"`
-
-	// Locations where JWT may be found. First match wins.
-	In []APIOperationParameter `yaml:"in" json:"in"`
-}
-
-func (JWTAuthentication) authenticationRequirement() {}
-
-// JWKSSource is the JWKS source.
-type JWKSSource interface {
-	jwksSource()
-}
-
-// RemoteJWKS contains information for remote JWKS.
-type RemoteJWKS struct {
-	// URL of the JWKS
-	URL string `yaml:"url" json:"url"`
-
-	// CacheDuration of the JWKS
-	CacheDuration time.Duration `yaml:"cache_duration,omitempty" json:"cache_duration,omitempty"`
-}
-
-func (RemoteJWKS) jwksSource() {}
-
-// ConsumerAuthorization is the configuration of API consumer authorization.
-type ConsumerAuthorization struct {
-	// Allow requests to be forwarded even if the consumer credential cannot be
-	// verified by the API Key provider due to service unavailability.
-	FailOpen bool `yaml:"fail_open,omitempty" json:"fail_open,omitempty"`
-
-	// Locations of API consumer credential (API Key). First match wins.
-	In []APIOperationParameter `yaml:"in" json:"in"`
-}
-
-// HTTPMatch is an HTTP request matching rule.
-type HTTPMatch struct {
-	// URL path template using to match incoming requests and optionally identify
-	// path variables.
-	PathTemplate string `yaml:"path_template" json:"path_template"`
-
-	// HTTP method (e.g. GET, POST, PUT, etc.)
-	Method string `yaml:"method,omitempty" json:"method,omitempty"`
-}
-
-// APIOperationParameter describes an input value to an API Operation.
-type APIOperationParameter struct {
-	// One of Query, Header, or JWTClaim.
-	Match ParamMatch
-
-	// Optional transformation of the parameter value.
-	Transformation StringTransformation `yaml:"transformation,omitempty" json:"transformation,omitempty"`
-}
-
-// ParamMatch tells the location of the HTTP paramter.
-type ParamMatch interface {
-	paramMatch()
-}
-
-// Name of an HTTP query string parameter.
-type Query string
-
-func (Query) paramMatch() {}
-
-// Name of an HTTP header.
-type Header string
-
-func (Header) paramMatch() {}
-
-// JWTClaim is reference to a JWT claim.
-type JWTClaim struct {
-	// Name of the JWT requirement
-	Requirement string `yaml:"requirement" json:"requirement"`
-
-	// Name of the claim
-	Name string `yaml:"name" json:"name"`
-}
-
-func (JWTClaim) paramMatch() {}
-
-// StringTransformation uses simple template syntax.
-// e.g. template: "prefix-{foo}-{bar}-suffix"
-//      substitution: "{foo}_{bar}"
-//      -->
-//      input: "prefix-hello-world-suffix"
-//      output: "hello_world"
-type StringTransformation struct {
-	// String template, optionally containing variable declarations.
-	Template string `yaml:"template,omitempty" json:"template,omitempty"`
-
-	// Substitution string, optionally using variables declared in the template.
-	Substitution string `yaml:"substitution,omitempty" json:"substitution,omitempty"`
+// Auth is auth-related config
+type Auth struct {
+	APIKeyClaim           string        `yaml:"api_key_claim,omitempty" mapstructure:"api_key_claim,omitempty"`
+	APIKeyCacheDuration   time.Duration `yaml:"api_key_cache_duration,omitempty" mapstructure:"api_key_cache_duration,omitempty"`
+	APIKeyHeader          string        `yaml:"api_key_header,omitempty" mapstructure:"api_key_header,omitempty"`
+	APIHeader             string        `yaml:"api_header,omitempty" mapstructure:"api_header,omitempty"`
+	AllowUnauthorized     bool          `yaml:"allow_unauthorized,omitempty" mapstructure:"allow_unauthorized,omitempty"`
+	JWTProviderKey        string        `yaml:"jwt_provider_key,omitempty" mapstructure:"jwt_provider_key,omitempty"`
+	AppendMetadataHeaders bool          `yaml:"append_metadata_headers,omitempty" mapstructure:"append_metadata_headers,omitempty"`
 }
 
 // Load config with the given config file, secret paths and a flag specifying whether analytics credentials must be present.
@@ -552,6 +359,12 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string, 
 		}
 	}
 
+	for _, f := range c.EnvironmentSpecs.References {
+		if err := c.loadEnvironmentSpec(f); err != nil {
+			return err
+		}
+	}
+
 	return c.Validate(requireAnalyticsCredentials)
 }
 
@@ -589,6 +402,24 @@ func (c *Config) analyticsCredentialsFromBytes(b []byte) error {
 	c.Analytics.CredentialsJSON = b
 	c.Analytics.Credentials, err = google.CredentialsFromJSON(context.Background(), b, ApigeeAPIScope)
 	return err
+}
+
+// loadEnvironmentSpec unmarshals the given file content into an EnvironmentSpec
+// and appends it to c.EnvironmentSpecs.Inline
+func (c *Config) loadEnvironmentSpec(f string) error {
+	log.Debugf("reading environment config from: %s", f)
+	data, err := os.ReadFile(f)
+	if err != nil {
+		return err
+	}
+
+	ec := EnvironmentSpec{}
+	if err := yaml.Unmarshal(data, &ec); err != nil {
+		return err
+	}
+	c.EnvironmentSpecs.Inline = append(c.EnvironmentSpecs.Inline, ec)
+
+	return nil
 }
 
 // IsGCPManaged is true for hybrid and NG SaaS
@@ -640,7 +471,7 @@ func (c *Config) Validate(requireAnalyticsCredentials bool) error {
 		(c.Tenant.TLS.CAFile == "" || c.Tenant.TLS.CertFile == "" || c.Tenant.TLS.KeyFile == "") {
 		errs = errorset.Append(errs, fmt.Errorf("all tenant.tls options are required if any are present"))
 	}
-	return errs
+	return errorset.Append(errs, ValidateEnvironmentSpecs(c.EnvironmentSpecs.Inline))
 }
 
 // ConfigMapCRD is a CRD for ConfigMap

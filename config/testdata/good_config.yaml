@@ -1,0 +1,13 @@
+global:
+  api_address: :5000
+  metrics_address: :5001
+tenant:
+  # internal_api: https://istioservices.apigee.net/edgemicro
+  remote_service_api: https://org-test.apigee.net/remote-service
+  org_name: org
+  env_name: env
+  key: mykey
+  secret: mysecret
+environment_specs:
+  references:
+  - ./testdata/good_env_config.yaml

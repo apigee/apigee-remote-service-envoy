@@ -74,7 +74,7 @@ auth:
 func TestPlatformDetect(t *testing.T) {
 	// OPDK
 	config := &Config{
-		Tenant: TenantConfig{
+		Tenant: Tenant{
 			InternalAPI: "x",
 		},
 	}
@@ -159,7 +159,7 @@ func TestHybridSingleFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := DefaultConfig()
+	c := Default()
 	if err := c.Load(tf.Name(), "xxx", DefaultAnalyticsSecretPath, true); err != nil {
 		t.Fatal(err)
 	}
@@ -201,7 +201,7 @@ func TestMultifileConfig(t *testing.T) {
 		}
 	}
 
-	c := DefaultConfig()
+	c := Default()
 	if err := c.Load(tf.Name(), secretDir, "", false); err != nil {
 		t.Fatal(err)
 	}
@@ -236,7 +236,7 @@ func TestIncompletePolicySecret(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := DefaultConfig()
+	c := Default()
 	if err := c.Load(tf.Name(), "", "", false); err != nil {
 		t.Fatal(err)
 	}
@@ -269,7 +269,7 @@ func TestLoadOrders(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := DefaultConfig()
+	c := Default()
 	if err := c.Load(tf.Name(), "", "", true); err != nil {
 		t.Fatal(err)
 	}
@@ -300,7 +300,7 @@ func TestLoadOrders(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c = DefaultConfig()
+	c = Default()
 	if err := c.Load(tf.Name(), "", "", true); err != nil {
 		t.Fatal(err)
 	}
@@ -420,7 +420,7 @@ tenant:
 	defer os.RemoveAll(credDir)
 
 	// valid path to analytics credentials
-	c := DefaultConfig()
+	c := Default()
 	if err := c.Load(tf.Name(), "", credDir, true); err != nil {
 		t.Error(err)
 	}
@@ -431,7 +431,7 @@ tenant:
 
 	// set valid GOOGLE_APPLICATION_CREDENTIALS
 	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", credFile)
-	c = DefaultConfig()
+	c = Default()
 	if err := c.Load(tf.Name(), "", "", true); err != nil {
 		t.Error(err)
 	}
@@ -440,7 +440,7 @@ tenant:
 	// explicitly set invalid GOOGLE_APPLICATION_CREDENTIALS to avoid
 	// any interference from the test environment
 	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "not valid")
-	c = DefaultConfig()
+	c = Default()
 	err = c.Load(tf.Name(), "", "", true)
 	if err == nil {
 		t.Fatal("want error got none")
@@ -488,7 +488,7 @@ func TestAnalyticsRollback(t *testing.T) {
 	var c *Config
 
 	// analytics to be rolled back to that from config file
-	c = DefaultConfig()
+	c = Default()
 	err = c.Load(tf.Name(), "", DefaultAnalyticsSecretPath, true)
 	if err != nil {
 		t.Errorf("want no error got %v", err)
@@ -498,7 +498,7 @@ func TestAnalyticsRollback(t *testing.T) {
 	}
 
 	// invalid path to analytics credentials
-	c = DefaultConfig()
+	c = Default()
 	err = c.Load(tf.Name(), "", "no such path", true)
 	if err == nil {
 		t.Error("want error got none")
@@ -603,7 +603,7 @@ func TestLoadFromEnvironmentVariables(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := DefaultConfig()
+	c := Default()
 	if err := c.Load(tf.Name(), "", DefaultAnalyticsSecretPath, true); err != nil {
 		t.Errorf("want no error got %v", err)
 	}
@@ -623,14 +623,14 @@ func TestLoadFromEnvironmentVariables(t *testing.T) {
 	}
 
 	os.Setenv(RemoteServiceKey, "not a private key")
-	c = DefaultConfig()
+	c = Default()
 	if err := c.Load(tf.Name(), "", DefaultAnalyticsSecretPath, true); err == nil {
 		t.Errorf("c.Load() should have given error on bad private key")
 	}
 
 	os.Setenv(RemoteServiceKey, string(pkBytes))
 	os.Setenv(RemoteServiceJWKS, "not a jwks")
-	c = DefaultConfig()
+	c = Default()
 	if err := c.Load(tf.Name(), "", DefaultAnalyticsSecretPath, true); err == nil {
 		t.Errorf("c.Load() should have given error on bad jwks")
 	}
@@ -690,8 +690,8 @@ func TestValidate(t *testing.T) {
 }
 
 func TestValidateTLS(t *testing.T) {
-	config := DefaultConfig()
-	config.Tenant = TenantConfig{
+	config := Default()
+	config.Tenant = Tenant{
 		InternalAPI:      "http://localhost/remote-service",
 		RemoteServiceAPI: "http://localhost/remote-service",
 		OrgName:          "org",
@@ -737,49 +737,22 @@ func TestValidateTLS(t *testing.T) {
 	}
 }
 
-func TestAuthenticationRequirementTypes(t *testing.T) {
-	j := JWTAuthentication{}
-	j.authenticationRequirement()
-
-	any := AnyAuthenticationRequirements{}
-	any.authenticationRequirement()
-
-	all := AllAuthenticationRequirements{}
-	all.authenticationRequirement()
-}
-
-func TestJWKSSourceTypes(t *testing.T) {
-	j := RemoteJWKS{}
-	j.jwksSource()
-}
-
-func TestParamMatchTypes(t *testing.T) {
-	h := Header("header")
-	h.paramMatch()
-
-	q := Query("query")
-	q.paramMatch()
-
-	j := JWTClaim{}
-	j.paramMatch()
-}
-
 func TestMultitenant(t *testing.T) {
 	tests := []struct {
 		desc string
-		tc   TenantConfig
+		tc   Tenant
 		want bool
 	}{
 		{
 			desc: "multitenant",
-			tc: TenantConfig{
+			tc: Tenant{
 				EnvName: "*",
 			},
 			want: true,
 		},
 		{
 			desc: "not multitenant",
-			tc: TenantConfig{
+			tc: Tenant{
 				EnvName: "env",
 			},
 			want: false,
