@@ -25,12 +25,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// ValidateEnvConfigs checks if there are
+// ValidateEnvironmentSpecs checks if there are
 //   * environment configs with the same ID,
 //   * API configs under the same environment config with the same ID,
 //   * JWT authentication requirement under the same API or operation with the same name
 // and report them as errors
-func ValidateEnvConfigs(cs []EnvironmentConfig) error {
+func ValidateEnvironmentSpecs(cs []EnvironmentSpec) error {
 	var err error
 	configIDSet := make(map[string]bool)
 	for _, ec := range cs {
@@ -75,28 +75,28 @@ func validateJWTAuthenticationName(a *AuthenticationRequirement, m map[string]bo
 	return err
 }
 
-// EnvironmentConfigs contains directly inlined Environment configs and references to Environment configs.
-type EnvironmentConfigs struct {
+// EnvironmentSpecs contains directly inlined Environment configs and references to Environment configs.
+type EnvironmentSpecs struct {
 	// A list of URIs referencing Environment configurations. Supported schemes:
 	// - `file`: An RFC 8089 file path where the configuration is stored on the local file system, e.g. `file://path/to/config.yaml`.
 	References []string `yaml:"references,omitempty" mapstructure:"references,omitempty"`
 
 	// A list of environment configs. Not supported yet for inline loading.
 	// TODO: Support reading this via viper.Unmarshal()
-	Inline []EnvironmentConfig `yaml:"inline,omitempty"`
+	Inline []EnvironmentSpec `yaml:"inline,omitempty"`
 }
 
-// EnvironmentConfig contains a snapshot of the set of API configurations associated with an Apigee Environment.
-type EnvironmentConfig struct {
+// EnvironmentSpec contains a snapshot of the set of API configurations associated with an Apigee Environment.
+type EnvironmentSpec struct {
 	// Unique ID of the environment config
 	ID string `yaml:"id" mapstructure:"id"`
 
 	// A list of API configs.
-	APIs []APIConfig `yaml:"apis" mapstructure:"apis"`
+	APIs []APISpec `yaml:"apis" mapstructure:"apis"`
 }
 
-// APIConfig contains authentication, authorization, and transformation settings for a group of API Operations.
-type APIConfig struct {
+// APISpec contains authentication, authorization, and transformation settings for a group of API Operations.
+type APISpec struct {
 	// ID of the API, used to match the api_source of API Product Operations.
 	ID string `yaml:"id" mapstructure:"id"`
 

@@ -101,7 +101,7 @@ func main() {
 
 			fmt.Printf("apigee-remote-service-envoy version %s %s [%s]\n", version, date, commit)
 
-			cfg := config.DefaultConfig()
+			cfg := config.Default()
 			if err := cfg.Load(configFile, policySecretPath, analyticsSecretPath, true); err != nil {
 				log.Errorf("Unable to load config: %s:\n%v", configFile, err)
 				os.Exit(1)

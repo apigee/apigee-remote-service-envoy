@@ -8,6 +8,6 @@ tenant:
   env_name: env
   key: mykey
   secret: mysecret
-environment_configs:
+environment_specs:
   references:
   - ./testdata/no_such_env_config.yaml

@@ -112,29 +112,29 @@ func envVarKey(key string) string {
 	return fmt.Sprintf("%s.%s", EnvironmentVariablePrefix, strings.ToUpper(key))
 }
 
-// DefaultConfig returns a config with defaults set
-func DefaultConfig() *Config {
+// Default returns a config with defaults set
+func Default() *Config {
 	return &Config{
-		Global: GlobalConfig{
+		Global: Global{
 			TempDir:                   "/tmp/apigee-istio",
 			KeepAliveMaxConnectionAge: time.Minute,
 			APIAddress:                ":5000",
 			MetricsAddress:            ":5001",
 		},
-		Tenant: TenantConfig{
+		Tenant: Tenant{
 			ClientTimeout:       30 * time.Second,
 			InternalJWTDuration: 10 * time.Minute,
 			InternalJWTRefresh:  30 * time.Second,
 		},
-		Products: ProductsConfig{
+		Products: Products{
 			RefreshRate: 2 * time.Minute,
 		},
-		Analytics: AnalyticsConfig{
+		Analytics: Analytics{
 			FileLimit:          1024,
 			SendChannelSize:    10,
 			CollectionInterval: 2 * time.Minute,
 		},
-		Auth: AuthConfig{
+		Auth: Auth{
 			APIKeyCacheDuration: 30 * time.Minute,
 			APIKeyHeader:        "x-api-key",
 			APIHeader:           ":authority",
@@ -144,42 +144,42 @@ func DefaultConfig() *Config {
 
 // Config is all config
 type Config struct {
-	Global    GlobalConfig    `yaml:"global,omitempty" mapstructure:"global,omitempty"`
-	Tenant    TenantConfig    `yaml:"tenant,omitempty" mapstructure:"tenant,omitempty"`
-	Products  ProductsConfig  `yaml:"products,omitempty" mapstructure:"products,omitempty"`
-	Analytics AnalyticsConfig `yaml:"analytics,omitempty" mapstructure:"analytics,omitempty"`
+	Global    Global    `yaml:"global,omitempty" mapstructure:"global,omitempty"`
+	Tenant    Tenant    `yaml:"tenant,omitempty" mapstructure:"tenant,omitempty"`
+	Products  Products  `yaml:"products,omitempty" mapstructure:"products,omitempty"`
+	Analytics Analytics `yaml:"analytics,omitempty" mapstructure:"analytics,omitempty"`
 	// If EnvironmentConfigs is specified, APIKeyHeader, APIKeyClaim, JWTProviderKey in AuthConfig will be ineffectual.
-	Auth AuthConfig `yaml:"auth,omitempty" mapstructure:"auth,omitempty"`
+	Auth Auth `yaml:"auth,omitempty" mapstructure:"auth,omitempty"`
 	// Apigee Environment configurations.
-	EnvironmentConfigs EnvironmentConfigs `yaml:"environment_configs,omitempty" mapstructure:"environment_configs,omitempty"`
+	EnvironmentSpecs EnvironmentSpecs `yaml:"environment_specs,omitempty" mapstructure:"environment_specs,omitempty"`
 }
 
-// GlobalConfig is global configuration for the server
-type GlobalConfig struct {
-	APIAddress                string            `yaml:"api_address,omitempty" mapstructure:"api_address,omitempty"`
-	MetricsAddress            string            `yaml:"metrics_address,omitempty" mapstructure:"metrics_address,omitempty"`
-	TempDir                   string            `yaml:"temp_dir,omitempty" mapstructure:"temp_dir,omitempty"`
-	KeepAliveMaxConnectionAge time.Duration     `yaml:"keep_alive_max_connection_age,omitempty" mapstructure:"keep_alive_max_connection_age,omitempty"`
-	TLS                       TLSListenerConfig `yaml:"tls,omitempty" mapstructure:"tls,omitempty"`
-	Namespace                 string            `yaml:"-" mapstructure:"namespace,omitempty"`
+// Global is global configuration for the server
+type Global struct {
+	APIAddress                string          `yaml:"api_address,omitempty" mapstructure:"api_address,omitempty"`
+	MetricsAddress            string          `yaml:"metrics_address,omitempty" mapstructure:"metrics_address,omitempty"`
+	TempDir                   string          `yaml:"temp_dir,omitempty" mapstructure:"temp_dir,omitempty"`
+	KeepAliveMaxConnectionAge time.Duration   `yaml:"keep_alive_max_connection_age,omitempty" mapstructure:"keep_alive_max_connection_age,omitempty"`
+	TLS                       TLSListenerSpec `yaml:"tls,omitempty" mapstructure:"tls,omitempty"`
+	Namespace                 string          `yaml:"-" mapstructure:"namespace,omitempty"`
 }
 
-// TLSListenerConfig is tls configuration
-type TLSListenerConfig struct {
+// TLSListenerSpec is tls configuration
+type TLSListenerSpec struct {
 	KeyFile  string `yaml:"key_file,omitempty" mapstructure:"key_file,omitempty"`
 	CertFile string `yaml:"cert_file,omitempty" mapstructure:"cert_file,omitempty"`
 }
 
-// TLSClientConfig is mtls configuration
-type TLSClientConfig struct {
+// TLSClientSpec is mtls configuration
+type TLSClientSpec struct {
 	CAFile                 string `yaml:"ca_file,omitempty" mapstructure:"ca_file,omitempty"`
 	KeyFile                string `yaml:"key_file,omitempty" mapstructure:"key_file,omitempty"`
 	CertFile               string `yaml:"cert_file,omitempty" mapstructure:"cert_file,omitempty"`
 	AllowUnverifiedSSLCert bool   `yaml:"allow_unverified_ssl_cert,omitempty" mapstructure:"allow_unverified_ssl_cert,omitempty"`
 }
 
-// TenantConfig is config relating to an Apigee tentant
-type TenantConfig struct {
+// Tenant is config relating to an Apigee tentant
+type Tenant struct {
 	InternalAPI         string          `yaml:"internal_api,omitempty" mapstructure:"internal_api,omitempty"`
 	RemoteServiceAPI    string          `yaml:"remote_service_api" mapstructure:"remote_service_api"`
 	OrgName             string          `yaml:"org_name" mapstructure:"org_name"`
@@ -187,7 +187,7 @@ type TenantConfig struct {
 	Key                 string          `yaml:"key,omitempty" mapstructure:"key,omitempty"`
 	Secret              string          `yaml:"secret,omitempty" mapstructure:"secret,omitempty"`
 	ClientTimeout       time.Duration   `yaml:"client_timeout,omitempty" mapstructure:"client_timeout,omitempty"`
-	TLS                 TLSClientConfig `yaml:"tls,omitempty" mapstructure:"tls,omitempty"`
+	TLS                 TLSClientSpec   `yaml:"tls,omitempty" mapstructure:"tls,omitempty"`
 	PrivateKey          *rsa.PrivateKey `yaml:"-"`
 	PrivateKeyID        string          `yaml:"-"`
 	JWKS                jwk.Set         `yaml:"-"`
@@ -195,17 +195,17 @@ type TenantConfig struct {
 	InternalJWTRefresh  time.Duration   `yaml:"-"`
 }
 
-func (t *TenantConfig) IsMultitenant() bool {
+func (t *Tenant) IsMultitenant() bool {
 	return t.EnvName == "*"
 }
 
-// ProductsConfig is products-related config
-type ProductsConfig struct {
+// Products is products-related config
+type Products struct {
 	RefreshRate time.Duration `yaml:"refresh_rate,omitempty" json:"refresh_rate,omitempty" mapstructure:"refresh_rate,omitempty"`
 }
 
-// AnalyticsConfig is analytics-related config
-type AnalyticsConfig struct {
+// Analytics is analytics-related config
+type Analytics struct {
 	LegacyEndpoint     bool                `yaml:"legacy_endpoint,omitempty" mapstructure:"legacy_endpoint,omitempty"`
 	FileLimit          int                 `yaml:"file_limit,omitempty" mapstructure:"file_limit,omitempty"`
 	SendChannelSize    int                 `yaml:"send_channel_size,omitempty" mapstructure:"send_channel_size,omitempty"`
@@ -214,8 +214,8 @@ type AnalyticsConfig struct {
 	Credentials        *google.Credentials `yaml:"-"`
 }
 
-// AuthConfig is auth-related config
-type AuthConfig struct {
+// Auth is auth-related config
+type Auth struct {
 	APIKeyClaim           string        `yaml:"api_key_claim,omitempty" mapstructure:"api_key_claim,omitempty"`
 	APIKeyCacheDuration   time.Duration `yaml:"api_key_cache_duration,omitempty" mapstructure:"api_key_cache_duration,omitempty"`
 	APIKeyHeader          string        `yaml:"api_key_header,omitempty" mapstructure:"api_key_header,omitempty"`
@@ -359,8 +359,8 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string, 
 		}
 	}
 
-	for _, f := range c.EnvironmentConfigs.References {
-		if err := c.loadEnvConfig(f); err != nil {
+	for _, f := range c.EnvironmentSpecs.References {
+		if err := c.loadEnvironmentSpec(f); err != nil {
 			return err
 		}
 	}
@@ -404,20 +404,20 @@ func (c *Config) analyticsCredentialsFromBytes(b []byte) error {
 	return err
 }
 
-// loadEnvConfig unmarshals the given file content into an EnvConfig
-// and appends it to c.EnvConfigs.Inline
-func (c *Config) loadEnvConfig(f string) error {
+// loadEnvironmentSpec unmarshals the given file content into an EnvironmentSpec
+// and appends it to c.EnvironmentSpecs.Inline
+func (c *Config) loadEnvironmentSpec(f string) error {
 	log.Debugf("reading environment config from: %s", f)
 	data, err := os.ReadFile(f)
 	if err != nil {
 		return err
 	}
 
-	ec := EnvironmentConfig{}
+	ec := EnvironmentSpec{}
 	if err := yaml.Unmarshal(data, &ec); err != nil {
 		return err
 	}
-	c.EnvironmentConfigs.Inline = append(c.EnvironmentConfigs.Inline, ec)
+	c.EnvironmentSpecs.Inline = append(c.EnvironmentSpecs.Inline, ec)
 
 	return nil
 }
@@ -471,7 +471,7 @@ func (c *Config) Validate(requireAnalyticsCredentials bool) error {
 		(c.Tenant.TLS.CAFile == "" || c.Tenant.TLS.CertFile == "" || c.Tenant.TLS.KeyFile == "") {
 		errs = errorset.Append(errs, fmt.Errorf("all tenant.tls options are required if any are present"))
 	}
-	return errorset.Append(errs, ValidateEnvConfigs(c.EnvironmentConfigs.Inline))
+	return errorset.Append(errs, ValidateEnvironmentSpecs(c.EnvironmentSpecs.Inline))
 }
 
 // ConfigMapCRD is a CRD for ConfigMap

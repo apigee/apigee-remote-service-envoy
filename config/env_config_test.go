@@ -27,18 +27,18 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestLoadEnvironmentConfigs(t *testing.T) {
+func TestLoadEnvironmentSpecs(t *testing.T) {
 	tests := []struct {
-		desc          string
-		filename      string
-		wantEnvConfig EnvironmentConfig
+		desc        string
+		filename    string
+		wantEnvSpec EnvironmentSpec
 	}{
 		{
 			desc:     "good config file with references to env config files",
 			filename: "./testdata/good_config.yaml",
-			wantEnvConfig: EnvironmentConfig{
+			wantEnvSpec: EnvironmentSpec{
 				ID: "good-env-config",
-				APIs: []APIConfig{
+				APIs: []APISpec{
 					{
 						BasePath: "/v1",
 						Authentication: AuthenticationRequirement{
@@ -89,17 +89,17 @@ func TestLoadEnvironmentConfigs(t *testing.T) {
 			if err := c.Load(test.filename, "", "", false); err != nil {
 				t.Errorf("c.Load() returns unexpected: %v", err)
 			}
-			if l := len(c.EnvironmentConfigs.Inline); l != 1 {
-				t.Fatalf("c.Load() results in %d EnvironmentConfig, wanted 1", l)
+			if l := len(c.EnvironmentSpecs.Inline); l != 1 {
+				t.Fatalf("c.Load() results in %d EnvironmentSpec, wanted 1", l)
 			}
-			if diff := cmp.Diff(test.wantEnvConfig, c.EnvironmentConfigs.Inline[0]); diff != "" {
-				t.Errorf("c.Load() results in unexpected EnvironmentConfig diff (-want +got):\n%s", diff)
+			if diff := cmp.Diff(test.wantEnvSpec, c.EnvironmentSpecs.Inline[0]); diff != "" {
+				t.Errorf("c.Load() results in unexpected EnvironmentSpec diff (-want +got):\n%s", diff)
 			}
 		})
 	}
 }
 
-func TestLoadEnvironmentConfigsError(t *testing.T) {
+func TestLoadEnvironmentSpecsError(t *testing.T) {
 	tests := []struct {
 		desc     string
 		filename string
@@ -124,19 +124,19 @@ func TestLoadEnvironmentConfigsError(t *testing.T) {
 	}
 }
 
-func TestValidateEnvironmentConfigs(t *testing.T) {
+func TestValidateEnvironmentSpecs(t *testing.T) {
 	tests := []struct {
 		desc    string
-		configs []EnvironmentConfig
+		configs []EnvironmentSpec
 		hasErr  bool
 		wantErr error
 	}{
 		{
 			desc: "good environment configs",
-			configs: []EnvironmentConfig{
+			configs: []EnvironmentSpec{
 				{
 					ID: "good-env-config",
-					APIs: []APIConfig{
+					APIs: []APISpec{
 						{
 							BasePath: "/v1",
 							Authentication: AuthenticationRequirement{
@@ -182,7 +182,7 @@ func TestValidateEnvironmentConfigs(t *testing.T) {
 		},
 		{
 			desc: "duplicate environment config ids",
-			configs: []EnvironmentConfig{
+			configs: []EnvironmentSpec{
 				{
 					ID: "duplicate-config",
 				},
@@ -199,10 +199,10 @@ func TestValidateEnvironmentConfigs(t *testing.T) {
 		},
 		{
 			desc: "duplicate operation names",
-			configs: []EnvironmentConfig{
+			configs: []EnvironmentSpec{
 				{
 					ID: "config",
-					APIs: []APIConfig{
+					APIs: []APISpec{
 						{
 							Operations: []APIOperation{
 								{
@@ -225,10 +225,10 @@ func TestValidateEnvironmentConfigs(t *testing.T) {
 		},
 		{
 			desc: "duplicate jwt authentication requirement names",
-			configs: []EnvironmentConfig{
+			configs: []EnvironmentSpec{
 				{
 					ID: "config",
-					APIs: []APIConfig{
+					APIs: []APISpec{
 						{
 							Authentication: AuthenticationRequirement{
 								Requirements: AllAuthenticationRequirements([]AuthenticationRequirement{
@@ -259,10 +259,10 @@ func TestValidateEnvironmentConfigs(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			if err := ValidateEnvConfigs(test.configs); (err != nil) != test.hasErr {
-				t.Errorf("c.validateEnvConfigs() returns no error, should have got error")
+			if err := ValidateEnvironmentSpecs(test.configs); (err != nil) != test.hasErr {
+				t.Errorf("c.validateEnvironmentSpecs() returns no error, should have got error")
 			} else if test.wantErr != nil && test.wantErr.Error() != err.Error() {
-				t.Errorf("c.validateEnvConfigs() returns error %v, want %s", err, test.wantErr)
+				t.Errorf("c.validateEnvironmentSpecs() returns error %v, want %s", err, test.wantErr)
 			}
 		})
 	}

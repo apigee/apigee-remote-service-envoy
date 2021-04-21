@@ -45,8 +45,8 @@ func TestNewHandler(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cfg := config.DefaultConfig()
-	cfg.Tenant = config.TenantConfig{
+	cfg := config.Default()
+	cfg.Tenant = config.Tenant{
 		InternalAPI:      "http://localhost/remote-service",
 		RemoteServiceAPI: "http://localhost/remote-service",
 		OrgName:          "org",
@@ -54,7 +54,7 @@ func TestNewHandler(t *testing.T) {
 		PrivateKeyID:     kid,
 		PrivateKey:       privateKey,
 	}
-	cfg.Auth = config.AuthConfig{
+	cfg.Auth = config.Auth{
 		APIKeyClaim:       "claim",
 		APIKeyHeader:      "header",
 		APIHeader:         "api",
@@ -164,28 +164,28 @@ func TestNewHandlerWithTLS(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cfg := config.DefaultConfig()
-	cfg.Tenant = config.TenantConfig{
+	cfg := config.Default()
+	cfg.Tenant = config.Tenant{
 		InternalAPI:      "http://localhost/remote-service",
 		RemoteServiceAPI: "http://localhost/remote-service",
 		OrgName:          "org",
 		EnvName:          "*",
 		PrivateKeyID:     kid,
 		PrivateKey:       privateKey,
-		TLS: config.TLSClientConfig{
+		TLS: config.TLSClientSpec{
 			CAFile:                 certFile,
 			CertFile:               certFile,
 			KeyFile:                keyFile,
 			AllowUnverifiedSSLCert: true,
 		},
 	}
-	cfg.Analytics = config.AnalyticsConfig{
+	cfg.Analytics = config.Analytics{
 		FileLimit:          1024,
 		SendChannelSize:    10,
 		CollectionInterval: 2 * time.Minute,
 		LegacyEndpoint:     true,
 	}
-	cfg.Auth = config.AuthConfig{
+	cfg.Auth = config.Auth{
 		APIKeyClaim:  "claim",
 		APIKeyHeader: "header",
 		APIHeader:    "api",
@@ -280,7 +280,7 @@ func TestMutualTLSRoundTripper(t *testing.T) {
 		t.Error("should get error")
 	}
 
-	tlsConfig := config.TLSClientConfig{
+	tlsConfig := config.TLSClientSpec{
 		CAFile:                 certFile,
 		CertFile:               certFile,
 		KeyFile:                keyFile,
