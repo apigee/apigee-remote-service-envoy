@@ -471,7 +471,7 @@ func (c *Config) Validate(requireAnalyticsCredentials bool) error {
 		(c.Tenant.TLS.CAFile == "" || c.Tenant.TLS.CertFile == "" || c.Tenant.TLS.KeyFile == "") {
 		errs = errorset.Append(errs, fmt.Errorf("all tenant.tls options are required if any are present"))
 	}
-	return errorset.Append(errs, c.validateEnvConfigs())
+	return errorset.Append(errs, ValidateEnvConfigs(c.EnvironmentConfigs.Inline))
 }
 
 // ConfigMapCRD is a CRD for ConfigMap

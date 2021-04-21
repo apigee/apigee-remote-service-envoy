@@ -127,56 +127,52 @@ func TestLoadEnvironmentConfigsError(t *testing.T) {
 func TestValidateEnvironmentConfigs(t *testing.T) {
 	tests := []struct {
 		desc    string
-		cfg     *Config
+		configs []EnvironmentConfig
 		hasErr  bool
 		wantErr error
 	}{
 		{
 			desc: "good environment configs",
-			cfg: &Config{
-				EnvironmentConfigs: EnvironmentConfigs{
-					Inline: []EnvironmentConfig{
+			configs: []EnvironmentConfig{
+				{
+					ID: "good-env-config",
+					APIs: []APIConfig{
 						{
-							ID: "good-env-config",
-							APIs: []APIConfig{
+							BasePath: "/v1",
+							Authentication: AuthenticationRequirement{
+								Requirements: JWTAuthentication{
+									Name:       "foo",
+									Issuer:     "bar",
+									JWKSSource: RemoteJWKS{URL: "url", CacheDuration: time.Hour},
+									In:         []APIOperationParameter{{Match: Header("header")}},
+								},
+							},
+							ConsumerAuthorization: ConsumerAuthorization{
+								In: []APIOperationParameter{{Match: Header("x-api-key")}},
+							},
+							Operations: []APIOperation{
 								{
-									BasePath: "/v1",
-									Authentication: AuthenticationRequirement{
-										Requirements: JWTAuthentication{
-											Name:       "foo",
-											Issuer:     "bar",
-											JWKSSource: RemoteJWKS{URL: "url", CacheDuration: time.Hour},
-											In:         []APIOperationParameter{{Match: Header("header")}},
-										},
-									},
-									ConsumerAuthorization: ConsumerAuthorization{
-										In: []APIOperationParameter{{Match: Header("x-api-key")}},
-									},
-									Operations: []APIOperation{
+									Name: "op-1",
+									HTTPMatches: []HTTPMatch{
 										{
-											Name: "op-1",
-											HTTPMatches: []HTTPMatch{
-												{
-													PathTemplate: "/petstore",
-													Method:       "GET",
-												},
-											},
+											PathTemplate: "/petstore",
+											Method:       "GET",
 										},
+									},
+								},
+								{
+									Name: "op-2",
+									HTTPMatches: []HTTPMatch{
 										{
-											Name: "op-2",
-											HTTPMatches: []HTTPMatch{
-												{
-													PathTemplate: "/bookshop",
-													Method:       "POST",
-												},
-											},
+											PathTemplate: "/bookshop",
+											Method:       "POST",
 										},
 									},
-									HTTPRequestTransforms: HTTPRequestTransformations{
-										SetHeaders: map[string]string{
-											"x-apigee-target": "target",
-										},
-									},
+								},
+							},
+							HTTPRequestTransforms: HTTPRequestTransformations{
+								SetHeaders: map[string]string{
+									"x-apigee-target": "target",
 								},
 							},
 						},
@@ -186,16 +182,12 @@ func TestValidateEnvironmentConfigs(t *testing.T) {
 		},
 		{
 			desc: "duplicate environment config ids",
-			cfg: &Config{
-				EnvironmentConfigs: EnvironmentConfigs{
-					Inline: []EnvironmentConfig{
-						{
-							ID: "duplicate-config",
-						},
-						{
-							ID: "duplicate-config",
-						},
-					},
+			configs: []EnvironmentConfig{
+				{
+					ID: "duplicate-config",
+				},
+				{
+					ID: "duplicate-config",
 				},
 			},
 			hasErr: true,
@@ -207,21 +199,17 @@ func TestValidateEnvironmentConfigs(t *testing.T) {
 		},
 		{
 			desc: "duplicate operation names",
-			cfg: &Config{
-				EnvironmentConfigs: EnvironmentConfigs{
-					Inline: []EnvironmentConfig{
+			configs: []EnvironmentConfig{
+				{
+					ID: "config",
+					APIs: []APIConfig{
 						{
-							ID: "config",
-							APIs: []APIConfig{
+							Operations: []APIOperation{
 								{
-									Operations: []APIOperation{
-										{
-											Name: "duplicate-op",
-										},
-										{
-											Name: "duplicate-op",
-										},
-									},
+									Name: "duplicate-op",
+								},
+								{
+									Name: "duplicate-op",
 								},
 							},
 						},
@@ -237,28 +225,24 @@ func TestValidateEnvironmentConfigs(t *testing.T) {
 		},
 		{
 			desc: "duplicate jwt authentication requirement names",
-			cfg: &Config{
-				EnvironmentConfigs: EnvironmentConfigs{
-					Inline: []EnvironmentConfig{
+			configs: []EnvironmentConfig{
+				{
+					ID: "config",
+					APIs: []APIConfig{
 						{
-							ID: "config",
-							APIs: []APIConfig{
-								{
-									Authentication: AuthenticationRequirement{
-										Requirements: AllAuthenticationRequirements([]AuthenticationRequirement{
+							Authentication: AuthenticationRequirement{
+								Requirements: AllAuthenticationRequirements([]AuthenticationRequirement{
+									{
+										Requirements: JWTAuthentication{Name: "duplicate-jwt"},
+									},
+									{
+										Requirements: AnyAuthenticationRequirements([]AuthenticationRequirement{
 											{
 												Requirements: JWTAuthentication{Name: "duplicate-jwt"},
 											},
-											{
-												Requirements: AnyAuthenticationRequirements([]AuthenticationRequirement{
-													{
-														Requirements: JWTAuthentication{Name: "duplicate-jwt"},
-													},
-												}),
-											},
 										}),
 									},
-								},
+								}),
 							},
 						},
 					},
@@ -275,7 +259,7 @@ func TestValidateEnvironmentConfigs(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			if err := test.cfg.validateEnvConfigs(); (err != nil) != test.hasErr {
+			if err := ValidateEnvConfigs(test.configs); (err != nil) != test.hasErr {
 				t.Errorf("c.validateEnvConfigs() returns no error, should have got error")
 			} else if test.wantErr != nil && test.wantErr.Error() != err.Error() {
 				t.Errorf("c.validateEnvConfigs() returns error %v, want %s", err, test.wantErr)

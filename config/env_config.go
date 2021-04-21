@@ -25,15 +25,15 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// validateEnvConfigs checks if there are
+// ValidateEnvConfigs checks if there are
 //   * environment configs with the same ID,
 //   * API configs under the same environment config with the same ID,
 //   * JWT authentication requirement under the same API or operation with the same name
 // and report them as errors
-func (c *Config) validateEnvConfigs() error {
+func ValidateEnvConfigs(cs []EnvironmentConfig) error {
 	var err error
 	configIDSet := make(map[string]bool)
-	for _, ec := range c.EnvironmentConfigs.Inline {
+	for _, ec := range cs {
 		if configIDSet[ec.ID] {
 			err = errorset.Append(err, fmt.Errorf("environment config IDs must be unique, got multiple %s", ec.ID))
 		}
