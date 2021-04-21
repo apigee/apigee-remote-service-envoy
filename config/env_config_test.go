@@ -74,7 +74,7 @@ func TestLoadEnvironmentConfigs(t *testing.T) {
 						},
 						HTTPRequestTransforms: HTTPRequestTransformations{
 							SetHeaders: map[string]string{
-								"x-apigee-target": "target",
+								"x-apigee-route": "route",
 							},
 						},
 					},
