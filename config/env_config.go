@@ -57,7 +57,7 @@ func (c *Config) validateEnvConfigs() error {
 // AuthenticationRequirement
 func validateJWTAuthenticationName(a *AuthenticationRequirement, m map[string]bool) error {
 	var err error
-	switch v := a.AuthenticationRequirements.(type) {
+	switch v := a.Requirements.(type) {
 	case JWTAuthentication:
 		if m[v.Name] {
 			err = errorset.Append(err, fmt.Errorf("JWT authentication requirement names within each API or operation must be unique, got multiple %s", v.Name))
@@ -148,7 +148,7 @@ type HTTPRequestTransformations struct {
 
 // AuthenticationRequirement defines the authentication requirement. It can be jwt, any or all.
 type AuthenticationRequirement struct {
-	AuthenticationRequirements AuthenticationRequirements `yaml:"-"`
+	Requirements AuthenticationRequirements `yaml:"-"`
 }
 
 type authenticationRequirementWrapper struct {
@@ -166,15 +166,15 @@ func (a *AuthenticationRequirement) UnmarshalYAML(node *yaml.Node) error {
 
 	ctr := 0
 	if w.JWT != nil {
-		a.AuthenticationRequirements = *w.JWT
+		a.Requirements = *w.JWT
 		ctr += 1
 	}
 	if w.Any != nil {
-		a.AuthenticationRequirements = *w.Any
+		a.Requirements = *w.Any
 		ctr += 1
 	}
 	if w.All != nil {
-		a.AuthenticationRequirements = *w.All
+		a.Requirements = *w.All
 		ctr += 1
 	}
 	if ctr != 1 {
@@ -188,7 +188,7 @@ func (a *AuthenticationRequirement) UnmarshalYAML(node *yaml.Node) error {
 func (a AuthenticationRequirement) MarshalYAML() (interface{}, error) {
 	w := authenticationRequirementWrapper{}
 
-	switch v := a.AuthenticationRequirements.(type) {
+	switch v := a.Requirements.(type) {
 	case JWTAuthentication:
 		w.JWT = &v
 	case AnyAuthenticationRequirements:

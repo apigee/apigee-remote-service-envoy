@@ -42,7 +42,7 @@ func TestLoadEnvironmentConfigs(t *testing.T) {
 					{
 						BasePath: "/v1",
 						Authentication: AuthenticationRequirement{
-							AuthenticationRequirements: JWTAuthentication{
+							Requirements: JWTAuthentication{
 								Name:       "foo",
 								Issuer:     "bar",
 								JWKSSource: RemoteJWKS{URL: "url", CacheDuration: time.Hour},
@@ -142,7 +142,7 @@ func TestValidateEnvironmentConfigs(t *testing.T) {
 								{
 									BasePath: "/v1",
 									Authentication: AuthenticationRequirement{
-										AuthenticationRequirements: JWTAuthentication{
+										Requirements: JWTAuthentication{
 											Name:       "foo",
 											Issuer:     "bar",
 											JWKSSource: RemoteJWKS{URL: "url", CacheDuration: time.Hour},
@@ -245,14 +245,14 @@ func TestValidateEnvironmentConfigs(t *testing.T) {
 							APIs: []APIConfig{
 								{
 									Authentication: AuthenticationRequirement{
-										AuthenticationRequirements: AllAuthenticationRequirements([]AuthenticationRequirement{
+										Requirements: AllAuthenticationRequirements([]AuthenticationRequirement{
 											{
-												AuthenticationRequirements: JWTAuthentication{Name: "duplicate-jwt"},
+												Requirements: JWTAuthentication{Name: "duplicate-jwt"},
 											},
 											{
-												AuthenticationRequirements: AnyAuthenticationRequirements([]AuthenticationRequirement{
+												Requirements: AnyAuthenticationRequirements([]AuthenticationRequirement{
 													{
-														AuthenticationRequirements: JWTAuthentication{Name: "duplicate-jwt"},
+														Requirements: JWTAuthentication{Name: "duplicate-jwt"},
 													},
 												}),
 											},
@@ -292,7 +292,7 @@ func TestMarshalAndUnmarshalAuthenticationRequirement(t *testing.T) {
 		{
 			desc: "valid jwt",
 			want: &AuthenticationRequirement{
-				AuthenticationRequirements: JWTAuthentication{
+				Requirements: JWTAuthentication{
 					Name:       "foo",
 					Issuer:     "bar",
 					In:         []APIOperationParameter{{Match: Header("header")}},
@@ -303,9 +303,9 @@ func TestMarshalAndUnmarshalAuthenticationRequirement(t *testing.T) {
 		{
 			desc: "valid any enclosing jwt",
 			want: &AuthenticationRequirement{
-				AuthenticationRequirements: AnyAuthenticationRequirements([]AuthenticationRequirement{
+				Requirements: AnyAuthenticationRequirements([]AuthenticationRequirement{
 					{
-						AuthenticationRequirements: JWTAuthentication{
+						Requirements: JWTAuthentication{
 							Name:       "foo",
 							Issuer:     "bar",
 							In:         []APIOperationParameter{{Match: Header("header")}},
@@ -313,7 +313,7 @@ func TestMarshalAndUnmarshalAuthenticationRequirement(t *testing.T) {
 						},
 					},
 					{
-						AuthenticationRequirements: JWTAuthentication{
+						Requirements: JWTAuthentication{
 							Name:       "bar",
 							Issuer:     "foo",
 							In:         []APIOperationParameter{{Match: Query("query")}},
@@ -326,9 +326,9 @@ func TestMarshalAndUnmarshalAuthenticationRequirement(t *testing.T) {
 		{
 			desc: "valid all enclosing jwt",
 			want: &AuthenticationRequirement{
-				AuthenticationRequirements: AllAuthenticationRequirements([]AuthenticationRequirement{
+				Requirements: AllAuthenticationRequirements([]AuthenticationRequirement{
 					{
-						AuthenticationRequirements: JWTAuthentication{
+						Requirements: JWTAuthentication{
 							Name:       "foo",
 							Issuer:     "bar",
 							In:         []APIOperationParameter{{Match: Header("header")}},
@@ -336,7 +336,7 @@ func TestMarshalAndUnmarshalAuthenticationRequirement(t *testing.T) {
 						},
 					},
 					{
-						AuthenticationRequirements: JWTAuthentication{
+						Requirements: JWTAuthentication{
 							Name:       "bar",
 							Issuer:     "foo",
 							In:         []APIOperationParameter{{Match: Query("query")}},
@@ -349,11 +349,11 @@ func TestMarshalAndUnmarshalAuthenticationRequirement(t *testing.T) {
 		{
 			desc: "valid any enclosing all and jwt",
 			want: &AuthenticationRequirement{
-				AuthenticationRequirements: AnyAuthenticationRequirements([]AuthenticationRequirement{
+				Requirements: AnyAuthenticationRequirements([]AuthenticationRequirement{
 					{
-						AuthenticationRequirements: AllAuthenticationRequirements([]AuthenticationRequirement{
+						Requirements: AllAuthenticationRequirements([]AuthenticationRequirement{
 							{
-								AuthenticationRequirements: JWTAuthentication{
+								Requirements: JWTAuthentication{
 									Name:       "foo",
 									Issuer:     "bar",
 									In:         []APIOperationParameter{{Match: Header("header")}},
@@ -361,7 +361,7 @@ func TestMarshalAndUnmarshalAuthenticationRequirement(t *testing.T) {
 								},
 							},
 							{
-								AuthenticationRequirements: JWTAuthentication{
+								Requirements: JWTAuthentication{
 									Name:       "bar",
 									Issuer:     "foo",
 									In:         []APIOperationParameter{{Match: Query("query")}},
@@ -371,7 +371,7 @@ func TestMarshalAndUnmarshalAuthenticationRequirement(t *testing.T) {
 						}),
 					},
 					{
-						AuthenticationRequirements: JWTAuthentication{
+						Requirements: JWTAuthentication{
 							Name:       "bac",
 							Issuer:     "foo",
 							In:         []APIOperationParameter{{Match: Query("query")}},
