@@ -18,118 +18,19 @@
 package config
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
-	"github.com/apigee/apigee-remote-service-golib/v2/errorset"
 	"github.com/google/go-cmp/cmp"
 	"gopkg.in/yaml.v3"
 )
-
-func TestLoadEnvironmentSpecs(t *testing.T) {
-	tests := []struct {
-		desc        string
-		filename    string
-		wantEnvSpec EnvironmentSpec
-	}{
-		{
-			desc:     "good config file with references to env config files",
-			filename: "./testdata/good_config.yaml",
-			wantEnvSpec: EnvironmentSpec{
-				ID: "good-env-config",
-				APIs: []APISpec{
-					{
-						BasePath: "/v1",
-						Authentication: AuthenticationRequirement{
-							Requirements: JWTAuthentication{
-								Name:       "foo",
-								Issuer:     "bar",
-								JWKSSource: RemoteJWKS{URL: "url", CacheDuration: time.Hour},
-								In:         []APIOperationParameter{{Match: Header("header")}},
-							},
-						},
-						ConsumerAuthorization: ConsumerAuthorization{
-							In: []APIOperationParameter{{Match: Header("x-api-key")}},
-						},
-						Operations: []APIOperation{
-							{
-								Name: "op-1",
-								HTTPMatches: []HTTPMatch{
-									{
-										PathTemplate: "/petstore",
-										Method:       "GET",
-									},
-								},
-							},
-							{
-								Name: "op-2",
-								HTTPMatches: []HTTPMatch{
-									{
-										PathTemplate: "/bookshop",
-										Method:       "POST",
-									},
-								},
-							},
-						},
-						HTTPRequestTransforms: HTTPRequestTransformations{
-							SetHeaders: map[string]string{
-								"x-apigee-route": "route",
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.desc, func(t *testing.T) {
-			c := &Config{}
-			if err := c.Load(test.filename, "", "", false); err != nil {
-				t.Errorf("c.Load() returns unexpected: %v", err)
-			}
-			if l := len(c.EnvironmentSpecs.Inline); l != 1 {
-				t.Fatalf("c.Load() results in %d EnvironmentSpec, wanted 1", l)
-			}
-			if diff := cmp.Diff(test.wantEnvSpec, c.EnvironmentSpecs.Inline[0]); diff != "" {
-				t.Errorf("c.Load() results in unexpected EnvironmentSpec diff (-want +got):\n%s", diff)
-			}
-		})
-	}
-}
-
-func TestLoadEnvironmentSpecsError(t *testing.T) {
-	tests := []struct {
-		desc     string
-		filename string
-	}{
-		{
-			desc:     "bad env config files",
-			filename: "./testdata/bad_config_1.yaml",
-		},
-		{
-			desc:     "non-existent env config files",
-			filename: "./testdata/bad_config_2.yaml",
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.desc, func(t *testing.T) {
-			c := &Config{}
-			if err := c.Load(test.filename, "", "", false); err == nil {
-				t.Errorf("c.Load() returns no error, should have got error")
-			}
-		})
-	}
-}
 
 func TestValidateEnvironmentSpecs(t *testing.T) {
 	tests := []struct {
 		desc    string
 		configs []EnvironmentSpec
 		hasErr  bool
-		wantErr error
+		wantErr string
 	}{
 		{
 			desc: "good environment configs",
@@ -190,12 +91,8 @@ func TestValidateEnvironmentSpecs(t *testing.T) {
 					ID: "duplicate-config",
 				},
 			},
-			hasErr: true,
-			wantErr: &errorset.Error{
-				Errors: []error{
-					fmt.Errorf("environment config IDs must be unique, got multiple duplicate-config"),
-				},
-			},
+			hasErr:  true,
+			wantErr: "environment config IDs must be unique, got multiple duplicate-config",
 		},
 		{
 			desc: "duplicate operation names",
@@ -216,12 +113,8 @@ func TestValidateEnvironmentSpecs(t *testing.T) {
 					},
 				},
 			},
-			hasErr: true,
-			wantErr: &errorset.Error{
-				Errors: []error{
-					fmt.Errorf("operation names within each API must be unique, got multiple duplicate-op"),
-				},
-			},
+			hasErr:  true,
+			wantErr: "operation names within each API must be unique, got multiple duplicate-op",
 		},
 		{
 			desc: "duplicate jwt authentication requirement names",
@@ -248,21 +141,17 @@ func TestValidateEnvironmentSpecs(t *testing.T) {
 					},
 				},
 			},
-			hasErr: true,
-			wantErr: &errorset.Error{
-				Errors: []error{
-					fmt.Errorf("JWT authentication requirement names within each API or operation must be unique, got multiple duplicate-jwt"),
-				},
-			},
+			hasErr:  true,
+			wantErr: "JWT authentication requirement names within each API or operation must be unique, got multiple duplicate-jwt",
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
 			if err := ValidateEnvironmentSpecs(test.configs); (err != nil) != test.hasErr {
-				t.Errorf("c.validateEnvironmentSpecs() returns no error, should have got error")
-			} else if test.wantErr != nil && test.wantErr.Error() != err.Error() {
-				t.Errorf("c.validateEnvironmentSpecs() returns error %v, want %s", err, test.wantErr)
+				t.Errorf("c.ValidateEnvironmentSpecs() returns no error, should have got error")
+			} else if test.wantErr != "" && test.wantErr != err.Error() {
+				t.Errorf("c.ValidateEnvironmentSpecs() returns error %v, want %s", err, test.wantErr)
 			}
 		})
 	}
