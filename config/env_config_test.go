@@ -17,6 +17,8 @@
 
 package config
 
+// NOTE: This file should be kept free from any additional dependencies,
+// especially those that are not commonly used libraries.
 import (
 	"testing"
 	"time"
