@@ -14,14 +14,14 @@
 
 // Package config defines the API Runtime Control config and provides
 // the config loading and validation functions.
-
 package config
 
+// NOTE: This file should be kept free from any additional dependencies,
+// especially those that are not commonly used libraries.
 import (
 	"fmt"
 	"time"
 
-	"github.com/apigee/apigee-remote-service-golib/v2/errorset"
 	"gopkg.in/yaml.v3"
 )
 
@@ -31,26 +31,29 @@ import (
 //   * JWT authentication requirement under the same API or operation with the same name
 // and report them as errors
 func ValidateEnvironmentSpecs(cs []EnvironmentSpec) error {
-	var err error
 	configIDSet := make(map[string]bool)
 	for _, ec := range cs {
 		if configIDSet[ec.ID] {
-			err = errorset.Append(err, fmt.Errorf("environment config IDs must be unique, got multiple %s", ec.ID))
+			return fmt.Errorf("environment config IDs must be unique, got multiple %s", ec.ID)
 		}
 		configIDSet[ec.ID] = true
 		for _, api := range ec.APIs {
 			opNameSet := make(map[string]bool)
 			for _, op := range api.Operations {
 				if opNameSet[op.Name] {
-					err = errorset.Append(err, fmt.Errorf("operation names within each API must be unique, got multiple %s", op.Name))
+					return fmt.Errorf("operation names within each API must be unique, got multiple %s", op.Name)
 				}
 				opNameSet[op.Name] = true
-				err = errorset.Append(err, validateJWTAuthenticationName(&op.Authentication, map[string]bool{}))
+				if err := validateJWTAuthenticationName(&op.Authentication, map[string]bool{}); err != nil {
+					return err
+				}
 			}
-			err = errorset.Append(err, validateJWTAuthenticationName(&api.Authentication, map[string]bool{}))
+			if err := validateJWTAuthenticationName(&api.Authentication, map[string]bool{}); err != nil {
+				return err
+			}
 		}
 	}
-	return err
+	return nil
 }
 
 // validateJWTAuthenticationName checks if the JWTAuthentication within the given
@@ -60,16 +63,16 @@ func validateJWTAuthenticationName(a *AuthenticationRequirement, m map[string]bo
 	switch v := a.Requirements.(type) {
 	case JWTAuthentication:
 		if m[v.Name] {
-			err = errorset.Append(err, fmt.Errorf("JWT authentication requirement names within each API or operation must be unique, got multiple %s", v.Name))
+			return fmt.Errorf("JWT authentication requirement names within each API or operation must be unique, got multiple %s", v.Name)
 		}
 		m[v.Name] = true
 	case AnyAuthenticationRequirements:
 		for _, val := range []AuthenticationRequirement(v) {
-			err = errorset.Append(err, validateJWTAuthenticationName(&val, m))
+			err = validateJWTAuthenticationName(&val, m)
 		}
 	case AllAuthenticationRequirements:
 		for _, val := range []AuthenticationRequirement(v) {
-			err = errorset.Append(err, validateJWTAuthenticationName(&val, m))
+			err = validateJWTAuthenticationName(&val, m)
 		}
 	}
 	return err
