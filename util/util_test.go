@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Package protostruct supports operations on the protocol buffer Struct message.
-package util
+package util_test
 
 import (
 	"bytes"
@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/apigee/apigee-remote-service-envoy/v2/testutil"
+	"github.com/apigee/apigee-remote-service-envoy/v2/util"
 	pb "github.com/golang/protobuf/ptypes/struct"
 )
 
@@ -77,14 +78,14 @@ func TestLoadPrivateKey(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		if _, err := LoadPrivateKey(test.pkBytes); (err != nil) != test.wantErr {
+		if _, err := util.LoadPrivateKey(test.pkBytes); (err != nil) != test.wantErr {
 			t.Errorf("LoadPrivateKey() error = %v, wantErr? %t", err, test.wantErr)
 		}
 	}
 }
 
 func TestDecodeToMap(t *testing.T) {
-	if got := DecodeToMap(nil); !testutil.Equal(got, map[string]interface{}(nil)) {
+	if got := util.DecodeToMap(nil); !testutil.Equal(got, map[string]interface{}(nil)) {
 		t.Errorf("DecodeToMap(nil) = %v, want nil", got)
 	}
 	nullv := &pb.Value{Kind: &pb.Value_NullValue{}}
@@ -112,7 +113,7 @@ func TestDecodeToMap(t *testing.T) {
 		"l": []interface{}{nil, "x", true, 2.7},
 		"S": map[string]interface{}{"n1": nil, "b1": true},
 	}
-	got := DecodeToMap(in)
+	got := util.DecodeToMap(in)
 	if diff := testutil.Diff(got, want); diff != "" {
 		t.Error(diff)
 	}
@@ -126,17 +127,50 @@ func TestProperties(t *testing.T) {
 
 	buffer := new(bytes.Buffer)
 
-	err := WriteProperties(buffer, want)
+	err := util.WriteProperties(buffer, want)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	got, err := ReadProperties(buffer)
+	got, err := util.ReadProperties(buffer)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if !reflect.DeepEqual(want, got) {
 		t.Errorf("want: %v, got %v", want, got)
+	}
+}
+
+func TestSimpleGlobMatch(t *testing.T) {
+	tests := []struct {
+		pattern string
+		target  string
+		want    bool
+	}{
+		{"", "", true},
+		{"x", "x", true},
+		{"x", "y", false},
+		{"*", "x", true},
+		{"x*", "x", true},
+		{"x*", "xy", true},
+		{"x*", "y", false},
+		{"*x", "y", false},
+		{"*x", "yx", true},
+		{"x*y", "xdoggy", true},
+		{"x*y", "axdoggy", false},
+		{"x*y", "xdoggyz", false},
+		{"*x*y", "xdoggy", true},
+		{"x*y*", "xdoggygo", true},
+		{"x**y", "xdoggy", true},
+		{"*x*y*", "xdoggy", true},
+		{"*x*y*", "axdoggyz", true},
+		{"*z*", "doggy", false},
+	}
+
+	for _, test := range tests {
+		if got := util.SimpleGlobMatch(test.pattern, test.target); got != test.want {
+			t.Errorf("pattern %s on %s failed. got: %t, want: %t", test.pattern, test.target, got, test.want)
+		}
 	}
 }
