@@ -51,6 +51,7 @@ type Handler struct {
 	appendMetadataHeaders bool
 	jwtProviderKey        string
 	isMultitenant         bool
+	envSpecsByID          map[string]*config.EnvironmentSpecExt
 
 	productMan   product.Manager
 	authMan      auth.Manager
@@ -204,6 +205,12 @@ func NewHandler(cfg *config.Config) (*Handler, error) {
 		return nil, err
 	}
 
+	envSpecsByID := make(map[string]*config.EnvironmentSpecExt, len(cfg.EnvironmentSpecs.Inline))
+	for i := range cfg.EnvironmentSpecs.Inline {
+		spec := cfg.EnvironmentSpecs.Inline[i]
+		envSpecsByID[spec.ID] = config.NewEnvironmentSpecExt(&spec)
+	}
+
 	h := &Handler{
 		remoteServiceAPI:      remoteServiceAPI,
 		internalAPI:           internalAPI,
@@ -220,6 +227,7 @@ func NewHandler(cfg *config.Config) (*Handler, error) {
 		jwtProviderKey:        cfg.Auth.JWTProviderKey,
 		appendMetadataHeaders: cfg.Auth.AppendMetadataHeaders,
 		isMultitenant:         cfg.Tenant.IsMultitenant(),
+		envSpecsByID:          envSpecsByID,
 	}
 
 	return h, nil
