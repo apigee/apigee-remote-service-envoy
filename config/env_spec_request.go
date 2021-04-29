@@ -114,7 +114,7 @@ func (e *EnvironmentSpecRequest) verifyJWTRequirement(requirementName string) bo
 		// todo: templating
 		jwtString := e.GetParamValue(p)           // todo: circular?
 		url := jwtReq.JWKSSource.(RemoteJWKS).URL // only remote supported for now
-		provider := jwt.Provider{JWKSURL: url}    // todo: fix this
+		provider := jwt.Provider{JWKSURL: url}
 		claims, err := e.verifier.Parse(jwtString, provider)
 		result := &jwtResult{
 			claims: claims,

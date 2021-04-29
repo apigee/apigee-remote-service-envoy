@@ -65,3 +65,57 @@ type EnvironmentSpecExt struct {
 	ApiPathTree        path.Tree                       // base path -> APISpec
 	OpPathTree         path.Tree                       // api.ID -> method -> sub path -> Operation
 }
+
+func (o APIOperation) GetAPIKey(req *EnvironmentSpecRequest) (apikey string) {
+	for _, authorization := range o.ConsumerAuthorization.In {
+		if apikey = req.GetParamValue(authorization); apikey != "" {
+			return
+		}
+	}
+	return
+}
+
+func (a AuthenticationRequirement) IsEmpty() bool {
+	return isEmpty(a)
+}
+
+func (a AuthenticationRequirement) AllJWTRequirements() []*JWTAuthentication {
+	return allJWTRequirements(a)
+}
+
+func allJWTRequirements(auth AuthenticationRequirement) []*JWTAuthentication {
+	var found []*JWTAuthentication
+	switch v := auth.Requirements.(type) {
+	case JWTAuthentication:
+		found = []*JWTAuthentication{&v}
+	case AnyAuthenticationRequirements:
+		for _, val := range []AuthenticationRequirement(v) {
+			found = append(found, allJWTRequirements(val)...)
+		}
+	case AllAuthenticationRequirements:
+		for _, val := range []AuthenticationRequirement(v) {
+			found = append(found, allJWTRequirements(val)...)
+		}
+	}
+	return found
+}
+
+func isEmpty(auth AuthenticationRequirement) bool {
+	switch a := auth.Requirements.(type) {
+	case JWTAuthentication:
+		return false
+	case AnyAuthenticationRequirements:
+		for _, r := range []AuthenticationRequirement(a) {
+			if !isEmpty(r) {
+				return true
+			}
+		}
+	case AllAuthenticationRequirements:
+		for _, r := range []AuthenticationRequirement(a) {
+			if !isEmpty(r) {
+				return true
+			}
+		}
+	}
+	return true
+}
