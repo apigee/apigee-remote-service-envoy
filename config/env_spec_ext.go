@@ -36,7 +36,7 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) *EnvironmentSpecExt {
 		// tree: base path -> APISpec
 		split := strings.Split(api.BasePath, "/")
 		split = append(split, "**")
-		apiPathTree.AddChild(split, 0, api)
+		apiPathTree.AddChild(split, 0, &api)
 
 		// tree: api.ID -> method -> path -> APIOperation
 		for i := range api.Operations {
@@ -44,7 +44,7 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) *EnvironmentSpecExt {
 			for _, m := range op.HTTPMatches {
 				split = strings.Split(m.PathTemplate, "/") // todo: templating
 				split = append([]string{api.ID, m.Method}, split...)
-				opPathTree.AddChild(split, 0, op)
+				opPathTree.AddChild(split, 0, &op)
 			}
 		}
 	}
@@ -61,18 +61,13 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) *EnvironmentSpecExt {
 // EnvironmentSpecExt extends an EnvironmentSpec to hold cached values
 type EnvironmentSpecExt struct {
 	*EnvironmentSpec
-	ApiJwtRequirements map[string][]*JWTAuthentication // api.ID -> JWTAuthentication
-	ApiPathTree        path.Tree                       // base path -> APISpec
-	OpPathTree         path.Tree                       // api.ID -> method -> sub path -> Operation
+	ApiJwtRequirements map[string][]*JWTAuthentication // api.ID -> []*JWTAuthentication
+	ApiPathTree        path.Tree                       // base path -> *APISpec
+	OpPathTree         path.Tree                       // api.ID -> method -> sub path -> *Operation
 }
 
-func (o APIOperation) GetAPIKey(req *EnvironmentSpecRequest) (apikey string) {
-	for _, authorization := range o.ConsumerAuthorization.In {
-		if apikey = req.GetParamValue(authorization); apikey != "" {
-			return
-		}
-	}
-	return
+func (c ConsumerAuthorization) isEmpty() bool {
+	return len(c.In) == 0
 }
 
 func (a AuthenticationRequirement) IsEmpty() bool {

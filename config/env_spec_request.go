@@ -39,6 +39,8 @@ type EnvironmentSpecRequest struct {
 	request         *envoy.CheckRequest
 	jwtResults      map[string]*jwtResult // JWTAuthentication.Name ->
 	verifier        jwt.Verifier
+	apiSpec         *APISpec
+	operation       *APIOperation
 }
 
 type jwtClaims map[string]interface{}
@@ -50,30 +52,32 @@ type jwtResult struct {
 
 // GetAPI uses the base path to return an APISpec
 func (e *EnvironmentSpecRequest) GetAPISpec() *APISpec {
-	splitPath := strings.SplitN(e.request.Attributes.Request.Http.Path, "?", 2)
-	path := strings.Split(splitPath[0], "/") // todo: special case / ?
+	if e.apiSpec == nil {
+		splitPath := strings.SplitN(e.request.Attributes.Request.Http.Path, "?", 2)
+		path := strings.Split(splitPath[0], "/") // todo: special case / ?
 
-	if result := e.ApiPathTree.Find(path, 0); result != nil {
-		return result.(*APISpec)
+		if result := e.ApiPathTree.Find(path, 0); result != nil {
+			e.apiSpec = result.(*APISpec)
+		}
 	}
-	return nil
+	return e.apiSpec
 }
 
 // GetOperation uses HttpMatch to return an APIOperation
 func (e EnvironmentSpecRequest) GetOperation() *APIOperation {
-	api := e.GetAPISpec()
-	if api != nil {
-		subPath := strings.TrimPrefix(api.BasePath, e.request.Attributes.Request.Http.Path) // strip basepath
-		splitPath := strings.SplitN(subPath, "?", 2)
-		path := strings.Split(splitPath[0], "/") // todo: special case / ?
-		path = append([]string{e.request.Attributes.Request.Http.Method}, path...)
+	if e.operation == nil {
+		if api := e.GetAPISpec(); api != nil {
+			subPath := strings.TrimPrefix(e.request.Attributes.Request.Http.Path, api.BasePath) // strip basepath
+			splitPath := strings.SplitN(subPath, "?", 2)
+			path := strings.Split(splitPath[0], "/") // todo: special case / ?
+			path = append([]string{e.request.Attributes.Request.Http.Method}, path...)
 
-		if result := e.OpPathTree.Find(path, 0); result != nil {
-			return result.(*APIOperation)
+			if result := e.OpPathTree.Find(path, 0); result != nil {
+				e.operation = result.(*APIOperation)
+			}
 		}
 	}
-
-	return nil
+	return e.operation
 }
 
 // GetParamValue extracts a value from request using Match
@@ -128,23 +132,48 @@ func (e *EnvironmentSpecRequest) verifyJWTRequirement(requirementName string) bo
 	return false
 }
 
-// MeetsAuthenticatationRequirements returns true if AuthenticatationRequirements are met for the request
-func (e *EnvironmentSpecRequest) MeetsAuthenticatationRequirements(auth AuthenticationRequirement) bool {
+// HasAuthentication returns true if AuthenticatationRequirements are met for the request
+func (e *EnvironmentSpecRequest) HasAuthentication() bool {
+	if !e.GetOperation().Authentication.IsEmpty() {
+		return e.meetsAuthenticatationRequirements(e.GetOperation().Authentication)
+	} else {
+		return e.meetsAuthenticatationRequirements(e.GetAPISpec().Authentication)
+	}
+}
+
+func (e *EnvironmentSpecRequest) meetsAuthenticatationRequirements(auth AuthenticationRequirement) bool {
 	switch a := auth.Requirements.(type) {
 	case JWTAuthentication:
 		return e.verifyJWTRequirement(a.Name)
 	case AnyAuthenticationRequirements:
 		for _, r := range []AuthenticationRequirement(a) {
-			if e.MeetsAuthenticatationRequirements(r) {
+			if e.meetsAuthenticatationRequirements(r) {
 				return true
 			}
 		}
 	case AllAuthenticationRequirements:
 		for _, r := range []AuthenticationRequirement(a) {
-			if !e.MeetsAuthenticatationRequirements(r) {
+			if !e.meetsAuthenticatationRequirements(r) {
 				return false
 			}
 		}
 	}
 	return true
+}
+
+// GetAPIKey uses ConsumerAuthorization of Operation or APISpec as appropriate
+func (req *EnvironmentSpecRequest) GetAPIKey() (key string) {
+	getAPIKey := func(auth ConsumerAuthorization) string {
+		for _, authorization := range auth.In {
+			if key = req.GetParamValue(authorization); key != "" {
+				return key
+			}
+		}
+		return ""
+	}
+	if !req.GetOperation().ConsumerAuthorization.isEmpty() {
+		return getAPIKey(req.GetOperation().ConsumerAuthorization)
+	} else {
+		return getAPIKey(req.GetAPISpec().ConsumerAuthorization)
+	}
 }

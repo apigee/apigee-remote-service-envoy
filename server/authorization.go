@@ -114,7 +114,6 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.Check
 		}
 		api = apiSpec.ID
 
-		// todo: authorization must match on operation name!
 		operation = envRequest.GetOperation()
 		if operation == nil {
 			log.Debugf("no valid operation found for api %s", apiSpec)
@@ -122,12 +121,12 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.Check
 		}
 		log.Debugf("operation: %s", operation.Name)
 
-		if !envRequest.MeetsAuthenticatationRequirements(operation.Authentication) {
+		if !envRequest.HasAuthentication() {
 			log.Debugf("authentication requirements not met")
 			return a.unauthenticated(req, tracker), nil
 		}
 
-		apiKey = operation.GetAPIKey(envRequest)
+		apiKey = envRequest.GetAPIKey()
 
 	} else { // global authentication
 

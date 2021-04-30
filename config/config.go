@@ -151,7 +151,8 @@ type Config struct {
 	// If EnvironmentConfigs is specified, APIKeyHeader, APIKeyClaim, JWTProviderKey in AuthConfig will be ineffectual.
 	Auth Auth `yaml:"auth,omitempty" mapstructure:"auth,omitempty"`
 	// Apigee Environment configurations.
-	EnvironmentSpecs EnvironmentSpecs `yaml:"environment_specs,omitempty" mapstructure:"environment_specs,omitempty"`
+	EnvironmentSpecs     EnvironmentSpecs               `yaml:"environment_specs,omitempty" mapstructure:"environment_specs,omitempty"`
+	EnvironmentSpecsByID map[string]*EnvironmentSpecExt `yaml:"-"`
 }
 
 // Global is global configuration for the server
@@ -363,6 +364,13 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string, 
 		if err := c.loadEnvironmentSpec(f); err != nil {
 			return err
 		}
+	}
+
+	// init lookup table
+	c.EnvironmentSpecsByID = make(map[string]*EnvironmentSpecExt, len(c.EnvironmentSpecs.Inline))
+	for i := range c.EnvironmentSpecs.Inline {
+		spec := c.EnvironmentSpecs.Inline[i]
+		c.EnvironmentSpecsByID[spec.ID] = NewEnvironmentSpecExt(&spec)
 	}
 
 	return c.Validate(requireAnalyticsCredentials)

@@ -706,6 +706,10 @@ func TestLoadEnvironmentSpecs(t *testing.T) {
 			if diff := cmp.Diff(test.wantEnvSpec, c.EnvironmentSpecs.Inline[0]); diff != "" {
 				t.Errorf("c.Load() results in unexpected EnvironmentSpec diff (-want +got):\n%s", diff)
 			}
+			id := c.EnvironmentSpecs.Inline[0].ID
+			if spec := c.EnvironmentSpecsByID[id]; spec == nil {
+				t.Fatalf("c.Load() failed to populate EnvironmentSpecsByID for id %s", id)
+			}
 		})
 	}
 }
