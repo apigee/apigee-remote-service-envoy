@@ -114,3 +114,10 @@ func isEmpty(auth AuthenticationRequirement) bool {
 	}
 	return true
 }
+
+// Transform uses StringTransformation syntax to transform the
+// passed string.
+func (s StringTransformation) Transform(in string) string {
+	// todo: implement StringTransformation.Transform
+	return in
+}

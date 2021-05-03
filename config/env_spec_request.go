@@ -52,9 +52,6 @@ type jwtResult struct {
 
 // GetAPI uses the base path to return an APISpec
 func (e *EnvironmentSpecRequest) GetAPISpec() *APISpec {
-	if e == nil {
-		return nil
-	}
 	if e.apiSpec == nil {
 		splitPath := strings.SplitN(e.request.Attributes.Request.Http.Path, "?", 2)
 		path := strings.Split(splitPath[0], "/") // todo: special case / ?
@@ -67,7 +64,7 @@ func (e *EnvironmentSpecRequest) GetAPISpec() *APISpec {
 }
 
 // GetOperation uses HttpMatch to return an APIOperation
-func (e EnvironmentSpecRequest) GetOperation() *APIOperation {
+func (e *EnvironmentSpecRequest) GetOperation() *APIOperation {
 	if e.operation == nil {
 		if api := e.GetAPISpec(); api != nil {
 			subPath := strings.TrimPrefix(e.request.Attributes.Request.Http.Path, api.BasePath) // strip basepath
@@ -84,24 +81,22 @@ func (e EnvironmentSpecRequest) GetOperation() *APIOperation {
 }
 
 // GetParamValue extracts a value from request using Match
-func (e EnvironmentSpecRequest) GetParamValue(param APIOperationParameter) string {
+func (e *EnvironmentSpecRequest) GetParamValue(param APIOperationParameter) string {
+	var value string
 	switch m := param.Match.(type) {
 	case Header:
-		return e.request.Attributes.Request.Http.Headers[string(m)]
+		value = e.request.Attributes.Request.Http.Headers[string(m)]
 	case Query:
 		if u, err := url.ParseRequestURI(e.request.Attributes.Request.Http.Path); err != nil {
-			u.Query().Get(string(m))
+			value = u.Query().Get(string(m))
 		}
 	case JWTClaim:
-		return e.getClaimValue(m)
+		value = e.getClaimValue(m)
 	}
-	return ""
+	return param.Transformation.Transform(value)
 }
 
 func (e *EnvironmentSpecRequest) getClaimValue(claim JWTClaim) string {
-	if e == nil {
-		return ""
-	}
 	r, ok := e.jwtResults[claim.Requirement]
 	if !ok {
 		e.verifyJWTRequirement(claim.Requirement)
@@ -121,7 +116,6 @@ func (e *EnvironmentSpecRequest) verifyJWTRequirement(requirementName string) bo
 
 	// uncached, parse it
 	for _, p := range jwtReq.In {
-		// todo: templating
 		jwtString := e.GetParamValue(p)
 		url := jwtReq.JWKSSource.(RemoteJWKS).URL // only remote supported for now
 		provider := jwt.Provider{JWKSURL: url}
