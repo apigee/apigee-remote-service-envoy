@@ -17,54 +17,141 @@
 
 package config
 
-// NOTE: This file should be kept free from any additional dependencies,
-// especially those that are not commonly used libraries.
+import (
+	"testing"
+)
 
-// "testing"
-// "time"
+func TestNewEnvironmentSpecExt(t *testing.T) {
 
-// func TestOperationGetAPIKey(t *testing.T) {
-// 	spec := EnvironmentSpec{
-// 		APIs: []APISpec{
-// 			{
-// 				BasePath: "/v1",
-// 				Authentication: AuthenticationRequirement{
-// 					Requirements: JWTAuthentication{
-// 						Name:       "foo",
-// 						Issuer:     "bar",
-// 						JWKSSource: RemoteJWKS{URL: "url", CacheDuration: time.Hour},
-// 						In:         []APIOperationParameter{{Match: Header("header")}},
-// 					},
-// 				},
-// 				ConsumerAuthorization: ConsumerAuthorization{
-// 					In: []APIOperationParameter{{Match: Header("x-api-key")}},
-// 				},
-// 				Operations: []APIOperation{
-// 					{
-// 						Name: "op-1",
-// 						HTTPMatches: []HTTPMatch{
-// 							{
-// 								PathTemplate: "/petstore",
-// 								Method:       "GET",
-// 							},
-// 						},
-// 					},
-// 					{
-// 						Name: "op-2",
-// 						HTTPMatches: []HTTPMatch{
-// 							{
-// 								PathTemplate: "/bookshop",
-// 								Method:       "POST",
-// 							},
-// 						},
-// 					},
-// 				},
-// 				HTTPRequestTransforms: HTTPRequestTransformations{
-// 					SetHeaders: map[string]string{
-// 						"x-apigee-target": "target",
-// 					},
-// 				},
-// 			},
-// 		},
-// 	}
+	envSpec := createGoodEnvSpec()
+	specExt := NewEnvironmentSpecExt(&envSpec)
+
+	if len(specExt.ApiJwtRequirements) != 1 {
+		t.Errorf("should be 1")
+	}
+
+	if specExt.ApiPathTree == nil {
+		t.Errorf("must not be nil")
+	}
+
+	if specExt.OpPathTree == nil {
+		t.Errorf("must not be nil")
+	}
+}
+
+func TestConsumerAuthorizationIsEmpty(t *testing.T) {
+	ca := ConsumerAuthorization{}
+
+	if !ca.isEmpty() {
+		t.Errorf("should be empty")
+	}
+}
+
+func TestAuthorizationRequirementIsEmpty(t *testing.T) {
+	tests := []struct {
+		desc  string
+		reqs  AuthenticationRequirements
+		empty bool
+	}{
+		{"just jwt", JWTAuthentication{}, false},
+		{"empty any", AnyAuthenticationRequirements{}, true},
+		{"empty all", AllAuthenticationRequirements{}, true},
+		{"jwt in all", AllAuthenticationRequirements{
+			AuthenticationRequirement{
+				Requirements: JWTAuthentication{},
+			},
+		}, false},
+		{"jwt in any", AnyAuthenticationRequirements{
+			AuthenticationRequirement{
+				Requirements: JWTAuthentication{},
+			},
+		}, false},
+		{"nested empty", AnyAuthenticationRequirements{
+			AuthenticationRequirement{
+				Requirements: AllAuthenticationRequirements{
+					AuthenticationRequirement{
+						Requirements: AnyAuthenticationRequirements{},
+					},
+				},
+			},
+		}, true},
+		{"nested jwt", AllAuthenticationRequirements{
+			AuthenticationRequirement{
+				Requirements: AnyAuthenticationRequirements{
+					AuthenticationRequirement{},
+					AuthenticationRequirement{
+						Requirements: JWTAuthentication{},
+					},
+				},
+			},
+		}, false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			req := AuthenticationRequirement{
+				Requirements: test.reqs,
+			}
+			if test.empty != req.IsEmpty() {
+				t.Errorf("expected empty == %t", test.empty)
+			}
+		})
+	}
+}
+
+func TestAllJWTRequirements(t *testing.T) {
+	tests := []struct {
+		desc  string
+		reqs  AuthenticationRequirements
+		count int
+	}{
+		{"just jwt", JWTAuthentication{}, 1},
+		{"jwt in all", AllAuthenticationRequirements{
+			AuthenticationRequirement{
+				Requirements: JWTAuthentication{},
+			},
+		}, 1},
+		{"jwt in any", AnyAuthenticationRequirements{
+			AuthenticationRequirement{
+				Requirements: JWTAuthentication{},
+			},
+		}, 1},
+		{"nested empty", AnyAuthenticationRequirements{
+			AuthenticationRequirement{
+				Requirements: AllAuthenticationRequirements{
+					AuthenticationRequirement{
+						Requirements: AnyAuthenticationRequirements{},
+					},
+				},
+			},
+		}, 0},
+		{"nested jwt", AllAuthenticationRequirements{
+			AuthenticationRequirement{
+				Requirements: AnyAuthenticationRequirements{
+					AuthenticationRequirement{
+						Requirements: JWTAuthentication{},
+					},
+					AuthenticationRequirement{
+						Requirements: JWTAuthentication{},
+					},
+				},
+			},
+		}, 2},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			req := AuthenticationRequirement{
+				Requirements: test.reqs,
+			}
+			req.AllJWTRequirements()
+			if test.count != len(req.AllJWTRequirements()) {
+				t.Errorf("expected %d, got %d", test.count, len(req.AllJWTRequirements()))
+			}
+		})
+	}
+}
+
+// todo: Add test
+// func TestStringTransform(t *testing.T) {
 // }

@@ -35,53 +35,8 @@ func TestValidateEnvironmentSpecs(t *testing.T) {
 		wantErr string
 	}{
 		{
-			desc: "good environment configs",
-			configs: []EnvironmentSpec{
-				{
-					ID: "good-env-config",
-					APIs: []APISpec{
-						{
-							BasePath: "/v1",
-							Authentication: AuthenticationRequirement{
-								Requirements: JWTAuthentication{
-									Name:       "foo",
-									Issuer:     "bar",
-									JWKSSource: RemoteJWKS{URL: "url", CacheDuration: time.Hour},
-									In:         []APIOperationParameter{{Match: Header("header")}},
-								},
-							},
-							ConsumerAuthorization: ConsumerAuthorization{
-								In: []APIOperationParameter{{Match: Header("x-api-key")}},
-							},
-							Operations: []APIOperation{
-								{
-									Name: "op-1",
-									HTTPMatches: []HTTPMatch{
-										{
-											PathTemplate: "/petstore",
-											Method:       "GET",
-										},
-									},
-								},
-								{
-									Name: "op-2",
-									HTTPMatches: []HTTPMatch{
-										{
-											PathTemplate: "/bookshop",
-											Method:       "POST",
-										},
-									},
-								},
-							},
-							HTTPRequestTransforms: HTTPRequestTransformations{
-								SetHeaders: map[string]string{
-									"x-apigee-target": "target",
-								},
-							},
-						},
-					},
-				},
-			},
+			desc:    "good environment configs",
+			configs: []EnvironmentSpec{createGoodEnvSpec()},
 		},
 		{
 			desc: "duplicate environment config ids",
@@ -623,4 +578,52 @@ func TestParamMatchTypes(t *testing.T) {
 
 	j := JWTClaim{}
 	j.paramMatch()
+}
+
+// matches ./testdata/good_env_config.yaml
+func createGoodEnvSpec() EnvironmentSpec {
+	return EnvironmentSpec{
+		ID: "good-env-config",
+		APIs: []APISpec{
+			{
+				BasePath: "/v1",
+				Authentication: AuthenticationRequirement{
+					Requirements: JWTAuthentication{
+						Name:       "foo",
+						Issuer:     "bar",
+						JWKSSource: RemoteJWKS{URL: "url", CacheDuration: time.Hour},
+						In:         []APIOperationParameter{{Match: Header("header")}},
+					},
+				},
+				ConsumerAuthorization: ConsumerAuthorization{
+					In: []APIOperationParameter{{Match: Header("x-api-key")}},
+				},
+				Operations: []APIOperation{
+					{
+						Name: "op-1",
+						HTTPMatches: []HTTPMatch{
+							{
+								PathTemplate: "/petstore",
+								Method:       "GET",
+							},
+						},
+					},
+					{
+						Name: "op-2",
+						HTTPMatches: []HTTPMatch{
+							{
+								PathTemplate: "/bookshop",
+								Method:       "POST",
+							},
+						},
+					},
+				},
+				HTTPRequestTransforms: HTTPRequestTransformations{
+					SetHeaders: map[string]string{
+						"x-apigee-target": "target",
+					},
+				},
+			},
+		},
+	}
 }

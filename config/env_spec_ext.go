@@ -102,13 +102,13 @@ func isEmpty(auth AuthenticationRequirement) bool {
 	case AnyAuthenticationRequirements:
 		for _, r := range []AuthenticationRequirement(a) {
 			if !isEmpty(r) {
-				return true
+				return false
 			}
 		}
 	case AllAuthenticationRequirements:
 		for _, r := range []AuthenticationRequirement(a) {
 			if !isEmpty(r) {
-				return true
+				return false
 			}
 		}
 	}
