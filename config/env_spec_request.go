@@ -52,6 +52,9 @@ type jwtResult struct {
 
 // GetAPI uses the base path to return an APISpec
 func (e *EnvironmentSpecRequest) GetAPISpec() *APISpec {
+	if e == nil {
+		return nil
+	}
 	if e.apiSpec == nil {
 		splitPath := strings.SplitN(e.request.Attributes.Request.Http.Path, "?", 2)
 		path := strings.Split(splitPath[0], "/") // todo: special case / ?
@@ -65,6 +68,9 @@ func (e *EnvironmentSpecRequest) GetAPISpec() *APISpec {
 
 // GetOperation uses HttpMatch to return an APIOperation
 func (e *EnvironmentSpecRequest) GetOperation() *APIOperation {
+	if e == nil {
+		return nil
+	}
 	if e.operation == nil {
 		if api := e.GetAPISpec(); api != nil {
 			subPath := strings.TrimPrefix(e.request.Attributes.Request.Http.Path, api.BasePath) // strip basepath
@@ -82,6 +88,9 @@ func (e *EnvironmentSpecRequest) GetOperation() *APIOperation {
 
 // GetParamValue extracts a value from request using Match
 func (e *EnvironmentSpecRequest) GetParamValue(param APIOperationParameter) string {
+	if e == nil {
+		return ""
+	}
 	var value string
 	switch m := param.Match.(type) {
 	case Header:
@@ -97,6 +106,9 @@ func (e *EnvironmentSpecRequest) GetParamValue(param APIOperationParameter) stri
 }
 
 func (e *EnvironmentSpecRequest) getClaimValue(claim JWTClaim) string {
+	if e == nil {
+		return ""
+	}
 	r, ok := e.jwtResults[claim.Requirement]
 	if !ok {
 		e.verifyJWTRequirement(claim.Requirement)
@@ -106,6 +118,9 @@ func (e *EnvironmentSpecRequest) getClaimValue(claim JWTClaim) string {
 }
 
 func (e *EnvironmentSpecRequest) verifyJWTRequirement(requirementName string) bool {
+	if e == nil {
+		return false
+	}
 	jwtReq, ok := e.jwtRequirements[requirementName]
 	if !ok {
 		return false
@@ -134,6 +149,9 @@ func (e *EnvironmentSpecRequest) verifyJWTRequirement(requirementName string) bo
 
 // HasAuthentication returns true if AuthenticatationRequirements are met for the request
 func (e *EnvironmentSpecRequest) HasAuthentication() bool {
+	if e == nil {
+		return false
+	}
 	if !e.GetOperation().Authentication.IsEmpty() {
 		return e.meetsAuthenticatationRequirements(e.GetOperation().Authentication)
 	} else {
@@ -142,6 +160,9 @@ func (e *EnvironmentSpecRequest) HasAuthentication() bool {
 }
 
 func (e *EnvironmentSpecRequest) meetsAuthenticatationRequirements(auth AuthenticationRequirement) bool {
+	if e == nil {
+		return false
+	}
 	switch a := auth.Requirements.(type) {
 	case JWTAuthentication:
 		return e.verifyJWTRequirement(a.Name)
@@ -163,6 +184,9 @@ func (e *EnvironmentSpecRequest) meetsAuthenticatationRequirements(auth Authenti
 
 // GetAPIKey uses ConsumerAuthorization of Operation or APISpec as appropriate
 func (req *EnvironmentSpecRequest) GetAPIKey() (key string) {
+	if req == nil {
+		return ""
+	}
 	getAPIKey := func(auth ConsumerAuthorization) string {
 		for _, authorization := range auth.In {
 			if key = req.GetParamValue(authorization); key != "" {
