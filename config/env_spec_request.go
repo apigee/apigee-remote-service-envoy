@@ -21,11 +21,11 @@ import (
 	"strings"
 
 	"github.com/apigee/apigee-remote-service-golib/v2/auth/jwt"
-	envoy "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
+	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 )
 
 // NewEnvironmentSpecRequest creates a new EnvironmentSpecRequest
-func (e *EnvironmentSpecExt) NewEnvironmentSpecRequest(req *envoy.CheckRequest) *EnvironmentSpecRequest {
+func (e *EnvironmentSpecExt) NewEnvironmentSpecRequest(req *authv3.CheckRequest) *EnvironmentSpecRequest {
 	return &EnvironmentSpecRequest{
 		EnvironmentSpecExt: e,
 		request:            req,
@@ -36,7 +36,7 @@ func (e *EnvironmentSpecExt) NewEnvironmentSpecRequest(req *envoy.CheckRequest) 
 type EnvironmentSpecRequest struct {
 	*EnvironmentSpecExt
 	jwtRequirements map[string]*JWTAuthentication // JWTAuthentication.Name ->
-	request         *envoy.CheckRequest
+	request         *authv3.CheckRequest
 	jwtResults      map[string]*jwtResult // JWTAuthentication.Name ->
 	verifier        jwt.Verifier
 	apiSpec         *APISpec
@@ -52,6 +52,9 @@ type jwtResult struct {
 
 // GetAPI uses the base path to return an APISpec
 func (e *EnvironmentSpecRequest) GetAPISpec() *APISpec {
+	if e == nil {
+		return nil
+	}
 	if e.apiSpec == nil {
 		splitPath := strings.SplitN(e.request.Attributes.Request.Http.Path, "?", 2)
 		path := strings.Split(splitPath[0], "/") // todo: special case / ?
@@ -96,12 +99,15 @@ func (e EnvironmentSpecRequest) GetParamValue(param APIOperationParameter) strin
 }
 
 func (e *EnvironmentSpecRequest) getClaimValue(claim JWTClaim) string {
+	if e == nil {
+		return ""
+	}
 	r, ok := e.jwtResults[claim.Requirement]
 	if !ok {
 		e.verifyJWTRequirement(claim.Requirement)
 		r = e.jwtResults[claim.Requirement]
 	}
-	return r.claims[claim.Name].(string) // todo: interface{} type?
+	return r.claims[claim.Name].(string)
 }
 
 func (e *EnvironmentSpecRequest) verifyJWTRequirement(requirementName string) bool {
@@ -116,7 +122,7 @@ func (e *EnvironmentSpecRequest) verifyJWTRequirement(requirementName string) bo
 	// uncached, parse it
 	for _, p := range jwtReq.In {
 		// todo: templating
-		jwtString := e.GetParamValue(p)           // todo: circular?
+		jwtString := e.GetParamValue(p)
 		url := jwtReq.JWKSSource.(RemoteJWKS).URL // only remote supported for now
 		provider := jwt.Provider{JWKSURL: url}
 		claims, err := e.verifier.Parse(jwtString, provider)
