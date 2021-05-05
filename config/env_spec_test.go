@@ -596,7 +596,10 @@ func createGoodEnvSpec() EnvironmentSpec {
 					},
 				},
 				ConsumerAuthorization: ConsumerAuthorization{
-					In: []APIOperationParameter{{Match: Header("x-api-key")}},
+					In: []APIOperationParameter{
+						{Match: Query("x-api-key")},
+						{Match: Header("x-api-key")},
+					},
 				},
 				Operations: []APIOperation{
 					{

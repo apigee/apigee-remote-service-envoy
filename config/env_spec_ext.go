@@ -22,6 +22,9 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/v2/path"
 )
 
+// TODO: add proper algorithm to StringTransform.Transform
+// TODO: add path templating
+
 // NewEnvironmentSpecExt creates an EnvironmentSpecExt
 func NewEnvironmentSpecExt(spec *EnvironmentSpec) *EnvironmentSpecExt {
 	apiJwtRequirements := make(map[string][]*JWTAuthentication)
@@ -35,14 +38,13 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) *EnvironmentSpecExt {
 
 		// tree: base path -> APISpec
 		split := strings.Split(api.BasePath, "/")
-		split = append(split, "**")
 		apiPathTree.AddChild(split, 0, &api)
 
 		// tree: api.ID -> method -> path -> APIOperation
 		for i := range api.Operations {
 			op := api.Operations[i]
 			for _, m := range op.HTTPMatches {
-				split = strings.Split(m.PathTemplate, "/") // todo: templating
+				split = strings.Split(m.PathTemplate, "/")
 				split = append([]string{api.ID, m.Method}, split...)
 				opPathTree.AddChild(split, 0, &op)
 			}
@@ -55,10 +57,10 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) *EnvironmentSpecExt {
 		ApiPathTree:        apiPathTree,
 		OpPathTree:         opPathTree,
 	}
-
 }
 
-// EnvironmentSpecExt extends an EnvironmentSpec to hold cached values
+// EnvironmentSpecExt extends an EnvironmentSpec to hold cached values.
+// Create using config.NewEnvironmentSpecExt()
 type EnvironmentSpecExt struct {
 	*EnvironmentSpec
 	ApiJwtRequirements map[string][]*JWTAuthentication // api.ID -> []*JWTAuthentication
@@ -115,9 +117,7 @@ func isEmpty(auth AuthenticationRequirement) bool {
 	return true
 }
 
-// Transform uses StringTransformation syntax to transform the
-// passed string.
+// Transform uses StringTransformation syntax to transform the passed string.
 func (s StringTransformation) Transform(in string) string {
-	// todo: implement StringTransformation.Transform
 	return in
 }

@@ -104,7 +104,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.Check
 
 	// EnvSpec found, takes priority over global settings
 	if envSpec != nil {
-		envRequest := envSpec.NewEnvironmentSpecRequest(req)
+		envRequest := config.NewEnvironmentSpecRequest(envSpec, req)
 		log.Debugf("environment spec: %s", envRequest.ID)
 
 		apiSpec := envRequest.GetAPISpec()
@@ -121,7 +121,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.Check
 		}
 		log.Debugf("operation: %s", operation.Name)
 
-		if !envRequest.HasAuthentication() {
+		if !envRequest.IsAuthenticated() {
 			log.Debugf("authentication requirements not met")
 			return a.unauthenticated(req, tracker), nil
 		}

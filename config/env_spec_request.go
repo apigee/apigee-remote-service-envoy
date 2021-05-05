@@ -17,6 +17,7 @@
 package config
 
 import (
+	"fmt"
 	"net/url"
 	"strings"
 
@@ -25,14 +26,23 @@ import (
 )
 
 // NewEnvironmentSpecRequest creates a new EnvironmentSpecRequest
-func (e *EnvironmentSpecExt) NewEnvironmentSpecRequest(req *authv3.CheckRequest) *EnvironmentSpecRequest {
-	return &EnvironmentSpecRequest{
+func NewEnvironmentSpecRequest(e *EnvironmentSpecExt, req *authv3.CheckRequest) *EnvironmentSpecRequest {
+	esr := &EnvironmentSpecRequest{
 		EnvironmentSpecExt: e,
 		request:            req,
+		jwtResults:         make(map[string]*jwtResult),
 	}
+	if api := esr.GetAPISpec(); api != nil {
+		esr.jwtRequirements = make(map[string]*JWTAuthentication)
+		for _, j := range e.ApiJwtRequirements[api.ID] {
+			esr.jwtRequirements[j.Name] = j
+		}
+	}
+	return esr
 }
 
-// EnvironmentSpecRequest extends a request to support operations within an EnvironmentSpec
+// EnvironmentSpecRequest extends a request to support operations within an EnvironmentSpec.
+// Create using NewEnvironmentSpecRequest()
 type EnvironmentSpecRequest struct {
 	*EnvironmentSpecExt
 	jwtRequirements map[string]*JWTAuthentication // JWTAuthentication.Name ->
@@ -41,6 +51,7 @@ type EnvironmentSpecRequest struct {
 	verifier        jwt.Verifier
 	apiSpec         *APISpec
 	operation       *APIOperation
+	queryValues     url.Values
 }
 
 type jwtClaims map[string]interface{}
@@ -56,14 +67,25 @@ func (e *EnvironmentSpecRequest) GetAPISpec() *APISpec {
 		return nil
 	}
 	if e.apiSpec == nil {
-		splitPath := strings.SplitN(e.request.Attributes.Request.Http.Path, "?", 2)
-		path := strings.Split(splitPath[0], "/") // todo: special case / ?
-
+		path := strings.Split(e.getRequestPath(), "/")
 		if result := e.ApiPathTree.Find(path, 0); result != nil {
 			e.apiSpec = result.(*APISpec)
 		}
 	}
 	return e.apiSpec
+}
+
+// path without querystring
+func (e *EnvironmentSpecRequest) getRequestPath() string {
+	return strings.SplitN(e.request.Attributes.Request.Http.Path, "?", 2)[0]
+}
+
+// path with base path stripped
+func (e *EnvironmentSpecRequest) getAPISubPath() string {
+	if api := e.GetAPISpec(); api != nil {
+		return strings.TrimPrefix(e.getRequestPath(), api.BasePath)
+	}
+	return ""
 }
 
 // GetOperation uses HttpMatch to return an APIOperation
@@ -72,15 +94,14 @@ func (e *EnvironmentSpecRequest) GetOperation() *APIOperation {
 		return nil
 	}
 	if e.operation == nil {
-		if api := e.GetAPISpec(); api != nil {
-			subPath := strings.TrimPrefix(e.request.Attributes.Request.Http.Path, api.BasePath) // strip basepath
-			splitPath := strings.SplitN(subPath, "?", 2)
-			path := strings.Split(splitPath[0], "/") // todo: special case / ?
-			path = append([]string{e.request.Attributes.Request.Http.Method}, path...)
+		sp := e.getAPISubPath()
+		fmt.Printf("%s", sp)
+		pathSplits := strings.Split(e.getAPISubPath(), "/")
+		// prepend method for search
+		pathSplits = append([]string{e.request.Attributes.Request.Http.Method}, pathSplits...)
 
-			if result := e.OpPathTree.Find(path, 0); result != nil {
-				e.operation = result.(*APIOperation)
-			}
+		if result := e.OpPathTree.Find(pathSplits, 0); result != nil {
+			e.operation = result.(*APIOperation)
 		}
 	}
 	return e.operation
@@ -88,16 +109,26 @@ func (e *EnvironmentSpecRequest) GetOperation() *APIOperation {
 
 // GetParamValue extracts a value from request using Match
 func (e *EnvironmentSpecRequest) GetParamValue(param APIOperationParameter) string {
-	if e == nil {
+	if e == nil || param.Match == nil {
 		return ""
 	}
 	var value string
 	switch m := param.Match.(type) {
 	case Header:
-		value = e.request.Attributes.Request.Http.Headers[string(m)]
+		value = e.request.Attributes.Request.Http.Headers[strings.ToLower(string(m))]
+		// Per Envoy: If multiple headers share the same key, they are merged per HTTP spec.
+		// So, we're just grabbing the first value (up to any comma).
+		if indx := strings.Index(value, ","); indx > 0 {
+			value = value[:indx]
+		}
 	case Query:
-		if u, err := url.ParseRequestURI(e.request.Attributes.Request.Http.Path); err != nil {
-			value = u.Query().Get(string(m))
+		if e.queryValues == nil {
+			q := strings.SplitN(e.request.Attributes.Request.Http.Path, "?", 2)
+			if len(q) > 1 {
+				vals, _ := url.ParseQuery(q[1])
+				e.queryValues = vals
+			}
+			value = e.queryValues.Get(string(m))
 		}
 	case JWTClaim:
 		value = e.getClaimValue(m)
@@ -106,61 +137,74 @@ func (e *EnvironmentSpecRequest) GetParamValue(param APIOperationParameter) stri
 }
 
 func (e *EnvironmentSpecRequest) getClaimValue(claim JWTClaim) string {
-	if e == nil {
-		return ""
+	if e != nil {
+		r, ok := e.jwtResults[claim.Requirement]
+		if !ok {
+			e.verifyJWTRequirement(claim.Requirement)
+			r = e.jwtResults[claim.Requirement]
+		}
+		if r != nil && r.claims != nil && r.claims[claim.Name] != nil {
+			return r.claims[claim.Name].(string)
+		}
 	}
-	r, ok := e.jwtResults[claim.Requirement]
-	if !ok {
-		e.verifyJWTRequirement(claim.Requirement)
-		r = e.jwtResults[claim.Requirement]
-	}
-	return r.claims[claim.Name].(string)
+	return ""
 }
 
 func (e *EnvironmentSpecRequest) verifyJWTRequirement(requirementName string) bool {
 	if e == nil {
 		return false
 	}
-	jwtReq, ok := e.jwtRequirements[requirementName]
-	if !ok {
+	jwtReq := e.jwtRequirements[requirementName]
+	if jwtReq == nil {
 		return false
 	}
-	if result, ok := e.jwtResults[requirementName]; ok {
-		return result.err == nil
+	if result := e.jwtResults[requirementName]; result != nil && result.err != nil {
+		return false
 	}
 
 	// uncached, parse it
-	for _, p := range jwtReq.In {
-		jwtString := e.GetParamValue(p)
-		url := jwtReq.JWKSSource.(RemoteJWKS).URL // only remote supported for now
-		provider := jwt.Provider{JWKSURL: url}
-		claims, err := e.verifier.Parse(jwtString, provider)
-		result := &jwtResult{
+	setResult := func(claims map[string]interface{}, err error) {
+		e.jwtResults[requirementName] = &jwtResult{
 			claims: claims,
 			err:    err,
 		}
-		e.jwtResults[requirementName] = result
-		if result.err != nil {
-			return true
+	}
+
+	for _, p := range jwtReq.In {
+		jwksSource, ok := jwtReq.JWKSSource.(RemoteJWKS) // only Remote supported for now
+		if !ok {
+			setResult(nil, fmt.Errorf("JWKSSource must be RemoteJWKS, got: %#v", jwtReq.JWKSSource))
+		}
+		jwtString := e.GetParamValue(p)
+		provider := jwt.Provider{JWKSURL: jwksSource.URL}
+		claims, err := e.verifier.Parse(jwtString, provider)
+		setResult(claims, err)
+		if err != nil {
+			return false
 		}
 	}
-	return false
+	return true
 }
 
-// HasAuthentication returns true if AuthenticatationRequirements are met for the request
-func (e *EnvironmentSpecRequest) HasAuthentication() bool {
-	if e == nil {
-		return false
+// IsAuthenticated returns true if AuthenticatationRequirements are met for the request
+func (e *EnvironmentSpecRequest) IsAuthenticated() bool {
+	return e.meetsAuthenticatationRequirements(e.getAuthenticationRequirement())
+}
+
+func (req *EnvironmentSpecRequest) getAuthenticationRequirement() (auth AuthenticationRequirement) {
+	if req != nil {
+		op := req.GetOperation()
+		if op != nil && !op.ConsumerAuthorization.isEmpty() {
+			auth = op.Authentication
+		} else if api := req.GetAPISpec(); api != nil {
+			auth = api.Authentication
+		}
 	}
-	if !e.GetOperation().Authentication.IsEmpty() {
-		return e.meetsAuthenticatationRequirements(e.GetOperation().Authentication)
-	} else {
-		return e.meetsAuthenticatationRequirements(e.GetAPISpec().Authentication)
-	}
+	return auth
 }
 
 func (e *EnvironmentSpecRequest) meetsAuthenticatationRequirements(auth AuthenticationRequirement) bool {
-	if e == nil {
+	if e == nil || auth.Requirements == nil {
 		return false
 	}
 	switch a := auth.Requirements.(type) {
@@ -183,21 +227,25 @@ func (e *EnvironmentSpecRequest) meetsAuthenticatationRequirements(auth Authenti
 }
 
 // GetAPIKey uses ConsumerAuthorization of Operation or APISpec as appropriate
+// TODO: should this error if IsAuthenticated == false?
 func (req *EnvironmentSpecRequest) GetAPIKey() (key string) {
-	if req == nil {
-		return ""
-	}
-	getAPIKey := func(auth ConsumerAuthorization) string {
-		for _, authorization := range auth.In {
-			if key = req.GetParamValue(authorization); key != "" {
-				return key
-			}
+	auth := req.getConsumerAuthorization()
+	for _, authorization := range auth.In {
+		if key = req.GetParamValue(authorization); key != "" {
+			return key
 		}
-		return ""
 	}
-	if !req.GetOperation().ConsumerAuthorization.isEmpty() {
-		return getAPIKey(req.GetOperation().ConsumerAuthorization)
-	} else {
-		return getAPIKey(req.GetAPISpec().ConsumerAuthorization)
+	return ""
+}
+
+func (req *EnvironmentSpecRequest) getConsumerAuthorization() (auth ConsumerAuthorization) {
+	if req != nil {
+		op := req.GetOperation()
+		if op != nil && !op.ConsumerAuthorization.isEmpty() {
+			auth = op.ConsumerAuthorization
+		} else if api := req.GetAPISpec(); api != nil {
+			auth = api.ConsumerAuthorization
+		}
 	}
+	return auth
 }

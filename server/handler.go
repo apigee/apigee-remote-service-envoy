@@ -144,10 +144,12 @@ func NewHandler(cfg *config.Config) (*Handler, error) {
 		return nil, err
 	}
 
+	// todo: Need to create JWTProviders!
 	authMan, err := auth.NewManager(auth.Options{
 		Client:              instrumentedClientFor(cfg, "auth", tr),
 		APIKeyCacheDuration: cfg.Auth.APIKeyCacheDuration,
 		Org:                 cfg.Tenant.OrgName,
+		JWTProviders:        nil,
 	})
 	if err != nil {
 		return nil, err

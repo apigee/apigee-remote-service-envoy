@@ -151,7 +151,3 @@ func TestAllJWTRequirements(t *testing.T) {
 		})
 	}
 }
-
-// todo: Add test
-// func TestStringTransform(t *testing.T) {
-// }

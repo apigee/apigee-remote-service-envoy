@@ -23,14 +23,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/apigee/apigee-remote-service-envoy/v2/testutil"
 	"github.com/apigee/apigee-remote-service-golib/v2/analytics"
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
 	libAuth "github.com/apigee/apigee-remote-service-golib/v2/auth"
 	apigeeContext "github.com/apigee/apigee-remote-service-golib/v2/context"
 	"github.com/apigee/apigee-remote-service-golib/v2/product"
 	"github.com/apigee/apigee-remote-service-golib/v2/quota"
-	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
-	v3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
+	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	"github.com/gogo/googleapis/google/rpc"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -78,21 +78,10 @@ func TestCheck(t *testing.T) {
 	}
 
 	uri := "path?x-api-key=foo"
-	req := &v3.CheckRequest{
-		Attributes: &v3.AttributeContext{
-			Request: &v3.AttributeContext_Request{
-				Http: &v3.AttributeContext_HttpRequest{
-					Path:    uri,
-					Headers: headers,
-				},
-			},
-			MetadataContext: &core.Metadata{
-				FilterMetadata: map[string]*structpb.Struct{
-					jwtFilterMetadataKey: jwtClaims,
-				},
-			},
-		},
-	}
+	req := testutil.NewEnvoyRequest(http.MethodGet, uri, headers,
+		map[string]*structpb.Struct{
+			jwtFilterMetadataKey: jwtClaims,
+		})
 
 	testAuthMan := &testAuthMan{}
 	testProductMan := &testProductMan{
@@ -116,7 +105,7 @@ func TestCheck(t *testing.T) {
 	}
 
 	// no api header
-	var resp *v3.CheckResponse
+	var resp *authv3.CheckResponse
 	var err error
 	if resp, err = server.Check(context.Background(), req); err != nil {
 		t.Errorf("should not get error. got: %s", err)
@@ -203,7 +192,7 @@ func TestCheck(t *testing.T) {
 	if resp.Status.Code != int32(rpc.RESOURCE_EXHAUSTED) {
 		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.RESOURCE_EXHAUSTED))
 	}
-	code := resp.HttpResponse.(*v3.CheckResponse_DeniedResponse).DeniedResponse.Status.Code
+	code := resp.HttpResponse.(*authv3.CheckResponse_DeniedResponse).DeniedResponse.Status.Code
 	if code != http.StatusTooManyRequests {
 		t.Errorf("got: %d, want: %d", code, http.StatusTooManyRequests)
 	}
@@ -342,23 +331,10 @@ func TestImmediateAnalytics(t *testing.T) {
 	requestTime := time.Now()
 	nowProto := timestamppb.New(requestTime)
 
-	req := &v3.CheckRequest{
-		Attributes: &v3.AttributeContext{
-			Request: &v3.AttributeContext_Request{
-				Http: &v3.AttributeContext_HttpRequest{
-					Path:    uri,
-					Headers: headers,
-					Method:  http.MethodGet,
-				},
-				Time: nowProto,
-			},
-			MetadataContext: &core.Metadata{
-				FilterMetadata: map[string]*structpb.Struct{
-					jwtFilterMetadataKey: jwtClaims,
-				},
-			},
-		},
-	}
+	req := testutil.NewEnvoyRequest(http.MethodGet, uri, headers, map[string]*structpb.Struct{
+		jwtFilterMetadataKey: jwtClaims,
+	})
+	req.Attributes.Request.Time = nowProto
 
 	testAuthMan := &testAuthMan{}
 	ac := &auth.Context{
@@ -395,7 +371,7 @@ func TestImmediateAnalytics(t *testing.T) {
 		},
 	}
 
-	var resp *v3.CheckResponse
+	var resp *authv3.CheckResponse
 	resp, err := server.Check(context.Background(), req)
 	if err != nil {
 		t.Errorf("should not get error. got: %s", err)
