@@ -580,19 +580,27 @@ func TestParamMatchTypes(t *testing.T) {
 	j.paramMatch()
 }
 
-// matches ./testdata/good_env_config.yaml
 func createGoodEnvSpec() EnvironmentSpec {
 	return EnvironmentSpec{
 		ID: "good-env-config",
 		APIs: []APISpec{
 			{
+				ID:       "apispec1",
 				BasePath: "/v1",
 				Authentication: AuthenticationRequirement{
-					Requirements: JWTAuthentication{
-						Name:       "foo",
-						Issuer:     "bar",
-						JWKSSource: RemoteJWKS{URL: "url", CacheDuration: time.Hour},
-						In:         []APIOperationParameter{{Match: Header("header")}},
+					Requirements: AnyAuthenticationRequirements{
+						AuthenticationRequirement{
+							Requirements: AllAuthenticationRequirements{
+								AuthenticationRequirement{
+									Requirements: JWTAuthentication{
+										Name:       "foo",
+										Issuer:     "bar",
+										JWKSSource: RemoteJWKS{URL: "url", CacheDuration: time.Hour},
+										In:         []APIOperationParameter{{Match: Header("header")}},
+									},
+								},
+							},
+						},
 					},
 				},
 				ConsumerAuthorization: ConsumerAuthorization{
@@ -624,6 +632,35 @@ func createGoodEnvSpec() EnvironmentSpec {
 				HTTPRequestTransforms: HTTPRequestTransformations{
 					SetHeaders: map[string]string{
 						"x-apigee-target": "target",
+					},
+				},
+			},
+			{
+				ID:       "apispec2",
+				BasePath: "/v2",
+				Operations: []APIOperation{
+					{
+						Name: "op-3",
+						HTTPMatches: []HTTPMatch{
+							{
+								PathTemplate: "/petstore",
+								Method:       "GET",
+							},
+						},
+						Authentication: AuthenticationRequirement{
+							Requirements: JWTAuthentication{
+								Name:       "foo",
+								Issuer:     "bar",
+								JWKSSource: RemoteJWKS{URL: "url", CacheDuration: time.Hour},
+								In:         []APIOperationParameter{{Match: Header("header")}},
+							},
+						},
+						ConsumerAuthorization: ConsumerAuthorization{
+							In: []APIOperationParameter{
+								{Match: Query("x-api-key2")},
+								{Match: Header("x-api-key2")},
+							},
+						},
 					},
 				},
 			},

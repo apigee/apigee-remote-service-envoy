@@ -33,10 +33,7 @@ func NewEnvironmentSpecRequest(e *EnvironmentSpecExt, req *authv3.CheckRequest) 
 		jwtResults:         make(map[string]*jwtResult),
 	}
 	if api := esr.GetAPISpec(); api != nil {
-		esr.jwtRequirements = make(map[string]*JWTAuthentication)
-		for _, j := range e.ApiJwtRequirements[api.ID] {
-			esr.jwtRequirements[j.Name] = j
-		}
+		esr.jwtAuthentications = e.jwtAuthentications[api.ID]
 	}
 	return esr
 }
@@ -45,13 +42,13 @@ func NewEnvironmentSpecRequest(e *EnvironmentSpecExt, req *authv3.CheckRequest) 
 // Create using NewEnvironmentSpecRequest()
 type EnvironmentSpecRequest struct {
 	*EnvironmentSpecExt
-	jwtRequirements map[string]*JWTAuthentication // JWTAuthentication.Name ->
-	request         *authv3.CheckRequest
-	jwtResults      map[string]*jwtResult // JWTAuthentication.Name ->
-	verifier        jwt.Verifier
-	apiSpec         *APISpec
-	operation       *APIOperation
-	queryValues     url.Values
+	jwtAuthentications map[string]*JWTAuthentication // JWTAuthentication.Name ->
+	request            *authv3.CheckRequest
+	jwtResults         map[string]*jwtResult // JWTAuthentication.Name ->
+	verifier           jwt.Verifier
+	apiSpec            *APISpec
+	operation          *APIOperation
+	queryValues        url.Values
 }
 
 type jwtClaims map[string]interface{}
@@ -68,7 +65,7 @@ func (e *EnvironmentSpecRequest) GetAPISpec() *APISpec {
 	}
 	if e.apiSpec == nil {
 		path := strings.Split(e.getRequestPath(), "/")
-		if result := e.ApiPathTree.Find(path, 0); result != nil {
+		if result := e.apiPathTree.Find(path, 0); result != nil {
 			e.apiSpec = result.(*APISpec)
 		}
 	}
@@ -80,28 +77,22 @@ func (e *EnvironmentSpecRequest) getRequestPath() string {
 	return strings.SplitN(e.request.Attributes.Request.Http.Path, "?", 2)[0]
 }
 
-// path with base path stripped
-func (e *EnvironmentSpecRequest) getAPISubPath() string {
-	if api := e.GetAPISpec(); api != nil {
-		return strings.TrimPrefix(e.getRequestPath(), api.BasePath)
-	}
-	return ""
-}
-
 // GetOperation uses HttpMatch to return an APIOperation
 func (e *EnvironmentSpecRequest) GetOperation() *APIOperation {
 	if e == nil {
 		return nil
 	}
 	if e.operation == nil {
-		sp := e.getAPISubPath()
-		fmt.Printf("%s", sp)
-		pathSplits := strings.Split(e.getAPISubPath(), "/")
-		// prepend method for search
-		pathSplits = append([]string{e.request.Attributes.Request.Http.Method}, pathSplits...)
+		api := e.GetAPISpec()
+		if api != nil {
+			subPath := strings.TrimPrefix(e.getRequestPath(), api.BasePath) // strip base path
+			pathSplits := strings.Split(subPath, "/")
+			// prepend method for search
+			pathSplits = append([]string{e.apiSpec.ID, e.request.Attributes.Request.Http.Method}, pathSplits...)
 
-		if result := e.OpPathTree.Find(pathSplits, 0); result != nil {
-			e.operation = result.(*APIOperation)
+			if result := e.opPathTree.Find(pathSplits, 0); result != nil {
+				e.operation = result.(*APIOperation)
+			}
 		}
 	}
 	return e.operation
@@ -140,7 +131,7 @@ func (e *EnvironmentSpecRequest) getClaimValue(claim JWTClaim) string {
 	if e != nil {
 		r, ok := e.jwtResults[claim.Requirement]
 		if !ok {
-			e.verifyJWTRequirement(claim.Requirement)
+			e.verifyJWTAuthentication(claim.Requirement)
 			r = e.jwtResults[claim.Requirement]
 		}
 		if r != nil && r.claims != nil && r.claims[claim.Name] != nil {
@@ -150,21 +141,24 @@ func (e *EnvironmentSpecRequest) getClaimValue(claim JWTClaim) string {
 	return ""
 }
 
-func (e *EnvironmentSpecRequest) verifyJWTRequirement(requirementName string) bool {
+// looks up the JWTAuthentication by name and runs verification
+// returns true if found and verified
+// any error can be in e.jwtResults[name]
+func (e *EnvironmentSpecRequest) verifyJWTAuthentication(name string) bool {
 	if e == nil {
 		return false
 	}
-	jwtReq := e.jwtRequirements[requirementName]
+	jwtReq := e.jwtAuthentications[name]
 	if jwtReq == nil {
 		return false
 	}
-	if result := e.jwtResults[requirementName]; result != nil && result.err != nil {
-		return false
+	if result := e.jwtResults[name]; result != nil { // return from cache
+		return result.err == nil
 	}
 
 	// uncached, parse it
 	setResult := func(claims map[string]interface{}, err error) {
-		e.jwtResults[requirementName] = &jwtResult{
+		e.jwtResults[name] = &jwtResult{
 			claims: claims,
 			err:    err,
 		}
@@ -177,6 +171,10 @@ func (e *EnvironmentSpecRequest) verifyJWTRequirement(requirementName string) bo
 		}
 		jwtString := e.GetParamValue(p)
 		provider := jwt.Provider{JWKSURL: jwksSource.URL}
+		if e.verifier == nil {
+			setResult(nil, fmt.Errorf("no jwt verifier for %#v", e))
+			return false
+		}
 		claims, err := e.verifier.Parse(jwtString, provider)
 		setResult(claims, err)
 		if err != nil {
@@ -209,25 +207,28 @@ func (e *EnvironmentSpecRequest) meetsAuthenticatationRequirements(auth Authenti
 	}
 	switch a := auth.Requirements.(type) {
 	case JWTAuthentication:
-		return e.verifyJWTRequirement(a.Name)
+		return e.verifyJWTAuthentication(a.Name)
 	case AnyAuthenticationRequirements:
 		for _, r := range []AuthenticationRequirement(a) {
 			if e.meetsAuthenticatationRequirements(r) {
 				return true
 			}
 		}
+		return false
 	case AllAuthenticationRequirements:
 		for _, r := range []AuthenticationRequirement(a) {
 			if !e.meetsAuthenticatationRequirements(r) {
 				return false
 			}
 		}
+		return true
+	default:
+		return false
 	}
-	return true
 }
 
 // GetAPIKey uses ConsumerAuthorization of Operation or APISpec as appropriate
-// TODO: should this error if IsAuthenticated == false?
+// to retrieve the API Key. This does not check if the request is authenticated.
 func (req *EnvironmentSpecRequest) GetAPIKey() (key string) {
 	auth := req.getConsumerAuthorization()
 	for _, authorization := range auth.In {

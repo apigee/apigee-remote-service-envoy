@@ -27,14 +27,14 @@ import (
 
 // NewEnvironmentSpecExt creates an EnvironmentSpecExt
 func NewEnvironmentSpecExt(spec *EnvironmentSpec) *EnvironmentSpecExt {
-	apiJwtRequirements := make(map[string][]*JWTAuthentication)
+	apiJwtRequirements := make(map[string]map[string]*JWTAuthentication)
 	apiPathTree := path.NewTree()
 	opPathTree := path.NewTree()
 	for i := range spec.APIs {
 		api := spec.APIs[i]
 
-		jwtRequirements := api.Authentication.AllJWTRequirements()
-		apiJwtRequirements[api.ID] = jwtRequirements
+		apiJwtRequirements[api.ID] = map[string]*JWTAuthentication{}
+		api.Authentication.mapJWTRequirements(apiJwtRequirements[api.ID])
 
 		// tree: base path -> APISpec
 		split := strings.Split(api.BasePath, "/")
@@ -43,6 +43,9 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) *EnvironmentSpecExt {
 		// tree: api.ID -> method -> path -> APIOperation
 		for i := range api.Operations {
 			op := api.Operations[i]
+
+			op.Authentication.mapJWTRequirements(apiJwtRequirements[api.ID])
+
 			for _, m := range op.HTTPMatches {
 				split = strings.Split(m.PathTemplate, "/")
 				split = append([]string{api.ID, m.Method}, split...)
@@ -53,9 +56,9 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) *EnvironmentSpecExt {
 
 	return &EnvironmentSpecExt{
 		EnvironmentSpec:    spec,
-		ApiJwtRequirements: apiJwtRequirements,
-		ApiPathTree:        apiPathTree,
-		OpPathTree:         opPathTree,
+		jwtAuthentications: apiJwtRequirements,
+		apiPathTree:        apiPathTree,
+		opPathTree:         opPathTree,
 	}
 }
 
@@ -63,9 +66,9 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) *EnvironmentSpecExt {
 // Create using config.NewEnvironmentSpecExt()
 type EnvironmentSpecExt struct {
 	*EnvironmentSpec
-	ApiJwtRequirements map[string][]*JWTAuthentication // api.ID -> []*JWTAuthentication
-	ApiPathTree        path.Tree                       // base path -> *APISpec
-	OpPathTree         path.Tree                       // api.ID -> method -> sub path -> *Operation
+	jwtAuthentications map[string]map[string]*JWTAuthentication // api.ID -> auth.name -> *JWTAuthentication
+	apiPathTree        path.Tree                                // base path -> *APISpec
+	opPathTree         path.Tree                                // api.ID -> method -> sub path -> *Operation
 }
 
 func (c ConsumerAuthorization) isEmpty() bool {
@@ -76,25 +79,25 @@ func (a AuthenticationRequirement) IsEmpty() bool {
 	return isEmpty(a)
 }
 
-func (a AuthenticationRequirement) AllJWTRequirements() []*JWTAuthentication {
-	return allJWTRequirements(a)
+// populates passed map with JWTAuthentication.name -> *JWTAuthentication for all enclosing Requirements
+func (a AuthenticationRequirement) mapJWTRequirements(nameMap map[string]*JWTAuthentication) {
+	mapJWTRequirements(a, nameMap)
 }
 
-func allJWTRequirements(auth AuthenticationRequirement) []*JWTAuthentication {
-	var found []*JWTAuthentication
+// populates passed map with JWTAuthentication.name -> *JWTAuthentication for all enclosing Requirements
+func mapJWTRequirements(auth AuthenticationRequirement, nameMap map[string]*JWTAuthentication) {
 	switch v := auth.Requirements.(type) {
 	case JWTAuthentication:
-		found = []*JWTAuthentication{&v}
+		nameMap[v.Name] = &v
 	case AnyAuthenticationRequirements:
 		for _, val := range []AuthenticationRequirement(v) {
-			found = append(found, allJWTRequirements(val)...)
+			mapJWTRequirements(val, nameMap)
 		}
 	case AllAuthenticationRequirements:
 		for _, val := range []AuthenticationRequirement(v) {
-			found = append(found, allJWTRequirements(val)...)
+			mapJWTRequirements(val, nameMap)
 		}
 	}
-	return found
 }
 
 func isEmpty(auth AuthenticationRequirement) bool {

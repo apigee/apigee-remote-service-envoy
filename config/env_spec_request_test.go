@@ -40,7 +40,26 @@ func TestNilReceivers(t *testing.T) {
 	s.GetOperation()
 	s.GetParamValue(APIOperationParameter{})
 	s.IsAuthenticated()
+	s.verifyJWTAuthentication("")
+	s.getAuthenticationRequirement()
+	s.meetsAuthenticatationRequirements(AuthenticationRequirement{})
+	s.getConsumerAuthorization()
 }
+
+func TestUnknownAuthenticationRequirementType(t *testing.T) {
+	authReqs := AuthenticationRequirement{
+		Requirements: unknownAR{},
+	}
+	req := EnvironmentSpecRequest{}
+	if req.meetsAuthenticatationRequirements(authReqs) {
+		t.Errorf("should be false")
+	}
+}
+
+type unknownAR struct {
+}
+
+func (u unknownAR) authenticationRequirements() {}
 
 func TestBasicEnvSpecRequest(t *testing.T) {
 	configFile := "./testdata/good_config.yaml"
@@ -115,6 +134,9 @@ func TestGetAPISpec(t *testing.T) {
 func TestGetOperation(t *testing.T) {
 	envSpec := createGoodEnvSpec()
 	specExt := NewEnvironmentSpecExt(&envSpec)
+	if envSpec.APIs[0].ID != "apispec1" {
+		t.Fatalf("incorrect API: %v", envSpec.APIs[0])
+	}
 	petstore := &envSpec.APIs[0].Operations[0]
 	bookshop := &envSpec.APIs[0].Operations[1]
 
@@ -272,19 +294,77 @@ func TestGetParamValueJWTClaim(t *testing.T) {
 	}
 }
 
-// TODO: write test
-// func TestIsAuthenticated(t *testing.T) {
-// 	envSpec := createGoodEnvSpec()
-// 	specExt := NewEnvironmentSpecExt(&envSpec)
+func TestIsAuthenticated(t *testing.T) {
+	envSpec := createGoodEnvSpec()
+	specExt := NewEnvironmentSpecExt(&envSpec)
 
-// 	apiKey := "myapikey"
-// 	envoyReq := testutil.NewEnvoyRequest(http.MethodGet, "/v1/petstore", map[string]string{"x-api-key": apiKey}, nil)
-// 	req := NewEnvironmentSpecRequest(specExt, envoyReq)
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jwtClaims := map[string]interface{}{"key": "value"}
+	jwtString, err := generateJWT(privateKey, jwtClaims)
+	if err != nil {
+		t.Fatalf("generateJWT() failed: %v", err)
+	}
 
-// 	if req.IsAuthenticated() {
-// 		t.Errorf("Operation should not meet authentication requirements")
-// 	}
-// }
+	headers := map[string]string{
+		"header": jwtString,
+	}
+
+	tests := []struct {
+		desc string
+		path string
+	}{
+		{"auth in api", "/v1/petstore"},
+		{"auth in operation", "/v2/petstore"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			envoyReq := testutil.NewEnvoyRequest(http.MethodGet, test.path, headers, nil)
+			req := NewEnvironmentSpecRequest(specExt, envoyReq)
+
+			if req.IsAuthenticated() {
+				t.Errorf("IsAuthenticated should be false")
+			}
+
+			// internal: err should be cached
+			if ok := req.verifyJWTAuthentication("foo"); ok {
+				t.Errorf("cache hit should also be correct")
+			}
+			if req.jwtResults["foo"].err == nil {
+				t.Errorf("should have cached err")
+			}
+			if req.jwtResults["foo"].claims != nil {
+				t.Errorf("should not have cached claims")
+			}
+
+			// fix the verifier so it works
+			req.verifier = &mockJWTVerifier{}
+			req.jwtResults = make(map[string]*jwtResult)
+			if !req.IsAuthenticated() {
+				t.Errorf("IsAuthenticated should be true")
+			}
+
+			// internal: claims should be cached
+			if ok := req.verifyJWTAuthentication("foo"); !ok {
+				t.Errorf("cache hit should also be correct")
+			}
+			if req.jwtResults["foo"].err != nil {
+				t.Errorf("should not have cached err")
+			}
+			if req.jwtResults["foo"].claims == nil {
+				t.Errorf("should have cached claims")
+			}
+
+			// test verifyJWTAuthentication directly with bad key
+			if ok := req.verifyJWTAuthentication("bad"); ok {
+				t.Errorf("verifyJWTAuthentication should return false for bad name")
+			}
+		})
+	}
+}
 
 func TestGetAPIKey(t *testing.T) {
 	envSpec := createGoodEnvSpec()
@@ -297,11 +377,12 @@ func TestGetAPIKey(t *testing.T) {
 		headers map[string]string
 		want    string
 	}{
-		{"in query", "/v1/petstore?x-api-key=" + apiKey, map[string]string{}, apiKey},
-		{"in header", "/v1/petstore", map[string]string{"x-api-key": apiKey}, apiKey},
-		{"good in query", "/v1/petstore?x-api-key=" + apiKey, map[string]string{"x-api-key": "bad"}, apiKey},
-		{"good in header", "/v1/petstore?not=real", map[string]string{"x-api-key": apiKey}, apiKey},
-		{"nothing", "/v1/petstore", nil, ""},
+		{"api no key", "/v1/petstore", nil, ""},
+		{"api key in query", "/v1/petstore?x-api-key=" + apiKey, map[string]string{}, apiKey},
+		{"api key in header", "/v1/petstore", map[string]string{"x-api-key": apiKey}, apiKey},
+		{"op no key", "/v2/petstore", nil, ""},
+		{"op key in query", "/v2/petstore?x-api-key2=" + apiKey, map[string]string{}, apiKey},
+		{"op key in header", "/v2/petstore", map[string]string{"x-api-key2": apiKey}, apiKey},
 	}
 
 	for _, test := range tests {

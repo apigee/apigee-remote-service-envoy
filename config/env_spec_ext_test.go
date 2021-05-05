@@ -26,15 +26,15 @@ func TestNewEnvironmentSpecExt(t *testing.T) {
 	envSpec := createGoodEnvSpec()
 	specExt := NewEnvironmentSpecExt(&envSpec)
 
-	if len(specExt.ApiJwtRequirements) != 1 {
-		t.Errorf("should be 1")
+	if len(specExt.jwtAuthentications) != 2 {
+		t.Errorf("should be 2")
 	}
 
-	if specExt.ApiPathTree == nil {
+	if specExt.apiPathTree == nil {
 		t.Errorf("must not be nil")
 	}
 
-	if specExt.OpPathTree == nil {
+	if specExt.opPathTree == nil {
 		t.Errorf("must not be nil")
 	}
 }
@@ -108,12 +108,16 @@ func TestAllJWTRequirements(t *testing.T) {
 		{"just jwt", JWTAuthentication{}, 1},
 		{"jwt in all", AllAuthenticationRequirements{
 			AuthenticationRequirement{
-				Requirements: JWTAuthentication{},
+				Requirements: JWTAuthentication{
+					Name: "1",
+				},
 			},
 		}, 1},
 		{"jwt in any", AnyAuthenticationRequirements{
 			AuthenticationRequirement{
-				Requirements: JWTAuthentication{},
+				Requirements: JWTAuthentication{
+					Name: "1",
+				},
 			},
 		}, 1},
 		{"nested empty", AnyAuthenticationRequirements{
@@ -125,14 +129,18 @@ func TestAllJWTRequirements(t *testing.T) {
 				},
 			},
 		}, 0},
-		{"nested jwt", AllAuthenticationRequirements{
+		{"nested jwts", AllAuthenticationRequirements{
 			AuthenticationRequirement{
 				Requirements: AnyAuthenticationRequirements{
 					AuthenticationRequirement{
-						Requirements: JWTAuthentication{},
+						Requirements: JWTAuthentication{
+							Name: "1",
+						},
 					},
 					AuthenticationRequirement{
-						Requirements: JWTAuthentication{},
+						Requirements: JWTAuthentication{
+							Name: "2",
+						},
 					},
 				},
 			},
@@ -144,9 +152,10 @@ func TestAllJWTRequirements(t *testing.T) {
 			req := AuthenticationRequirement{
 				Requirements: test.reqs,
 			}
-			req.AllJWTRequirements()
-			if test.count != len(req.AllJWTRequirements()) {
-				t.Errorf("expected %d, got %d", test.count, len(req.AllJWTRequirements()))
+			nameMap := map[string]*JWTAuthentication{}
+			req.mapJWTRequirements(nameMap)
+			if test.count != len(nameMap) {
+				t.Errorf("expected %d, got %d", test.count, len(nameMap))
 			}
 		})
 	}
