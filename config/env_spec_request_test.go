@@ -61,42 +61,6 @@ type unknownAR struct {
 
 func (u unknownAR) authenticationRequirements() {}
 
-func TestBasicEnvSpecRequest(t *testing.T) {
-	configFile := "./testdata/good_config.yaml"
-	c := &Config{}
-	if err := c.Load(configFile, "", "", false); err != nil {
-		t.Fatalf("c.Load() returns unexpected: %v", err)
-	}
-
-	apiKey := "myapikey"
-	envoyReq := testutil.NewEnvoyRequest(http.MethodGet, "/v1/petstore", map[string]string{"x-api-key": apiKey}, nil)
-	specName := "good-env-config"
-	spec := c.EnvironmentSpecsByID[specName]
-	if spec == nil {
-		t.Fatalf("spec not found: %s", specName)
-	}
-	req := NewEnvironmentSpecRequest(spec, envoyReq)
-	req.verifier = &mockJWTVerifier{}
-
-	api := req.GetAPISpec()
-	if api == nil {
-		t.Errorf("APISpec not found for req")
-	}
-	op := req.GetOperation()
-	if op == nil {
-		t.Errorf("Operation not found for req")
-	}
-
-	if req.IsAuthenticated() {
-		t.Errorf("Operation should not meet authentication requirements")
-	}
-
-	got := req.GetAPIKey()
-	if got != apiKey {
-		t.Errorf("api key incorrect. got: %s, want: %s", got, apiKey)
-	}
-}
-
 func TestGetAPISpec(t *testing.T) {
 	envSpec := createGoodEnvSpec()
 	specExt := NewEnvironmentSpecExt(&envSpec)
