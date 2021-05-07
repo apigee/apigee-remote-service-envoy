@@ -16,6 +16,8 @@ package server
 
 import (
 	gocontext "context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
@@ -47,6 +49,8 @@ const (
 	apiContextKey        = "apigee_api"
 	envSpecContextKey    = "apigee_env_config"
 )
+
+// TODO: ConsumerAuthorization.FailOpen
 
 // AuthorizationServer server
 type AuthorizationServer struct {
@@ -103,8 +107,9 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.Check
 	var claims map[string]interface{}
 
 	// EnvSpec found, takes priority over global settings
+	var envRequest *config.EnvironmentSpecRequest
 	if envSpec != nil {
-		envRequest := config.NewEnvironmentSpecRequest(envSpec, req)
+		envRequest = config.NewEnvironmentSpecRequest(a.handler.authMan, envSpec, req)
 		log.Debugf("environment spec: %s", envRequest.ID)
 
 		apiSpec := envRequest.GetAPISpec()
@@ -202,11 +207,11 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.Check
 		return a.quotaExceeded(req, tracker, authContext, api), nil
 	}
 
-	return a.authOK(req, tracker, authContext, api, operation), nil
+	return a.authOK(req, tracker, authContext, api, envRequest), nil
 }
 
 // apply quotas to all matched operations
-//returns error if
+// returns an error if any quota failed
 func (a *AuthorizationServer) applyQuotas(ops []product.AuthorizedOperation, authC *auth.Context) (exceeded bool, errors error) {
 	var quotaArgs = quota.Args{QuotaAmount: 1}
 	for _, op := range ops {
@@ -225,15 +230,15 @@ func (a *AuthorizationServer) applyQuotas(ops []product.AuthorizedOperation, aut
 }
 
 func (a *AuthorizationServer) authOK(req *envoy_auth.CheckRequest, tracker *prometheusRequestMetricTracker,
-	authContext *auth.Context, api string, apiOperation *config.APIOperation) *envoy_auth.CheckResponse {
+	authContext *auth.Context, api string, envRequest *config.EnvironmentSpecRequest) *envoy_auth.CheckResponse {
 
 	okResponse := &envoy_auth.OkHttpResponse{}
 
 	if a.handler.appendMetadataHeaders {
-		headers := makeMetadataHeaders(api, authContext, true)
-		okResponse.Headers = headers
+		addMetadataHeaders(okResponse, api, authContext, true)
 	}
-	addHeaderTransforms(req, apiOperation, okResponse)
+
+	addHeaderTransforms(req, envRequest, okResponse)
 
 	tracker.statusCode = envoy_type.StatusCode_OK
 	return &envoy_auth.CheckResponse{
@@ -247,31 +252,54 @@ func (a *AuthorizationServer) authOK(req *envoy_auth.CheckRequest, tracker *prom
 	}
 }
 
-func addHeaderTransforms(req *envoy_auth.CheckRequest, apiOperation *config.APIOperation, okResponse *envoy_auth.OkHttpResponse) {
-	if apiOperation != nil {
-		for _, rhpat := range apiOperation.HTTPRequestTransforms.RemoveHeaders {
-			for _, hdr := range req.Attributes.Request.Http.Headers {
-				if util.SimpleGlobMatch(rhpat, hdr) {
-					okResponse.HeadersToRemove = append(okResponse.HeadersToRemove, hdr)
+// includes any JWTAuthentication.ForwardPayloadHeader requests
+func addHeaderTransforms(req *envoy_auth.CheckRequest, envRequest *config.EnvironmentSpecRequest,
+	okResponse *envoy_auth.OkHttpResponse) {
+	if envRequest != nil {
+		if apiOperation := envRequest.GetOperation(); apiOperation != nil {
+
+			for _, ja := range envRequest.JWTAuthentications() {
+				claims, _ := envRequest.GetJWTResult(ja.Name)
+				if claims != nil && ja.ForwardPayloadHeader != "" {
+					b, err := json.Marshal(claims)
+					if err != nil {
+						log.Errorf("unable to marshal ForwardPayloadHeader for %s", ja.Name)
+						continue
+					}
+					encodedClaims := base64.URLEncoding.EncodeToString(b)
+					addHeaderValueOption(okResponse, ja.ForwardPayloadHeader, encodedClaims, true)
 				}
 			}
-		}
-		makeHeaderOpt := func(key, value string, append bool) *envoy_core.HeaderValueOption {
-			return &envoy_core.HeaderValueOption{
-				Header: &envoy_core.HeaderValue{
-					Key:   key,
-					Value: value,
-				},
-				Append: wrapperspb.Bool(append),
+
+			transforms := envRequest.GetHTTPRequestTransformations()
+			for _, rhpat := range transforms.RemoveHeaders {
+				for hdr := range req.Attributes.Request.Http.Headers {
+					if util.SimpleGlobMatch(rhpat, hdr) {
+						okResponse.HeadersToRemove = append(okResponse.HeadersToRemove, hdr)
+					}
+				}
+			}
+			for k, v := range transforms.SetHeaders {
+				addHeaderValueOption(okResponse, k, v, false)
+			}
+			for k, v := range transforms.AppendHeaders {
+				addHeaderValueOption(okResponse, k, v, true)
 			}
 		}
-		for k, v := range apiOperation.HTTPRequestTransforms.SetHeaders {
-			okResponse.Headers = append(okResponse.Headers, makeHeaderOpt(k, v, false))
-		}
-		for k, v := range apiOperation.HTTPRequestTransforms.AppendHeaders {
-			okResponse.Headers = append(okResponse.Headers, makeHeaderOpt(k, v, true))
-		}
 	}
+}
+
+func addHeaderValueOption(ok *envoy_auth.OkHttpResponse, key, value string, appnd bool) {
+	if value == "" {
+		return
+	}
+	ok.Headers = append(ok.Headers, &envoy_core.HeaderValueOption{
+		Header: &envoy_core.HeaderValue{
+			Key:   key,
+			Value: value,
+		},
+		Append: wrapperspb.Bool(appnd),
+	})
 }
 
 func (a *AuthorizationServer) notFound(req *envoy_auth.CheckRequest, tracker *prometheusRequestMetricTracker) *envoy_auth.CheckResponse {
@@ -379,8 +407,7 @@ func (a *AuthorizationServer) createDenyResponse(req *envoy_auth.CheckRequest, t
 	okResponse := &envoy_auth.OkHttpResponse{}
 
 	if a.handler.appendMetadataHeaders {
-		headers := makeMetadataHeaders(api, authContext, false)
-		okResponse.Headers = headers
+		addMetadataHeaders(okResponse, api, authContext, false)
 	}
 
 	// allow request to continue upstream

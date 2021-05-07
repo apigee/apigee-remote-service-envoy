@@ -20,39 +20,26 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
 	"github.com/apigee/apigee-remote-service-golib/v2/context"
 	"github.com/apigee/apigee-remote-service-golib/v2/log"
-	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
+	envoy_auth "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 )
 
-func makeMetadataHeaders(api string, ac *auth.Context, authorized bool) []*core.HeaderValueOption {
+func addMetadataHeaders(okResponse *envoy_auth.OkHttpResponse, api string, ac *auth.Context, authorized bool) {
 	if ac == nil {
-		return nil
+		return
 	}
 
-	headers := []*core.HeaderValueOption{
-		header(headerAccessToken, ac.AccessToken),
-		header(headerAPI, api),
-		header(headerAPIProducts, strings.Join(ac.APIProducts, ",")),
-		header(headerApplication, ac.Application),
-		header(headerClientID, ac.ClientID),
-		header(headerDeveloperEmail, ac.DeveloperEmail),
-		header(headerEnvironment, ac.Environment()),
-		header(headerOrganization, ac.Organization()),
-		header(headerScope, strings.Join(ac.Scopes, " ")),
-	}
+	addHeaderValueOption(okResponse, headerAccessToken, ac.AccessToken, false)
+	addHeaderValueOption(okResponse, headerAPI, api, false)
+	addHeaderValueOption(okResponse, headerAPIProducts, strings.Join(ac.APIProducts, ","), false)
+	addHeaderValueOption(okResponse, headerApplication, ac.Application, false)
+	addHeaderValueOption(okResponse, headerClientID, ac.ClientID, false)
+	addHeaderValueOption(okResponse, headerDeveloperEmail, ac.DeveloperEmail, false)
+	addHeaderValueOption(okResponse, headerEnvironment, ac.Environment(), false)
+	addHeaderValueOption(okResponse, headerOrganization, ac.Organization(), false)
+	addHeaderValueOption(okResponse, headerScope, strings.Join(ac.Scopes, " "), false)
 
 	if authorized {
-		headers = append(headers, header(headerAuthorized, "true"))
-	}
-
-	return headers
-}
-
-func header(key, value string) *core.HeaderValueOption {
-	return &core.HeaderValueOption{
-		Header: &core.HeaderValue{
-			Key:   key,
-			Value: value,
-		},
+		addHeaderValueOption(okResponse, headerAuthorized, "true", false)
 	}
 }
 

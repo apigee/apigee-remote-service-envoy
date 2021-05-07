@@ -15,12 +15,15 @@
 package testutil
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
 
+	authjwt "github.com/apigee/apigee-remote-service-golib/v2/auth/jwt"
 	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jwk"
+	"github.com/lestrrat-go/jwx/jwt"
 )
 
 // GenerateKeyAndJWKs generates a new key and JWKS, kid = "kid"
@@ -45,4 +48,51 @@ func GenerateKeyAndJWKs(kid string) (privateKey *rsa.PrivateKey, jwksBuf []byte,
 	jwksBuf, err = json.MarshalIndent(key, "", "")
 
 	return
+}
+
+func GenerateJWT(privateKey *rsa.PrivateKey, claims map[string]interface{}) (string, error) {
+	key, err := jwk.New(privateKey)
+	if err != nil {
+		return "", err
+	}
+	if err := key.Set(jwk.KeyIDKey, "1"); err != nil {
+		return "", err
+	}
+	if err := key.Set(jwk.AlgorithmKey, jwa.RS256.String()); err != nil {
+		return "", err
+	}
+
+	token := jwt.New()
+	for k, v := range claims {
+		if err = token.Set(k, v); err != nil {
+			return "", err
+		}
+	}
+
+	payload, err := jwt.Sign(token, jwa.RS256, key)
+	return string(payload), err
+}
+
+type MockJWTVerifier struct {
+}
+
+func (f MockJWTVerifier) Start() {
+}
+
+func (f MockJWTVerifier) Stop() {
+}
+
+func (f MockJWTVerifier) AddProvider(p authjwt.Provider) {
+}
+
+func (f MockJWTVerifier) EnsureProvidersLoaded(context.Context) error {
+	return nil
+}
+
+func (f MockJWTVerifier) Parse(raw string, p authjwt.Provider) (map[string]interface{}, error) {
+	token, err := jwt.Parse([]byte(raw))
+	if err != nil {
+		return nil, err
+	}
+	return token.AsMap(context.Background())
 }

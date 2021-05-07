@@ -21,14 +21,16 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/apigee/apigee-remote-service-golib/v2/auth"
 	"github.com/apigee/apigee-remote-service-golib/v2/auth/jwt"
 	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 )
 
 // NewEnvironmentSpecRequest creates a new EnvironmentSpecRequest
-func NewEnvironmentSpecRequest(e *EnvironmentSpecExt, req *authv3.CheckRequest) *EnvironmentSpecRequest {
+func NewEnvironmentSpecRequest(authMan auth.Manager, e *EnvironmentSpecExt, req *authv3.CheckRequest) *EnvironmentSpecRequest {
 	esr := &EnvironmentSpecRequest{
 		EnvironmentSpecExt: e,
+		authMan:            authMan,
 		request:            req,
 		jwtResults:         make(map[string]*jwtResult),
 	}
@@ -42,9 +44,10 @@ func NewEnvironmentSpecRequest(e *EnvironmentSpecExt, req *authv3.CheckRequest) 
 // Create using NewEnvironmentSpecRequest()
 type EnvironmentSpecRequest struct {
 	*EnvironmentSpecExt
-	jwtAuthentications map[string]*JWTAuthentication // JWTAuthentication.Name ->
 	request            *authv3.CheckRequest
-	jwtResults         map[string]*jwtResult // JWTAuthentication.Name ->
+	authMan            auth.Manager
+	jwtAuthentications map[string]*JWTAuthentication // JWTAuthentication.Name ->
+	jwtResults         map[string]*jwtResult         // JWTAuthentication.Name ->
 	verifier           jwt.Verifier
 	apiSpec            *APISpec
 	operation          *APIOperation
@@ -58,7 +61,17 @@ type jwtResult struct {
 	err    error
 }
 
-// GetAPI uses the base path to return an APISpec
+// GetJWTResult returns the claims and error if a JWTAuthentication of the passed name was
+// verified, nil if it was not verified or does not exist
+func (e *EnvironmentSpecRequest) GetJWTResult(name string) (map[string]interface{}, error) {
+	if e != nil {
+		if jwtResult := e.jwtResults[name]; jwtResult != nil {
+			return jwtResult.claims, jwtResult.err
+		}
+	}
+	return nil, nil
+}
+
 func (e *EnvironmentSpecRequest) GetAPISpec() *APISpec {
 	if e == nil {
 		return nil
@@ -165,23 +178,52 @@ func (e *EnvironmentSpecRequest) verifyJWTAuthentication(name string) bool {
 	}
 
 	for _, p := range jwtReq.In {
-		jwksSource, ok := jwtReq.JWKSSource.(RemoteJWKS) // only Remote supported for now
+		jwksSource, ok := jwtReq.JWKSSource.(RemoteJWKS) // only RemoteJWKS supported for now
 		if !ok {
 			setResult(nil, fmt.Errorf("JWKSSource must be RemoteJWKS, got: %#v", jwtReq.JWKSSource))
 		}
 		jwtString := e.GetParamValue(p)
 		provider := jwt.Provider{JWKSURL: jwksSource.URL}
-		if e.verifier == nil {
-			setResult(nil, fmt.Errorf("no jwt verifier for %#v", e))
-			return false
+
+		claims, err := e.authMan.ParseJWT(jwtString, provider)
+		if err == nil {
+			err = mustBeInClaim(jwtReq.Issuer, "iss", claims)
 		}
-		claims, err := e.verifier.Parse(jwtString, provider)
+		if err == nil {
+			for _, aud := range jwtReq.Audiences {
+				err = mustBeInClaim(aud, "aud", claims)
+				if err != nil {
+					break
+				}
+			}
+		}
+
 		setResult(claims, err)
 		if err != nil {
 			return false
 		}
 	}
 	return true
+}
+
+// returns error if passed value is not in claim as string or []string
+func mustBeInClaim(value, name string, claims map[string]interface{}) error {
+	if value == "" {
+		return nil
+	}
+	switch claim := claims[name].(type) {
+	case string:
+		if value == claim {
+			return nil
+		}
+	case []string:
+		for _, ea := range claim {
+			if value == ea {
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("%s doesn't match", name)
 }
 
 // IsAuthenticated returns true if AuthenticatationRequirements are met for the request
@@ -199,6 +241,18 @@ func (req *EnvironmentSpecRequest) getAuthenticationRequirement() (auth Authenti
 		}
 	}
 	return auth
+}
+
+func (req *EnvironmentSpecRequest) GetHTTPRequestTransformations() (transforms HTTPRequestTransformations) {
+	if req != nil {
+		op := req.GetOperation()
+		if op != nil && !op.HTTPRequestTransforms.isEmpty() {
+			transforms = op.HTTPRequestTransforms
+		} else if api := req.GetAPISpec(); api != nil {
+			transforms = api.HTTPRequestTransforms
+		}
+	}
+	return transforms
 }
 
 func (e *EnvironmentSpecRequest) meetsAuthenticatationRequirements(auth AuthenticationRequirement) bool {

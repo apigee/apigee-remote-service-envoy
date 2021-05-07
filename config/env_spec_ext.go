@@ -27,14 +27,14 @@ import (
 
 // NewEnvironmentSpecExt creates an EnvironmentSpecExt
 func NewEnvironmentSpecExt(spec *EnvironmentSpec) *EnvironmentSpecExt {
-	apiJwtRequirements := make(map[string]map[string]*JWTAuthentication)
+	jwtAuthentications := make(map[string]map[string]*JWTAuthentication)
 	apiPathTree := path.NewTree()
 	opPathTree := path.NewTree()
 	for i := range spec.APIs {
 		api := spec.APIs[i]
 
-		apiJwtRequirements[api.ID] = map[string]*JWTAuthentication{}
-		api.Authentication.mapJWTRequirements(apiJwtRequirements[api.ID])
+		jwtAuthentications[api.ID] = map[string]*JWTAuthentication{}
+		api.Authentication.mapJWTAuthentications(jwtAuthentications[api.ID])
 
 		// tree: base path -> APISpec
 		split := strings.Split(api.BasePath, "/")
@@ -44,7 +44,7 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) *EnvironmentSpecExt {
 		for i := range api.Operations {
 			op := api.Operations[i]
 
-			op.Authentication.mapJWTRequirements(apiJwtRequirements[api.ID])
+			op.Authentication.mapJWTAuthentications(jwtAuthentications[api.ID])
 
 			for _, m := range op.HTTPMatches {
 				split = strings.Split(m.PathTemplate, "/")
@@ -56,7 +56,7 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) *EnvironmentSpecExt {
 
 	return &EnvironmentSpecExt{
 		EnvironmentSpec:    spec,
-		jwtAuthentications: apiJwtRequirements,
+		jwtAuthentications: jwtAuthentications,
 		apiPathTree:        apiPathTree,
 		opPathTree:         opPathTree,
 	}
@@ -71,6 +71,21 @@ type EnvironmentSpecExt struct {
 	opPathTree         path.Tree                                // api.ID -> method -> sub path -> *Operation
 }
 
+// JWTAuthentications returns a list of all JWTAuthentications for the Spec
+func (a EnvironmentSpecExt) JWTAuthentications() []*JWTAuthentication {
+	var auths []*JWTAuthentication
+	for _, m := range a.jwtAuthentications {
+		for _, v := range m {
+			auths = append(auths, v)
+		}
+	}
+	return auths
+}
+
+func (h HTTPRequestTransformations) isEmpty() bool {
+	return len(h.AppendHeaders) == 0 && len(h.RemoveHeaders) == 0 && len(h.SetHeaders) == 0
+}
+
 func (c ConsumerAuthorization) isEmpty() bool {
 	return len(c.In) == 0
 }
@@ -80,7 +95,7 @@ func (a AuthenticationRequirement) IsEmpty() bool {
 }
 
 // populates passed map with JWTAuthentication.name -> *JWTAuthentication for all enclosing Requirements
-func (a AuthenticationRequirement) mapJWTRequirements(nameMap map[string]*JWTAuthentication) {
+func (a AuthenticationRequirement) mapJWTAuthentications(nameMap map[string]*JWTAuthentication) {
 	mapJWTRequirements(a, nameMap)
 }
 

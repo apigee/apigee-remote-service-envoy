@@ -18,18 +18,17 @@
 package config
 
 import (
-	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"fmt"
 	"net/http"
 	"testing"
 
 	"github.com/apigee/apigee-remote-service-envoy/v2/testutil"
-	jwtv "github.com/apigee/apigee-remote-service-golib/v2/auth/jwt"
+	"github.com/apigee/apigee-remote-service-golib/v2/auth"
+	"github.com/apigee/apigee-remote-service-golib/v2/auth/jwt"
+	"github.com/apigee/apigee-remote-service-golib/v2/context"
 	"github.com/google/go-cmp/cmp"
-	"github.com/lestrrat-go/jwx/jwa"
-	"github.com/lestrrat-go/jwx/jwk"
-	"github.com/lestrrat-go/jwx/jwt"
 )
 
 func TestNilReceivers(t *testing.T) {
@@ -85,7 +84,7 @@ func TestGetAPISpec(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 
 			envoyReq := testutil.NewEnvoyRequest(test.method, test.path, nil, nil)
-			specReq := NewEnvironmentSpecRequest(specExt, envoyReq)
+			specReq := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
 
 			got := specReq.GetAPISpec()
 			if diff := cmp.Diff(test.want, got); diff != "" {
@@ -123,7 +122,7 @@ func TestGetOperation(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 
 			envoyReq := testutil.NewEnvoyRequest(test.method, test.path, nil, nil)
-			specReq := NewEnvironmentSpecRequest(specExt, envoyReq)
+			specReq := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
 
 			gotAPI := specReq.GetOperation()
 			if diff := cmp.Diff(test.want, gotAPI); diff != "" {
@@ -159,7 +158,7 @@ func TestGetParamValueQuery(t *testing.T) {
 			}
 
 			envoyReq := testutil.NewEnvoyRequest(http.MethodGet, test.path, nil, nil)
-			specReq := NewEnvironmentSpecRequest(specExt, envoyReq)
+			specReq := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
 			got := specReq.GetParamValue(param)
 
 			if test.want != got {
@@ -195,7 +194,7 @@ func TestGetParamValueHeader(t *testing.T) {
 			}
 
 			envoyReq := testutil.NewEnvoyRequest(http.MethodGet, "/", test.headers, nil)
-			specReq := NewEnvironmentSpecRequest(specExt, envoyReq)
+			specReq := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
 			got := specReq.GetParamValue(param)
 
 			if test.want != got {
@@ -235,19 +234,19 @@ func TestGetParamValueJWTClaim(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			jwtString, err := generateJWT(privateKey, test.jwtClaims)
+			jwtString, err := testutil.GenerateJWT(privateKey, test.jwtClaims)
 			if err != nil {
 				t.Fatalf("generateJWT() failed: %v", err)
 			}
 
 			headers := map[string]string{
-				"header": jwtString,
+				"jwt": jwtString,
 			}
 
 			envoyReq := testutil.NewEnvoyRequest(http.MethodGet, "/v1/petstore", headers, nil)
-			specReq := NewEnvironmentSpecRequest(specExt, envoyReq)
+			specReq := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
 
-			specReq.verifier = &mockJWTVerifier{}
+			specReq.verifier = &testutil.MockJWTVerifier{}
 
 			got := specReq.GetParamValue(param)
 
@@ -266,14 +265,13 @@ func TestIsAuthenticated(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	jwtClaims := map[string]interface{}{"key": "value"}
-	jwtString, err := generateJWT(privateKey, jwtClaims)
+	jwtClaims := map[string]interface{}{
+		"key": "value",
+		"iss": "issuer",
+	}
+	jwtString, err := testutil.GenerateJWT(privateKey, jwtClaims)
 	if err != nil {
 		t.Fatalf("generateJWT() failed: %v", err)
-	}
-
-	headers := map[string]string{
-		"header": jwtString,
 	}
 
 	tests := []struct {
@@ -286,8 +284,9 @@ func TestIsAuthenticated(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			envoyReq := testutil.NewEnvoyRequest(http.MethodGet, test.path, headers, nil)
-			req := NewEnvironmentSpecRequest(specExt, envoyReq)
+			// not authenticated
+			envoyReq := testutil.NewEnvoyRequest(http.MethodGet, test.path, nil, nil)
+			req := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
 
 			if req.IsAuthenticated() {
 				t.Errorf("IsAuthenticated should be false")
@@ -304,8 +303,11 @@ func TestIsAuthenticated(t *testing.T) {
 				t.Errorf("should not have cached claims")
 			}
 
-			// fix the verifier so it works
-			req.verifier = &mockJWTVerifier{}
+			// authenticated
+			headers := map[string]string{"jwt": jwtString}
+			envoyReq = testutil.NewEnvoyRequest(http.MethodGet, test.path, headers, nil)
+			req = NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
+
 			req.jwtResults = make(map[string]*jwtResult)
 			if !req.IsAuthenticated() {
 				t.Errorf("IsAuthenticated should be true")
@@ -353,7 +355,7 @@ func TestGetAPIKey(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 
 			envoyReq := testutil.NewEnvoyRequest(http.MethodGet, test.path, test.headers, nil)
-			req := NewEnvironmentSpecRequest(specExt, envoyReq)
+			req := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
 			got := req.GetAPIKey()
 
 			if test.want != got {
@@ -363,49 +365,15 @@ func TestGetAPIKey(t *testing.T) {
 	}
 }
 
-func generateJWT(privateKey *rsa.PrivateKey, claims map[string]interface{}) (string, error) {
-	key, err := jwk.New(privateKey)
-	if err != nil {
-		return "", err
-	}
-	if err := key.Set("kid", "1"); err != nil {
-		return "", err
-	}
-	if err := key.Set("alg", jwa.RS256.String()); err != nil {
-		return "", err
-	}
-
-	token := jwt.New()
-	for k, v := range claims {
-		if err = token.Set(k, v); err != nil {
-			return "", err
-		}
-	}
-
-	payload, err := jwt.Sign(token, jwa.RS256, key)
-	return string(payload), err
+type testAuthMan struct {
 }
 
-type mockJWTVerifier struct {
+func (a *testAuthMan) Close() {}
+func (a *testAuthMan) Authenticate(ctx context.Context, apiKey string, claims map[string]interface{},
+	apiKeyClaimKey string) (*auth.Context, error) {
+	return nil, fmt.Errorf("not implemented")
 }
 
-func (f mockJWTVerifier) Start() {
-}
-
-func (f mockJWTVerifier) Stop() {
-}
-
-func (f mockJWTVerifier) AddProvider(p jwtv.Provider) {
-}
-
-func (f mockJWTVerifier) EnsureProvidersLoaded(context.Context) error {
-	return nil
-}
-
-func (f mockJWTVerifier) Parse(raw string, p jwtv.Provider) (map[string]interface{}, error) {
-	token, err := jwt.Parse([]byte(raw))
-	if err != nil {
-		return nil, err
-	}
-	return token.AsMap(context.Background())
+func (a *testAuthMan) ParseJWT(jwtString string, provider jwt.Provider) (map[string]interface{}, error) {
+	return testutil.MockJWTVerifier{}.Parse(jwtString, provider)
 }

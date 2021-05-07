@@ -153,7 +153,7 @@ func TestAllJWTRequirements(t *testing.T) {
 				Requirements: test.reqs,
 			}
 			nameMap := map[string]*JWTAuthentication{}
-			req.mapJWTRequirements(nameMap)
+			req.mapJWTAuthentications(nameMap)
 			if test.count != len(nameMap) {
 				t.Errorf("expected %d, got %d", test.count, len(nameMap))
 			}

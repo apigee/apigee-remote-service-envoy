@@ -594,9 +594,9 @@ func createGoodEnvSpec() EnvironmentSpec {
 								AuthenticationRequirement{
 									Requirements: JWTAuthentication{
 										Name:       "foo",
-										Issuer:     "bar",
+										Issuer:     "issuer",
 										JWKSSource: RemoteJWKS{URL: "url", CacheDuration: time.Hour},
-										In:         []APIOperationParameter{{Match: Header("header")}},
+										In:         []APIOperationParameter{{Match: Header("jwt")}},
 									},
 								},
 							},
@@ -650,9 +650,9 @@ func createGoodEnvSpec() EnvironmentSpec {
 						Authentication: AuthenticationRequirement{
 							Requirements: JWTAuthentication{
 								Name:       "foo",
-								Issuer:     "bar",
+								Issuer:     "issuer",
 								JWKSSource: RemoteJWKS{URL: "url", CacheDuration: time.Hour},
-								In:         []APIOperationParameter{{Match: Header("header")}},
+								In:         []APIOperationParameter{{Match: Header("jwt")}},
 							},
 						},
 						ConsumerAuthorization: ConsumerAuthorization{

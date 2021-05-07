@@ -17,16 +17,20 @@ package server
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"errors"
 	"net/http"
 	"reflect"
 	"testing"
 	"time"
 
+	"github.com/apigee/apigee-remote-service-envoy/v2/config"
 	"github.com/apigee/apigee-remote-service-envoy/v2/testutil"
 	"github.com/apigee/apigee-remote-service-golib/v2/analytics"
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
 	libAuth "github.com/apigee/apigee-remote-service-golib/v2/auth"
+	"github.com/apigee/apigee-remote-service-golib/v2/auth/jwt"
 	apigeeContext "github.com/apigee/apigee-remote-service-golib/v2/context"
 	"github.com/apigee/apigee-remote-service-golib/v2/product"
 	"github.com/apigee/apigee-remote-service-golib/v2/quota"
@@ -36,6 +40,8 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+// TODO: add TestAddHeaderTransforms
 
 func TestRegister(t *testing.T) {
 	opts := []grpc.ServerOption{}
@@ -49,7 +55,122 @@ func TestRegister(t *testing.T) {
 	grpcServer.Stop()
 }
 
-func TestCheck(t *testing.T) {
+func TestEnvRequestCheck(t *testing.T) {
+	envSpec := createAuthEnvSpec()
+	specExt := config.NewEnvironmentSpecExt(&envSpec)
+	environmentSpecsByID := map[string]*config.EnvironmentSpecExt{
+		specExt.ID: specExt,
+	}
+
+	testAuthMan := &testAuthMan{}
+	testProductMan := &testProductMan{
+		api:     "api",
+		resolve: true,
+		products: product.ProductsNameMap{
+			"product1": &product.APIProduct{
+				DisplayName: "product1",
+			},
+		},
+	}
+	testQuotaMan := &testQuotaMan{}
+	testAnalyticsMan := &testAnalyticsMan{}
+	server := AuthorizationServer{
+		handler: &Handler{
+			apiKeyClaim:           headerClientID, // ignored
+			apiHeader:             headerAPI,      // ignored
+			apiKeyHeader:          "x-api-key",    // ignored
+			authMan:               testAuthMan,
+			productMan:            testProductMan,
+			quotaMan:              testQuotaMan,
+			jwtProviderKey:        "apigee",
+			appendMetadataHeaders: true,
+			analyticsMan:          testAnalyticsMan,
+			envSpecsByID:          environmentSpecsByID,
+		},
+	}
+
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jwtClaims := map[string]interface{}{
+		"iss": "issuer",
+		"aud": []string{"aud1", "aud2"},
+	}
+	jwtString, err := testutil.GenerateJWT(privateKey, jwtClaims)
+	if err != nil {
+		t.Fatalf("generateJWT() failed: %v", err)
+	}
+
+	uri := "/v1/petstore?x-api-key=foo"
+	contextExtensions := map[string]string{
+		envSpecContextKey: specExt.ID,
+	}
+
+	// Cannot authenticate
+	req := testutil.NewEnvoyRequest(http.MethodGet, uri, nil, nil)
+	req.Attributes.ContextExtensions = contextExtensions
+	var resp *authv3.CheckResponse
+	if resp, err = server.Check(context.Background(), req); err != nil {
+		t.Errorf("should not get error. got: %s", err)
+	}
+	if resp.Status.Code != int32(rpc.UNAUTHENTICATED) {
+		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.UNAUTHENTICATED))
+	}
+
+	// Can authenticate, cannot authorize
+	headers := map[string]string{
+		"jwt": jwtString,
+	}
+	req = testutil.NewEnvoyRequest(http.MethodGet, uri, headers, nil)
+	req.Attributes.ContextExtensions = contextExtensions
+	testAuthMan.sendAuth(nil, libAuth.ErrBadAuth)
+	if resp, err = server.Check(context.Background(), req); err != nil {
+		t.Errorf("should not get error. got: %s", err)
+	}
+	if resp.Status.Code != int32(rpc.PERMISSION_DENIED) {
+		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.PERMISSION_DENIED))
+	}
+
+	// good request
+	testAuthMan.sendAuth(&auth.Context{
+		APIProducts: []string{"product1"},
+	}, nil)
+	if resp, err = server.Check(context.Background(), req); err != nil {
+		t.Errorf("should not get error. got: %s", err)
+	}
+	if resp.Status.Code != int32(rpc.OK) {
+		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.OK))
+	}
+
+	okr, ok := resp.HttpResponse.(*authv3.CheckResponse_OkResponse)
+	if !ok {
+		t.Fatal("must be OkResponse")
+	}
+
+	addTargetHeader := false
+	appendTargetHeader := false
+	for _, h := range okr.OkResponse.Headers {
+		if h.Header.Key == "target" {
+			if h.Append.Value {
+				appendTargetHeader = true
+			} else {
+				addTargetHeader = true
+			}
+		}
+	}
+	if !addTargetHeader {
+		t.Errorf("add header option not found")
+	}
+	if !appendTargetHeader {
+		t.Errorf("append header option not found")
+	}
+	if okr.OkResponse.HeadersToRemove[0] != "jwt" {
+		t.Errorf("remove header not found")
+	}
+}
+
+func TestGlobalCheck(t *testing.T) {
 
 	jwtClaims := &structpb.Struct{
 		Fields: map[string]*structpb.Value{
@@ -459,6 +580,10 @@ func (a *testAuthMan) sendAuth(ac *auth.Context, err error) {
 	}
 }
 
+func (a *testAuthMan) ParseJWT(jwtString string, provider jwt.Provider) (map[string]interface{}, error) {
+	return testutil.MockJWTVerifier{}.Parse(jwtString, provider)
+}
+
 type testProductMan struct {
 	products map[string]*product.APIProduct
 	api      string
@@ -500,4 +625,53 @@ func (q *testQuotaMan) Apply(auth *auth.Context, p product.AuthorizedOperation, 
 	return &quota.Result{
 		Exceeded: q.exceeded,
 	}, nil
+}
+
+func createAuthEnvSpec() config.EnvironmentSpec {
+	return config.EnvironmentSpec{
+		ID: "good-env-config",
+		APIs: []config.APISpec{
+			{
+				ID:       "api",
+				BasePath: "/v1",
+				Authentication: config.AuthenticationRequirement{
+					Requirements: config.JWTAuthentication{
+						Name:                 "jwt",
+						Issuer:               "issuer",
+						Audiences:            []string{"aud1"},
+						JWKSSource:           config.RemoteJWKS{URL: "url", CacheDuration: time.Hour},
+						In:                   []config.APIOperationParameter{{Match: config.Header("jwt")}},
+						ForwardPayloadHeader: "jwt",
+					},
+				},
+				ConsumerAuthorization: config.ConsumerAuthorization{
+					In: []config.APIOperationParameter{
+						{Match: config.Query("x-api-key")},
+					},
+				},
+				Operations: []config.APIOperation{
+					{
+						Name: "op",
+						HTTPMatches: []config.HTTPMatch{
+							{
+								PathTemplate: "/petstore",
+								Method:       "GET",
+							},
+						},
+					},
+				},
+				HTTPRequestTransforms: config.HTTPRequestTransformations{
+					SetHeaders: map[string]string{
+						"target": "add",
+					},
+					AppendHeaders: map[string]string{
+						"target": "append",
+					},
+					RemoveHeaders: []string{
+						"jw*",
+					},
+				},
+			},
+		},
+	}
 }
