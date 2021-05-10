@@ -97,9 +97,13 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.Check
 		}
 	}
 
-	path, queryString := func(path string) (string, string) {
+	path, queryString := func(path string) (base, qs string) {
 		pathSplits := strings.SplitN(req.Attributes.Request.Http.Path, "?", 2)
-		return pathSplits[0], pathSplits[1]
+		base = pathSplits[0]
+		if len(pathSplits) > 1 {
+			qs = pathSplits[1]
+		}
+		return
 	}(req.Attributes.Request.Http.Path)
 
 	var api string
@@ -118,6 +122,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.Check
 			return a.notFound(req, envRequest, tracker), nil
 		}
 		api = apiSpec.ID
+		log.Debugf("api: %s", apiSpec)
 
 		operation = envRequest.GetOperation()
 		if operation == nil {
