@@ -122,11 +122,11 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.Check
 			return a.notFound(req, envRequest, tracker), nil
 		}
 		api = apiSpec.ID
-		log.Debugf("api: %s", apiSpec)
+		log.Debugf("api: %s", apiSpec.ID)
 
 		operation = envRequest.GetOperation()
 		if operation == nil {
-			log.Debugf("no valid operation found for api %s", apiSpec)
+			log.Debugf("no valid operation found for api %s", apiSpec.ID)
 			return a.notFound(req, envRequest, tracker), nil
 		}
 		log.Debugf("operation: %s", operation.Name)
