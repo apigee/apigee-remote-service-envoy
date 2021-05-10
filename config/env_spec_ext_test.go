@@ -26,7 +26,7 @@ func TestNewEnvironmentSpecExt(t *testing.T) {
 	envSpec := createGoodEnvSpec()
 	specExt := NewEnvironmentSpecExt(&envSpec)
 
-	if len(specExt.jwtAuthentications) != 2 {
+	if len(specExt.JWTAuthentications()) != 2 {
 		t.Errorf("should be 2")
 	}
 
