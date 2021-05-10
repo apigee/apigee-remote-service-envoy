@@ -23,7 +23,7 @@ import (
 	envoy_auth "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 )
 
-func addMetadataHeaders(okResponse *envoy_auth.OkHttpResponse, api string, ac *auth.Context, authorized bool) {
+func addMetadataHeaders(okResponse *envoy_auth.OkHttpResponse, api string, ac *auth.Context) {
 	if ac == nil {
 		return
 	}
@@ -37,10 +37,6 @@ func addMetadataHeaders(okResponse *envoy_auth.OkHttpResponse, api string, ac *a
 	addHeaderValueOption(okResponse, headerEnvironment, ac.Environment(), false)
 	addHeaderValueOption(okResponse, headerOrganization, ac.Organization(), false)
 	addHeaderValueOption(okResponse, headerScope, strings.Join(ac.Scopes, " "), false)
-
-	if authorized {
-		addHeaderValueOption(okResponse, headerAuthorized, "true", false)
-	}
 }
 
 func (h *Handler) decodeMetadataHeaders(headers map[string]string) (string, *auth.Context) {

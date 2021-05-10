@@ -43,7 +43,7 @@ func TestMetadataHeaders(t *testing.T) {
 	}
 	api := "api"
 	okResponse := &envoy_auth.OkHttpResponse{}
-	addMetadataHeaders(okResponse, api, authContext, true)
+	addMetadataHeaders(okResponse, api, authContext)
 	headers := map[string]string{}
 	for _, o := range okResponse.Headers {
 		headers[o.Header.Key] = o.Header.Value
@@ -77,7 +77,7 @@ func TestMetadataHeaders(t *testing.T) {
 
 func TestMetadataHeadersExceptions(t *testing.T) {
 	okResponse := &envoy_auth.OkHttpResponse{}
-	addMetadataHeaders(okResponse, "api", nil, true)
+	addMetadataHeaders(okResponse, "api", nil)
 	if okResponse.Headers != nil {
 		t.Errorf("should return nil if no context")
 	}

@@ -86,7 +86,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.Check
 	defer tracker.record()
 
 	if err != nil {
-		return a.internalError(req, tracker, err), nil
+		return a.internalError(req, nil, tracker, err), nil
 	}
 
 	var envSpec *config.EnvironmentSpecExt
@@ -115,20 +115,20 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.Check
 		apiSpec := envRequest.GetAPISpec()
 		if apiSpec == nil {
 			log.Debugf("api not found for environment spec %s", envSpec.ID)
-			return a.notFound(req, tracker), nil
+			return a.notFound(req, envRequest, tracker), nil
 		}
 		api = apiSpec.ID
 
 		operation = envRequest.GetOperation()
 		if operation == nil {
 			log.Debugf("no valid operation found for api %s", apiSpec)
-			return a.notFound(req, tracker), nil
+			return a.notFound(req, envRequest, tracker), nil
 		}
 		log.Debugf("operation: %s", operation.Name)
 
 		if !envRequest.IsAuthenticated() {
 			log.Debugf("authentication requirements not met")
-			return a.unauthenticated(req, tracker), nil
+			return a.unauthenticated(req, envRequest, tracker), nil
 		}
 
 		apiKey = envRequest.GetAPIKey()
@@ -141,7 +141,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.Check
 			api, ok = req.Attributes.Request.Http.Headers[a.handler.apiHeader]
 			if !ok {
 				log.Debugf("missing api header %s", a.handler.apiHeader)
-				return a.unauthenticated(req, tracker), nil
+				return a.unauthenticated(req, envRequest, tracker), nil
 			}
 		}
 
@@ -180,31 +180,31 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.Check
 	authContext, err := a.handler.authMan.Authenticate(rootContext, apiKey, claims, a.handler.apiKeyClaim)
 	switch err {
 	case auth.ErrNoAuth:
-		return a.unauthenticated(req, tracker), nil
+		return a.unauthenticated(req, envRequest, tracker), nil
 	case auth.ErrBadAuth:
-		return a.denied(req, tracker, authContext, api), nil
+		return a.denied(req, envRequest, tracker, authContext, api), nil
 	case auth.ErrInternalError:
-		return a.internalError(req, tracker, err), nil
+		return a.internalError(req, envRequest, tracker, err), nil
 	}
 
 	if len(authContext.APIProducts) == 0 {
-		return a.denied(req, tracker, authContext, api), nil
+		return a.denied(req, envRequest, tracker, authContext, api), nil
 	}
 
 	// authorize against products
 	method := req.Attributes.Request.Http.Method
 	authorizedOps := a.handler.productMan.Authorize(authContext, api, path, method)
 	if len(authorizedOps) == 0 {
-		return a.denied(req, tracker, authContext, api), nil
+		return a.denied(req, envRequest, tracker, authContext, api), nil
 	}
 
 	// apply quotas to matched operations
 	exceeded, quotaError := a.applyQuotas(authorizedOps, authContext)
 	if quotaError != nil {
-		return a.internalError(req, tracker, quotaError), nil
+		return a.internalError(req, envRequest, tracker, quotaError), nil
 	}
 	if exceeded {
-		return a.quotaExceeded(req, tracker, authContext, api), nil
+		return a.quotaExceeded(req, envRequest, tracker, authContext, api), nil
 	}
 
 	return a.authOK(req, tracker, authContext, api, envRequest), nil
@@ -235,9 +235,10 @@ func (a *AuthorizationServer) authOK(req *envoy_auth.CheckRequest, tracker *prom
 	okResponse := &envoy_auth.OkHttpResponse{}
 
 	if a.handler.appendMetadataHeaders {
-		addMetadataHeaders(okResponse, api, authContext, true)
+		addMetadataHeaders(okResponse, api, authContext)
 	}
 
+	addHeaderValueOption(okResponse, headerAuthorized, "true", false)
 	addHeaderTransforms(req, envRequest, okResponse)
 
 	tracker.statusCode = envoy_type.StatusCode_OK
@@ -302,28 +303,34 @@ func addHeaderValueOption(ok *envoy_auth.OkHttpResponse, key, value string, appn
 	})
 }
 
-func (a *AuthorizationServer) notFound(req *envoy_auth.CheckRequest, tracker *prometheusRequestMetricTracker) *envoy_auth.CheckResponse {
-	return a.createDenyResponse(req, tracker, nil, "", rpc.NOT_FOUND)
+func (a *AuthorizationServer) notFound(req *envoy_auth.CheckRequest, envRequest *config.EnvironmentSpecRequest,
+	tracker *prometheusRequestMetricTracker) *envoy_auth.CheckResponse {
+	return a.createDenyResponse(req, envRequest, tracker, nil, "", rpc.NOT_FOUND)
 }
 
-func (a *AuthorizationServer) unauthenticated(req *envoy_auth.CheckRequest, tracker *prometheusRequestMetricTracker) *envoy_auth.CheckResponse {
-	return a.createDenyResponse(req, tracker, nil, "", rpc.UNAUTHENTICATED)
+func (a *AuthorizationServer) unauthenticated(req *envoy_auth.CheckRequest, envRequest *config.EnvironmentSpecRequest,
+	tracker *prometheusRequestMetricTracker) *envoy_auth.CheckResponse {
+	return a.createDenyResponse(req, envRequest, tracker, nil, "", rpc.UNAUTHENTICATED)
 }
 
-func (a *AuthorizationServer) internalError(req *envoy_auth.CheckRequest, tracker *prometheusRequestMetricTracker, err error) *envoy_auth.CheckResponse {
+func (a *AuthorizationServer) internalError(req *envoy_auth.CheckRequest, envRequest *config.EnvironmentSpecRequest,
+	tracker *prometheusRequestMetricTracker, err error) *envoy_auth.CheckResponse {
 	log.Errorf("sending internal error: %v", err)
-	return a.createDenyResponse(req, tracker, nil, "", rpc.INTERNAL)
+	return a.createDenyResponse(req, envRequest, tracker, nil, "", rpc.INTERNAL)
 }
 
-func (a *AuthorizationServer) denied(req *envoy_auth.CheckRequest, tracker *prometheusRequestMetricTracker, authContext *auth.Context, api string) *envoy_auth.CheckResponse {
-	return a.createDenyResponse(req, tracker, authContext, api, rpc.PERMISSION_DENIED)
+func (a *AuthorizationServer) denied(req *envoy_auth.CheckRequest, envRequest *config.EnvironmentSpecRequest,
+	tracker *prometheusRequestMetricTracker, authContext *auth.Context, api string) *envoy_auth.CheckResponse {
+	return a.createDenyResponse(req, envRequest, tracker, authContext, api, rpc.PERMISSION_DENIED)
 }
 
-func (a *AuthorizationServer) quotaExceeded(req *envoy_auth.CheckRequest, tracker *prometheusRequestMetricTracker, authContext *auth.Context, api string) *envoy_auth.CheckResponse {
-	return a.createDenyResponse(req, tracker, authContext, api, rpc.RESOURCE_EXHAUSTED)
+func (a *AuthorizationServer) quotaExceeded(req *envoy_auth.CheckRequest, envRequest *config.EnvironmentSpecRequest,
+	tracker *prometheusRequestMetricTracker, authContext *auth.Context, api string) *envoy_auth.CheckResponse {
+	return a.createDenyResponse(req, envRequest, tracker, authContext, api, rpc.RESOURCE_EXHAUSTED)
 }
 
-func (a *AuthorizationServer) createDenyResponse(req *envoy_auth.CheckRequest, tracker *prometheusRequestMetricTracker, authContext *auth.Context, api string, code rpc.Code) *envoy_auth.CheckResponse {
+func (a *AuthorizationServer) createDenyResponse(req *envoy_auth.CheckRequest, envRequest *config.EnvironmentSpecRequest,
+	tracker *prometheusRequestMetricTracker, authContext *auth.Context, api string, code rpc.Code) *envoy_auth.CheckResponse {
 
 	// use intended code, not OK
 	switch code {
@@ -407,8 +414,10 @@ func (a *AuthorizationServer) createDenyResponse(req *envoy_auth.CheckRequest, t
 	okResponse := &envoy_auth.OkHttpResponse{}
 
 	if a.handler.appendMetadataHeaders {
-		addMetadataHeaders(okResponse, api, authContext, false)
+		addMetadataHeaders(okResponse, api, authContext)
 	}
+
+	addHeaderTransforms(req, envRequest, okResponse)
 
 	// allow request to continue upstream
 	log.Debugf("sending ok (actual: %s)", code.String())
