@@ -256,8 +256,11 @@ func (req *EnvironmentSpecRequest) GetHTTPRequestTransformations() (transforms H
 }
 
 func (e *EnvironmentSpecRequest) meetsAuthenticatationRequirements(auth AuthenticationRequirement) bool {
-	if e == nil || auth.Requirements == nil {
+	if e == nil {
 		return false
+	}
+	if auth.Requirements == nil {
+		return true
 	}
 	switch a := auth.Requirements.(type) {
 	case JWTAuthentication:
