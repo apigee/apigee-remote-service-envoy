@@ -52,6 +52,7 @@ type EnvironmentSpecRequest struct {
 	apiSpec            *APISpec
 	operation          *APIOperation
 	queryValues        url.Values
+	operationPath      string
 }
 
 type jwtClaims map[string]interface{}
@@ -77,7 +78,7 @@ func (e *EnvironmentSpecRequest) GetAPISpec() *APISpec {
 		return nil
 	}
 	if e.apiSpec == nil {
-		path := strings.Split(e.getRequestPath(), "/")
+		path := strings.Split(strings.SplitN(e.request.Attributes.Request.Http.Path, "?", 2)[0], "/") // strip querystring and split
 		path = append([]string{"/"}, path...)
 		if result := e.apiPathTree.Find(path, 0); result != nil {
 			e.apiSpec = result.(*APISpec)
@@ -86,9 +87,10 @@ func (e *EnvironmentSpecRequest) GetAPISpec() *APISpec {
 	return e.apiSpec
 }
 
-// path without querystring
-func (e *EnvironmentSpecRequest) getRequestPath() string {
-	return strings.SplitN(e.request.Attributes.Request.Http.Path, "?", 2)[0]
+// GetOperationPath returns path of Operation - no basepath, includes query string
+func (e *EnvironmentSpecRequest) GetOperationPath() string {
+	e.GetOperation() // ensures operationPath is populated
+	return e.operationPath
 }
 
 // GetOperation uses HttpMatch to return an APIOperation
@@ -97,10 +99,9 @@ func (e *EnvironmentSpecRequest) GetOperation() *APIOperation {
 		return nil
 	}
 	if e.operation == nil {
-		api := e.GetAPISpec()
-		if api != nil {
-			subPath := strings.TrimPrefix(e.getRequestPath(), api.BasePath) // strip base path
-			pathSplits := strings.Split(subPath, "/")
+		if api := e.GetAPISpec(); api != nil {
+			e.operationPath = strings.TrimPrefix(e.request.Attributes.Request.Http.Path, api.BasePath) // strip base path
+			pathSplits := strings.Split(strings.SplitN(e.operationPath, "?", 2)[0], "/")               // strip querystring and split
 			// prepend method for search
 			pathSplits = append([]string{e.apiSpec.ID, e.request.Attributes.Request.Http.Method}, pathSplits...)
 
