@@ -173,12 +173,10 @@ func (e *EnvironmentSpecRequest) verifyJWTAuthentication(name string) bool {
 
 	// uncached, parse it
 	setResult := func(claims map[string]interface{}, err error) {
-		if log.DebugEnabled() {
-			if err != nil {
-				log.Debugf("JWTAuthentication %q verification error: %s", name, err)
-			} else {
-				log.Debugf("JWTAuthentication %q verified, claims: %v", name, claims)
-			}
+		if err != nil {
+			log.Debugf("JWTAuthentication %q verification error: %s", name, err)
+		} else {
+			log.Debugf("JWTAuthentication %q verified, claims: %v", name, claims)
 		}
 		e.jwtResults[name] = &jwtResult{
 			claims: claims,
