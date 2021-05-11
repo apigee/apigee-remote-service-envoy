@@ -23,6 +23,7 @@ import (
 
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
 	"github.com/apigee/apigee-remote-service-golib/v2/auth/jwt"
+	"github.com/apigee/apigee-remote-service-golib/v2/log"
 	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 )
 
@@ -172,6 +173,13 @@ func (e *EnvironmentSpecRequest) verifyJWTAuthentication(name string) bool {
 
 	// uncached, parse it
 	setResult := func(claims map[string]interface{}, err error) {
+		if log.DebugEnabled() {
+			if err != nil {
+				log.Debugf("JWTAuthentication %q verification error: %s", name, err)
+			} else {
+				log.Debugf("JWTAuthentication %q verified, claims: %v", name, claims)
+			}
+		}
 		e.jwtResults[name] = &jwtResult{
 			claims: claims,
 			err:    err,
@@ -224,7 +232,7 @@ func mustBeInClaim(value, name string, claims map[string]interface{}) error {
 			}
 		}
 	}
-	return fmt.Errorf("%s doesn't match", name)
+	return fmt.Errorf("%q not in claim %q", value, name)
 }
 
 // IsAuthenticated returns true if AuthenticatationRequirements are met for the request
