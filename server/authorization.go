@@ -48,6 +48,7 @@ const (
 	envContextKey        = "apigee_environment"
 	apiContextKey        = "apigee_api"
 	envSpecContextKey    = "apigee_env_config"
+	envoyPathHeader      = ":path"
 )
 
 // TODO: ConsumerAuthorization.FailOpen
@@ -264,6 +265,7 @@ func addHeaderTransforms(req *envoy_auth.CheckRequest, envRequest *config.Enviro
 	if envRequest != nil {
 		if apiOperation := envRequest.GetOperation(); apiOperation != nil {
 
+			// add ForwardPayloadHeaders
 			for _, ja := range envRequest.JWTAuthentications() {
 				claims, _ := envRequest.GetJWTResult(ja.Name)
 				if claims != nil && ja.ForwardPayloadHeader != "" {
@@ -277,6 +279,10 @@ func addHeaderTransforms(req *envoy_auth.CheckRequest, envRequest *config.Enviro
 				}
 			}
 
+			// strip proxy base path from request path
+			addHeaderValueOption(okResponse, envoyPathHeader, envRequest.GetOperationPath(), false)
+
+			// header transforms from env config
 			transforms := envRequest.GetHTTPRequestTransformations()
 			for _, rhpat := range transforms.RemoveHeaders {
 				for hdr := range req.Attributes.Request.Http.Headers {

@@ -150,6 +150,7 @@ func TestEnvRequestCheck(t *testing.T) {
 
 	addTargetHeader := false
 	appendTargetHeader := false
+	pathHeader := ""
 	for _, h := range okr.OkResponse.Headers {
 		if h.Header.Key == "target" {
 			if h.Append.Value {
@@ -157,7 +158,13 @@ func TestEnvRequestCheck(t *testing.T) {
 			} else {
 				addTargetHeader = true
 			}
+		} else if h.Header.Key == envoyPathHeader {
+			pathHeader = h.Header.Value
 		}
+	}
+	want := "/petstore?x-api-key=foo"
+	if pathHeader != want {
+		t.Errorf(":path header should be: %s", want)
 	}
 	if !addTargetHeader {
 		t.Errorf("add header option not found")
