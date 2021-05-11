@@ -37,10 +37,8 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) *EnvironmentSpecExt {
 		api.Authentication.mapJWTAuthentications(jwtAuthentications[api.ID])
 
 		// tree: base path -> APISpec
-		if api.BasePath == "/" {
-			api.BasePath = "/**"
-		}
 		split := strings.Split(api.BasePath, "/")
+		split = append([]string{"/"}, split...)
 		apiPathTree.AddChild(split, 0, &api)
 
 		// tree: api.ID -> method -> path -> APIOperation

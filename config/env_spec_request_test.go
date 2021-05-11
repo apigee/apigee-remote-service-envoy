@@ -61,9 +61,30 @@ type unknownAR struct {
 func (u unknownAR) authenticationRequirements() {}
 
 func TestGetAPISpec(t *testing.T) {
-	envSpec := createGoodEnvSpec()
+	envSpec := EnvironmentSpec{
+		ID: "env-config",
+		APIs: []APISpec{
+			{
+				ID:       "root",
+				BasePath: "/",
+			},
+			{
+				ID:       "petstore",
+				BasePath: "/v1",
+			},
+			{
+				ID:       "bookshop",
+				BasePath: "/v1/bookshop",
+			},
+		},
+	}
 	specExt := NewEnvironmentSpecExt(&envSpec)
-	api := &envSpec.APIs[0]
+
+	apis := make(map[string]*APISpec)
+	for i := range envSpec.APIs {
+		api := &envSpec.APIs[i]
+		apis[api.ID] = api
+	}
 
 	tests := []struct {
 		desc   string
@@ -71,14 +92,15 @@ func TestGetAPISpec(t *testing.T) {
 		path   string
 		want   *APISpec
 	}{
-		{"root", http.MethodGet, "/", nil},
-		{"v1 root", http.MethodGet, "/v1", api},
-		{"v1 trailing", http.MethodGet, "/v1/", api},
-		{"other method /", http.MethodPost, "/v1/petstore/", api},
-		{"no prefix /", http.MethodGet, "v1/petstore/", api},
-		{"trailing /", http.MethodGet, "/v1/petstore/", api},
-		{"no trailing", http.MethodGet, "/v1/petstore", api},
-		{"querystring", http.MethodGet, "/v1/petstore?foo=bar", api},
+		{"root", http.MethodGet, "/", apis["root"]},
+		{"v1 root", http.MethodGet, "/v1", apis["petstore"]},
+		{"v1 trailing", http.MethodGet, "/v1/", apis["petstore"]},
+		{"other method /", http.MethodPost, "/v1/petstore/", apis["petstore"]},
+		{"no prefix /", http.MethodGet, "v1/petstore/", apis["petstore"]},
+		{"trailing /", http.MethodGet, "/v1/petstore/", apis["petstore"]},
+		{"no trailing", http.MethodGet, "/v1/petstore", apis["petstore"]},
+		{"querystring", http.MethodGet, "/v1/petstore?foo=bar", apis["petstore"]},
+		{"bookshop", http.MethodGet, "/v1/bookshop?foo=bar", apis["bookshop"]},
 	}
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {

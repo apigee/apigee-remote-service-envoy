@@ -78,6 +78,7 @@ func (e *EnvironmentSpecRequest) GetAPISpec() *APISpec {
 	}
 	if e.apiSpec == nil {
 		path := strings.Split(e.getRequestPath(), "/")
+		path = append([]string{"/"}, path...)
 		if result := e.apiPathTree.Find(path, 0); result != nil {
 			e.apiSpec = result.(*APISpec)
 		}
