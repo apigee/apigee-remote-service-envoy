@@ -20,10 +20,10 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
 	"github.com/apigee/apigee-remote-service-golib/v2/context"
 	"github.com/apigee/apigee-remote-service-golib/v2/log"
-	envoy_auth "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
+	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 )
 
-func addMetadataHeaders(okResponse *envoy_auth.OkHttpResponse, api string, ac *auth.Context) {
+func addMetadataHeaders(okResponse *authv3.OkHttpResponse, api string, ac *auth.Context) {
 	if ac == nil {
 		return
 	}
