@@ -16,17 +16,23 @@ package server
 
 import (
 	gocontext "context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
 	"time"
 
+	"github.com/apigee/apigee-remote-service-envoy/v2/config"
 	"github.com/apigee/apigee-remote-service-envoy/v2/util"
 	"github.com/apigee/apigee-remote-service-golib/v2/analytics"
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
 	"github.com/apigee/apigee-remote-service-golib/v2/context"
+	"github.com/apigee/apigee-remote-service-golib/v2/errorset"
 	"github.com/apigee/apigee-remote-service-golib/v2/log"
+	"github.com/apigee/apigee-remote-service-golib/v2/product"
 	"github.com/apigee/apigee-remote-service-golib/v2/quota"
+	envoy_core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoy_auth "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	envoy_type "github.com/envoyproxy/go-control-plane/envoy/type/v3"
 	"github.com/gogo/googleapis/google/rpc"
@@ -34,13 +40,17 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	rpcstatus "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 const (
 	jwtFilterMetadataKey = "envoy.filters.http.jwt_authn"
 	envContextKey        = "apigee_environment"
 	apiContextKey        = "apigee_api"
+	envSpecContextKey    = "apigee_env_config"
 )
+
+// TODO: ConsumerAuthorization.FailOpen
 
 // AuthorizationServer server
 type AuthorizationServer struct {
@@ -76,51 +86,98 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.Check
 	defer tracker.record()
 
 	if err != nil {
-		return a.internalError(req, tracker, err), nil
+		return a.internalError(req, nil, tracker, err), nil
 	}
+
+	var envSpec *config.EnvironmentSpecExt
+	var operation *config.APIOperation
+	if envSpecID, ok := req.Attributes.ContextExtensions[envSpecContextKey]; ok {
+		if spec, ok := a.handler.envSpecsByID[envSpecID]; ok {
+			envSpec = spec
+		}
+	}
+
+	path, queryString := func(path string) (base, qs string) {
+		pathSplits := strings.SplitN(req.Attributes.Request.Http.Path, "?", 2)
+		base = pathSplits[0]
+		if len(pathSplits) > 1 {
+			qs = pathSplits[1]
+		}
+		return
+	}(req.Attributes.Request.Http.Path)
 
 	var api string
-	if v, ok := req.Attributes.ContextExtensions[apiContextKey]; ok { // api specified in context metadata
-		api = v
-	} else {
-		api, ok = req.Attributes.Request.Http.Headers[a.handler.apiHeader]
-		if !ok {
-			log.Debugf("missing api header %s", a.handler.apiHeader)
-			return a.unauthorized(req, tracker), nil
-		}
-	}
-
-	// check for JWT from Envoy filter
-	protoBufStruct := req.Attributes.GetMetadataContext().GetFilterMetadata()[jwtFilterMetadataKey]
-	fieldsMap := protoBufStruct.GetFields()
+	var apiKey string
 	var claims map[string]interface{}
 
-	// use jwtProviderKey check if jwtProviderKey is set in config
-	if a.handler.jwtProviderKey != "" {
-		claimsStruct, ok := fieldsMap[a.handler.jwtProviderKey]
-		if ok {
-			log.Debugf("Using JWT at provider key: %s", a.handler.jwtProviderKey)
-			claims = util.DecodeToMap(claimsStruct.GetStructValue())
+	// EnvSpec found, takes priority over global settings
+	var envRequest *config.EnvironmentSpecRequest
+	if envSpec != nil {
+		envRequest = config.NewEnvironmentSpecRequest(a.handler.authMan, envSpec, req)
+		log.Debugf("environment spec: %s", envRequest.ID)
+
+		apiSpec := envRequest.GetAPISpec()
+		if apiSpec == nil {
+			log.Debugf("api not found for environment spec %s", envSpec.ID)
+			return a.notFound(req, envRequest, tracker), nil
 		}
-	} else { // otherwise iterate over apiKeyClaim loop
-		for k, v := range fieldsMap {
-			vFields := v.GetStructValue().GetFields()
-			if vFields[a.handler.apiKeyClaim] != nil || vFields["api_product_list"] != nil {
-				log.Debugf("Using JWT with provider key: %s", k)
-				claims = util.DecodeToMap(v.GetStructValue())
+		api = apiSpec.ID
+		log.Debugf("api: %s", apiSpec.ID)
+
+		operation = envRequest.GetOperation()
+		if operation == nil {
+			log.Debugf("no valid operation found for api %s", apiSpec.ID)
+			return a.notFound(req, envRequest, tracker), nil
+		}
+		log.Debugf("operation: %s", operation.Name)
+
+		if !envRequest.IsAuthenticated() {
+			log.Debugf("authentication requirements not met")
+			return a.unauthenticated(req, envRequest, tracker), nil
+		}
+
+		apiKey = envRequest.GetAPIKey()
+
+	} else { // global authentication
+
+		if v, ok := req.Attributes.ContextExtensions[apiContextKey]; ok { // api specified in context metadata
+			api = v
+		} else {
+			api, ok = req.Attributes.Request.Http.Headers[a.handler.apiHeader]
+			if !ok {
+				log.Debugf("missing api header %s", a.handler.apiHeader)
+				return a.unauthenticated(req, envRequest, tracker), nil
 			}
 		}
-	}
 
-	splitPath := strings.SplitN(req.Attributes.Request.Http.Path, "?", 2)
-	path := splitPath[0]
+		// check for JWT from Envoy filter
+		protoBufStruct := req.Attributes.GetMetadataContext().GetFilterMetadata()[jwtFilterMetadataKey]
+		fieldsMap := protoBufStruct.GetFields()
 
-	apiKey, ok := req.Attributes.Request.Http.Headers[a.handler.apiKeyHeader] // grab from header
+		// use jwtProviderKey check if jwtProviderKey is set in config
+		if a.handler.jwtProviderKey != "" {
+			claimsStruct, ok := fieldsMap[a.handler.jwtProviderKey]
+			if ok {
+				log.Debugf("Using JWT at provider key: %s", a.handler.jwtProviderKey)
+				claims = util.DecodeToMap(claimsStruct.GetStructValue())
+			}
+		} else { // otherwise iterate over apiKeyClaim loop
+			for k, v := range fieldsMap {
+				vFields := v.GetStructValue().GetFields()
+				if vFields[a.handler.apiKeyClaim] != nil || vFields["api_product_list"] != nil {
+					log.Debugf("Using JWT with provider key: %s", k)
+					claims = util.DecodeToMap(v.GetStructValue())
+				}
+			}
+		}
 
-	if !ok && len(splitPath) > 1 { // look in querystring if not in header
-		if qs, err := url.ParseQuery(splitPath[1]); err == nil {
-			if keys, ok := qs[a.handler.apiKeyHeader]; ok {
-				apiKey = keys[0]
+		apiKey = req.Attributes.Request.Http.Headers[a.handler.apiKeyHeader] // grab from header
+
+		if apiKey == "" && queryString != "" { // look in querystring if not in header
+			if qs, err := url.ParseQuery(queryString); err == nil {
+				if keys, ok := qs[a.handler.apiKeyHeader]; ok {
+					apiKey = keys[0]
+				}
 			}
 		}
 	}
@@ -128,58 +185,66 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.Check
 	authContext, err := a.handler.authMan.Authenticate(rootContext, apiKey, claims, a.handler.apiKeyClaim)
 	switch err {
 	case auth.ErrNoAuth:
-		return a.unauthorized(req, tracker), nil
+		return a.unauthenticated(req, envRequest, tracker), nil
 	case auth.ErrBadAuth:
-		return a.denied(req, tracker, authContext, api), nil
+		return a.denied(req, envRequest, tracker, authContext, api), nil
 	case auth.ErrInternalError:
-		return a.internalError(req, tracker, err), nil
+		return a.internalError(req, envRequest, tracker, err), nil
 	}
 
 	if len(authContext.APIProducts) == 0 {
-		return a.denied(req, tracker, authContext, api), nil
+		return a.denied(req, envRequest, tracker, authContext, api), nil
 	}
 
 	// authorize against products
 	method := req.Attributes.Request.Http.Method
 	authorizedOps := a.handler.productMan.Authorize(authContext, api, path, method)
 	if len(authorizedOps) == 0 {
-		return a.denied(req, tracker, authContext, api), nil
+		return a.denied(req, envRequest, tracker, authContext, api), nil
 	}
 
 	// apply quotas to matched operations
+	exceeded, quotaError := a.applyQuotas(authorizedOps, authContext)
+	if quotaError != nil {
+		return a.internalError(req, envRequest, tracker, quotaError), nil
+	}
+	if exceeded {
+		return a.quotaExceeded(req, envRequest, tracker, authContext, api), nil
+	}
+
+	return a.authOK(req, tracker, authContext, api, envRequest), nil
+}
+
+// apply quotas to all matched operations
+// returns an error if any quota failed
+func (a *AuthorizationServer) applyQuotas(ops []product.AuthorizedOperation, authC *auth.Context) (exceeded bool, errors error) {
 	var quotaArgs = quota.Args{QuotaAmount: 1}
-	var exceeded bool
-	var anyError error
-	for _, op := range authorizedOps {
+	for _, op := range ops {
 		if op.QuotaLimit > 0 {
-			result, err := a.handler.quotaMan.Apply(authContext, op, quotaArgs)
+			result, err := a.handler.quotaMan.Apply(authC, op, quotaArgs)
 			if err != nil {
 				log.Errorf("quota check: %v", err)
-				anyError = err
+				errors = errorset.Append(errors, err)
 			} else if result.Exceeded > 0 {
 				log.Debugf("quota exceeded: %v", op.ID)
 				exceeded = true
 			}
 		}
 	}
-	if anyError != nil {
-		return a.internalError(req, tracker, anyError), nil
-	}
-	if exceeded {
-		return a.quotaExceeded(req, tracker, authContext, api), nil
-	}
-
-	return a.authOK(tracker, authContext, api), nil
+	return
 }
 
-func (a *AuthorizationServer) authOK(tracker *prometheusRequestMetricTracker, authContext *auth.Context, api string) *envoy_auth.CheckResponse {
+func (a *AuthorizationServer) authOK(req *envoy_auth.CheckRequest, tracker *prometheusRequestMetricTracker,
+	authContext *auth.Context, api string, envRequest *config.EnvironmentSpecRequest) *envoy_auth.CheckResponse {
 
 	okResponse := &envoy_auth.OkHttpResponse{}
 
 	if a.handler.appendMetadataHeaders {
-		headers := makeMetadataHeaders(api, authContext, true)
-		okResponse.Headers = headers
+		addMetadataHeaders(okResponse, api, authContext)
 	}
+
+	addHeaderValueOption(okResponse, headerAuthorized, "true", false)
+	addHeaderTransforms(req, envRequest, okResponse)
 
 	tracker.statusCode = envoy_type.StatusCode_OK
 	return &envoy_auth.CheckResponse{
@@ -193,27 +258,90 @@ func (a *AuthorizationServer) authOK(tracker *prometheusRequestMetricTracker, au
 	}
 }
 
-func (a *AuthorizationServer) unauthorized(req *envoy_auth.CheckRequest, tracker *prometheusRequestMetricTracker) *envoy_auth.CheckResponse {
-	return a.createDenyResponse(req, tracker, nil, "", rpc.UNAUTHENTICATED)
+// includes any JWTAuthentication.ForwardPayloadHeader requests
+func addHeaderTransforms(req *envoy_auth.CheckRequest, envRequest *config.EnvironmentSpecRequest,
+	okResponse *envoy_auth.OkHttpResponse) {
+	if envRequest != nil {
+		if apiOperation := envRequest.GetOperation(); apiOperation != nil {
+
+			for _, ja := range envRequest.JWTAuthentications() {
+				claims, _ := envRequest.GetJWTResult(ja.Name)
+				if claims != nil && ja.ForwardPayloadHeader != "" {
+					b, err := json.Marshal(claims)
+					if err != nil {
+						log.Errorf("unable to marshal ForwardPayloadHeader for %s", ja.Name)
+						continue
+					}
+					encodedClaims := base64.URLEncoding.EncodeToString(b)
+					addHeaderValueOption(okResponse, ja.ForwardPayloadHeader, encodedClaims, true)
+				}
+			}
+
+			transforms := envRequest.GetHTTPRequestTransformations()
+			for _, rhpat := range transforms.RemoveHeaders {
+				for hdr := range req.Attributes.Request.Http.Headers {
+					if util.SimpleGlobMatch(rhpat, hdr) {
+						okResponse.HeadersToRemove = append(okResponse.HeadersToRemove, hdr)
+					}
+				}
+			}
+			for k, v := range transforms.SetHeaders {
+				addHeaderValueOption(okResponse, k, v, false)
+			}
+			for k, v := range transforms.AppendHeaders {
+				addHeaderValueOption(okResponse, k, v, true)
+			}
+		}
+	}
 }
 
-func (a *AuthorizationServer) internalError(req *envoy_auth.CheckRequest, tracker *prometheusRequestMetricTracker, err error) *envoy_auth.CheckResponse {
+func addHeaderValueOption(ok *envoy_auth.OkHttpResponse, key, value string, appnd bool) {
+	if value == "" {
+		return
+	}
+	ok.Headers = append(ok.Headers, &envoy_core.HeaderValueOption{
+		Header: &envoy_core.HeaderValue{
+			Key:   key,
+			Value: value,
+		},
+		Append: wrapperspb.Bool(appnd),
+	})
+}
+
+func (a *AuthorizationServer) notFound(req *envoy_auth.CheckRequest, envRequest *config.EnvironmentSpecRequest,
+	tracker *prometheusRequestMetricTracker) *envoy_auth.CheckResponse {
+	return a.createDenyResponse(req, envRequest, tracker, nil, "", rpc.NOT_FOUND)
+}
+
+func (a *AuthorizationServer) unauthenticated(req *envoy_auth.CheckRequest, envRequest *config.EnvironmentSpecRequest,
+	tracker *prometheusRequestMetricTracker) *envoy_auth.CheckResponse {
+	return a.createDenyResponse(req, envRequest, tracker, nil, "", rpc.UNAUTHENTICATED)
+}
+
+func (a *AuthorizationServer) internalError(req *envoy_auth.CheckRequest, envRequest *config.EnvironmentSpecRequest,
+	tracker *prometheusRequestMetricTracker, err error) *envoy_auth.CheckResponse {
 	log.Errorf("sending internal error: %v", err)
-	return a.createDenyResponse(req, tracker, nil, "", rpc.INTERNAL)
+	return a.createDenyResponse(req, envRequest, tracker, nil, "", rpc.INTERNAL)
 }
 
-func (a *AuthorizationServer) denied(req *envoy_auth.CheckRequest, tracker *prometheusRequestMetricTracker, authContext *auth.Context, api string) *envoy_auth.CheckResponse {
-	return a.createDenyResponse(req, tracker, authContext, api, rpc.PERMISSION_DENIED)
+func (a *AuthorizationServer) denied(req *envoy_auth.CheckRequest, envRequest *config.EnvironmentSpecRequest,
+	tracker *prometheusRequestMetricTracker, authContext *auth.Context, api string) *envoy_auth.CheckResponse {
+	return a.createDenyResponse(req, envRequest, tracker, authContext, api, rpc.PERMISSION_DENIED)
 }
 
-func (a *AuthorizationServer) quotaExceeded(req *envoy_auth.CheckRequest, tracker *prometheusRequestMetricTracker, authContext *auth.Context, api string) *envoy_auth.CheckResponse {
-	return a.createDenyResponse(req, tracker, authContext, api, rpc.RESOURCE_EXHAUSTED)
+func (a *AuthorizationServer) quotaExceeded(req *envoy_auth.CheckRequest, envRequest *config.EnvironmentSpecRequest,
+	tracker *prometheusRequestMetricTracker, authContext *auth.Context, api string) *envoy_auth.CheckResponse {
+	return a.createDenyResponse(req, envRequest, tracker, authContext, api, rpc.RESOURCE_EXHAUSTED)
 }
 
-func (a *AuthorizationServer) createDenyResponse(req *envoy_auth.CheckRequest, tracker *prometheusRequestMetricTracker, authContext *auth.Context, api string, code rpc.Code) *envoy_auth.CheckResponse {
+func (a *AuthorizationServer) createDenyResponse(req *envoy_auth.CheckRequest, envRequest *config.EnvironmentSpecRequest,
+	tracker *prometheusRequestMetricTracker, authContext *auth.Context, api string, code rpc.Code) *envoy_auth.CheckResponse {
 
 	// use intended code, not OK
 	switch code {
+	case rpc.NOT_FOUND:
+		tracker.statusCode = envoy_type.StatusCode_NotFound
+
 	case rpc.UNAUTHENTICATED:
 		tracker.statusCode = envoy_type.StatusCode_Unauthorized
 
@@ -291,9 +419,10 @@ func (a *AuthorizationServer) createDenyResponse(req *envoy_auth.CheckRequest, t
 	okResponse := &envoy_auth.OkHttpResponse{}
 
 	if a.handler.appendMetadataHeaders {
-		headers := makeMetadataHeaders(api, authContext, false)
-		okResponse.Headers = headers
+		addMetadataHeaders(okResponse, api, authContext)
 	}
+
+	addHeaderTransforms(req, envRequest, okResponse)
 
 	// allow request to continue upstream
 	log.Debugf("sending ok (actual: %s)", code.String())

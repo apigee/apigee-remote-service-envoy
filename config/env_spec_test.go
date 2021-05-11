@@ -35,53 +35,8 @@ func TestValidateEnvironmentSpecs(t *testing.T) {
 		wantErr string
 	}{
 		{
-			desc: "good environment configs",
-			configs: []EnvironmentSpec{
-				{
-					ID: "good-env-config",
-					APIs: []APISpec{
-						{
-							BasePath: "/v1",
-							Authentication: AuthenticationRequirement{
-								Requirements: JWTAuthentication{
-									Name:       "foo",
-									Issuer:     "bar",
-									JWKSSource: RemoteJWKS{URL: "url", CacheDuration: time.Hour},
-									In:         []APIOperationParameter{{Match: Header("header")}},
-								},
-							},
-							ConsumerAuthorization: ConsumerAuthorization{
-								In: []APIOperationParameter{{Match: Header("x-api-key")}},
-							},
-							Operations: []APIOperation{
-								{
-									Name: "op-1",
-									HTTPMatches: []HTTPMatch{
-										{
-											PathTemplate: "/petstore",
-											Method:       "GET",
-										},
-									},
-								},
-								{
-									Name: "op-2",
-									HTTPMatches: []HTTPMatch{
-										{
-											PathTemplate: "/bookshop",
-											Method:       "POST",
-										},
-									},
-								},
-							},
-							HTTPRequestTransforms: HTTPRequestTransformations{
-								SetHeaders: map[string]string{
-									"x-apigee-target": "target",
-								},
-							},
-						},
-					},
-				},
-			},
+			desc:    "good environment configs",
+			configs: []EnvironmentSpec{createGoodEnvSpec()},
 		},
 		{
 			desc: "duplicate environment config ids",
@@ -623,4 +578,92 @@ func TestParamMatchTypes(t *testing.T) {
 
 	j := JWTClaim{}
 	j.paramMatch()
+}
+
+func createGoodEnvSpec() EnvironmentSpec {
+	return EnvironmentSpec{
+		ID: "good-env-config",
+		APIs: []APISpec{
+			{
+				ID:       "apispec1",
+				BasePath: "/v1",
+				Authentication: AuthenticationRequirement{
+					Requirements: AnyAuthenticationRequirements{
+						AuthenticationRequirement{
+							Requirements: AllAuthenticationRequirements{
+								AuthenticationRequirement{
+									Requirements: JWTAuthentication{
+										Name:       "foo",
+										Issuer:     "issuer",
+										JWKSSource: RemoteJWKS{URL: "url", CacheDuration: time.Hour},
+										In:         []APIOperationParameter{{Match: Header("jwt")}},
+									},
+								},
+							},
+						},
+					},
+				},
+				ConsumerAuthorization: ConsumerAuthorization{
+					In: []APIOperationParameter{
+						{Match: Query("x-api-key")},
+						{Match: Header("x-api-key")},
+					},
+				},
+				Operations: []APIOperation{
+					{
+						Name: "op-1",
+						HTTPMatches: []HTTPMatch{
+							{
+								PathTemplate: "/petstore",
+								Method:       "GET",
+							},
+						},
+					},
+					{
+						Name: "op-2",
+						HTTPMatches: []HTTPMatch{
+							{
+								PathTemplate: "/bookshop",
+								Method:       "POST",
+							},
+						},
+					},
+				},
+				HTTPRequestTransforms: HTTPRequestTransformations{
+					SetHeaders: map[string]string{
+						"x-apigee-target": "target",
+					},
+				},
+			},
+			{
+				ID:       "apispec2",
+				BasePath: "/v2",
+				Operations: []APIOperation{
+					{
+						Name: "op-3",
+						HTTPMatches: []HTTPMatch{
+							{
+								PathTemplate: "/petstore",
+								Method:       "GET",
+							},
+						},
+						Authentication: AuthenticationRequirement{
+							Requirements: JWTAuthentication{
+								Name:       "foo",
+								Issuer:     "issuer",
+								JWKSSource: RemoteJWKS{URL: "url", CacheDuration: time.Hour},
+								In:         []APIOperationParameter{{Match: Header("jwt")}},
+							},
+						},
+						ConsumerAuthorization: ConsumerAuthorization{
+							In: []APIOperationParameter{
+								{Match: Query("x-api-key2")},
+								{Match: Header("x-api-key2")},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
 }

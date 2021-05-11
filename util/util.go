@@ -127,3 +127,40 @@ func LoadPrivateKey(privateKeyBytes []byte) (*rsa.PrivateKey, error) {
 
 	return privateKey, nil
 }
+
+// SimpleGlobMatch returns true if target matches pattern using "*"
+func SimpleGlobMatch(pattern, target string) bool {
+	const STAR = "*"
+	if pattern == STAR {
+		return true
+	}
+	if pattern == "" {
+		return target == pattern
+	}
+
+	splits := strings.Split(pattern, STAR)
+	if len(splits) == 1 { // no glob
+		return target == pattern
+	}
+
+	prefixed := strings.HasPrefix(pattern, STAR)
+	suffixed := strings.HasSuffix(pattern, STAR)
+	end := len(splits) - 1
+	for i := 0; i < end; i++ {
+		splitIndex := strings.Index(target, splits[i])
+		switch i {
+		case 0: // first
+			if !prefixed && splitIndex != 0 {
+				return false
+			}
+		default:
+			if splitIndex < 0 {
+				return false
+			}
+		}
+		target = target[splitIndex+len(splits[i]):]
+	}
+
+	// final
+	return suffixed || strings.HasSuffix(target, splits[end])
+}

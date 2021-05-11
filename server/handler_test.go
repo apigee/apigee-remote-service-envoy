@@ -134,6 +134,38 @@ func TestNewHandler(t *testing.T) {
 	h.Close()
 }
 
+func TestNewHandlerWithEnvSpec(t *testing.T) {
+
+	kid := "kid"
+	privateKey, _, err := testutil.GenerateKeyAndJWKs(kid)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := config.Default()
+	cfg.EnvironmentSpecs = config.EnvironmentSpecs{
+		Inline: []config.EnvironmentSpec{createAuthEnvSpec()},
+	}
+
+	cfg.Tenant = config.Tenant{
+		InternalAPI:      "http://localhost/remote-service",
+		RemoteServiceAPI: "http://localhost/remote-service",
+		OrgName:          "org",
+		EnvName:          "*",
+		PrivateKeyID:     kid,
+		PrivateKey:       privateKey,
+	}
+
+	h, err := NewHandler(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(h.envSpecsByID) < 1 {
+		t.Errorf("envSpecsByID was not populated")
+	}
+}
+
 func TestNewHandlerWithTLS(t *testing.T) {
 	kid := "kid"
 	privateKey, _, err := testutil.GenerateKeyAndJWKs(kid)

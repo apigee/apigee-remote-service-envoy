@@ -28,6 +28,7 @@ import (
 	"github.com/apigee/apigee-remote-service-envoy/v2/config"
 	"github.com/apigee/apigee-remote-service-golib/v2/analytics"
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
+	"github.com/apigee/apigee-remote-service-golib/v2/auth/jwt"
 	"github.com/apigee/apigee-remote-service-golib/v2/log"
 	"github.com/apigee/apigee-remote-service-golib/v2/product"
 	"github.com/apigee/apigee-remote-service-golib/v2/quota"
@@ -51,6 +52,7 @@ type Handler struct {
 	appendMetadataHeaders bool
 	jwtProviderKey        string
 	isMultitenant         bool
+	envSpecsByID          map[string]*config.EnvironmentSpecExt
 
 	productMan   product.Manager
 	authMan      auth.Manager
@@ -143,10 +145,30 @@ func NewHandler(cfg *config.Config) (*Handler, error) {
 		return nil, err
 	}
 
+	environmentSpecsByID := make(map[string]*config.EnvironmentSpecExt, len(cfg.EnvironmentSpecs.Inline))
+	var jwtProviders []jwt.Provider
+	for i := range cfg.EnvironmentSpecs.Inline {
+		// make EnvironmentSpecExt lookup table
+		spec := cfg.EnvironmentSpecs.Inline[i]
+		envSpec := config.NewEnvironmentSpecExt(&spec)
+		environmentSpecsByID[spec.ID] = envSpec
+
+		// make providers array
+		for _, jwtAuth := range envSpec.JWTAuthentications() {
+			source := jwtAuth.JWKSSource.(config.RemoteJWKS)
+			provider := jwt.Provider{
+				JWKSURL: source.URL,
+				Refresh: source.CacheDuration,
+			}
+			jwtProviders = append(jwtProviders, provider)
+		}
+	}
+
 	authMan, err := auth.NewManager(auth.Options{
 		Client:              instrumentedClientFor(cfg, "auth", tr),
 		APIKeyCacheDuration: cfg.Auth.APIKeyCacheDuration,
 		Org:                 cfg.Tenant.OrgName,
+		JWTProviders:        jwtProviders,
 	})
 	if err != nil {
 		return nil, err
@@ -220,6 +242,7 @@ func NewHandler(cfg *config.Config) (*Handler, error) {
 		jwtProviderKey:        cfg.Auth.JWTProviderKey,
 		appendMetadataHeaders: cfg.Auth.AppendMetadataHeaders,
 		isMultitenant:         cfg.Tenant.IsMultitenant(),
+		envSpecsByID:          environmentSpecsByID,
 	}
 
 	return h, nil

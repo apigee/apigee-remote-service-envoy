@@ -20,11 +20,10 @@ import (
 	"testing"
 
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
-	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
+	envoy_auth "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 )
 
 func TestMetadataHeaders(t *testing.T) {
-	var opts []*core.HeaderValueOption
 	h := &multitenantContext{
 		&Handler{
 			orgName:       "org",
@@ -43,9 +42,10 @@ func TestMetadataHeaders(t *testing.T) {
 		Scopes:         []string{"scope1", "scope2"},
 	}
 	api := "api"
-	opts = makeMetadataHeaders(api, authContext, true)
+	okResponse := &envoy_auth.OkHttpResponse{}
+	addMetadataHeaders(okResponse, api, authContext)
 	headers := map[string]string{}
-	for _, o := range opts {
+	for _, o := range okResponse.Headers {
 		headers[o.Header.Key] = o.Header.Value
 	}
 
@@ -76,8 +76,9 @@ func TestMetadataHeaders(t *testing.T) {
 }
 
 func TestMetadataHeadersExceptions(t *testing.T) {
-	opts := makeMetadataHeaders("api", nil, true)
-	if opts != nil {
+	okResponse := &envoy_auth.OkHttpResponse{}
+	addMetadataHeaders(okResponse, "api", nil)
+	if okResponse.Headers != nil {
 		t.Errorf("should return nil if no context")
 	}
 
@@ -120,11 +121,4 @@ func TestMetadataHeadersExceptions(t *testing.T) {
 		t.Errorf("authContext should be nil")
 	}
 
-}
-
-func TestMetadataHeadersNilCheck(t *testing.T) {
-	opts := makeMetadataHeaders("api", nil, true)
-	if opts != nil {
-		t.Errorf("should return nil if no context")
-	}
 }
