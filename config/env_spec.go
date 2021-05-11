@@ -147,6 +147,17 @@ type HTTPRequestTransformations struct {
 
 	// Headers to remove. Supports single wildcard globbing e.g. `x-apigee-*`.
 	RemoveHeaders []string `yaml:"remove_headers,omitempty" mapstructure:"remove_headers,omitempty"`
+
+	// URLPathTransformations transform the URL path on authorized requests.
+	URLPathTransformations URLPathTransformations `yaml:"set_path,omitempty" mapstructure:"set_path,omitempty"`
+}
+
+// URLPathTransformations configure how a request path will be transformed.
+type URLPathTransformations struct {
+	// AddPrefix is the prefix that will be added to the request path.
+	// Double slashes will be merged, e.g., AddPrefix = "/prefix/" with path = "/foo"
+	// will result in path = "/prefix/foo".
+	AddPrefix string `yaml:"add_prefix,omitempty" mapstructure:"add_prefix,omitempty"`
 }
 
 // AuthenticationRequirement defines the authentication requirement. It can be jwt, any or all.
