@@ -633,6 +633,9 @@ func createGoodEnvSpec() EnvironmentSpec {
 					SetHeaders: map[string]string{
 						"x-apigee-target": "target",
 					},
+					SetPath: SetPath{
+						AddPrefix: "/target_prefix/",
+					},
 				},
 			},
 			{

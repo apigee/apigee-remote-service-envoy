@@ -149,13 +149,13 @@ type HTTPRequestTransformations struct {
 	RemoveHeaders []string `yaml:"remove_headers,omitempty" mapstructure:"remove_headers,omitempty"`
 
 	// SetPath transforms path on authorized requests.
-	SetPath SetPath
+	SetPath SetPath `yaml:"set_path,omitempty" mapstructure:"set_path,omitempty"`
 }
 
 // SetPath configures how a request path will be transformed.
 type SetPath struct {
 	// AddPrefix is the prefix that will be added to the request path
-	AddPrefix string
+	AddPrefix string `yaml:"add_prefix,omitempty" mapstructure:"add_prefix,omitempty"`
 }
 
 // AuthenticationRequirement defines the authentication requirement. It can be jwt, any or all.
