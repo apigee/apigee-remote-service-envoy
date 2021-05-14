@@ -188,9 +188,9 @@ type Tenant struct {
 	Secret              string          `yaml:"secret,omitempty" mapstructure:"secret,omitempty"`
 	ClientTimeout       time.Duration   `yaml:"client_timeout,omitempty" mapstructure:"client_timeout,omitempty"`
 	TLS                 TLSClientSpec   `yaml:"tls,omitempty" mapstructure:"tls,omitempty"`
-	PrivateKey          *rsa.PrivateKey `yaml:"-"`
-	PrivateKeyID        string          `yaml:"-"`
-	JWKS                jwk.Set         `yaml:"-"`
+	PrivateKey          *rsa.PrivateKey `yaml:"-" json:"-"`
+	PrivateKeyID        string          `yaml:"-" json:"-"`
+	JWKS                jwk.Set         `yaml:"-" json:"-"`
 	InternalJWTDuration time.Duration   `yaml:"-"`
 	InternalJWTRefresh  time.Duration   `yaml:"-"`
 }
@@ -210,8 +210,8 @@ type Analytics struct {
 	FileLimit          int                 `yaml:"file_limit,omitempty" mapstructure:"file_limit,omitempty"`
 	SendChannelSize    int                 `yaml:"send_channel_size,omitempty" mapstructure:"send_channel_size,omitempty"`
 	CollectionInterval time.Duration       `yaml:"collection_interval,omitempty" mapstructure:"collection_interval,omitempty"`
-	CredentialsJSON    []byte              `yaml:"-"`
-	Credentials        *google.Credentials `yaml:"-"`
+	CredentialsJSON    []byte              `yaml:"-" json:"-"`
+	Credentials        *google.Credentials `yaml:"-" json:"-"`
 }
 
 // Auth is auth-related config
