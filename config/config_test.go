@@ -651,6 +651,7 @@ func TestLoadEnvironmentSpecs(t *testing.T) {
 				ID: "good-env-config",
 				APIs: []APISpec{
 					{
+						ID:       "api-1",
 						BasePath: "/v1",
 						Authentication: AuthenticationRequirement{
 							Requirements: JWTAuthentication{

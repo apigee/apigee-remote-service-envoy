@@ -35,11 +35,17 @@ func TestValidateEnvironmentSpecs(t *testing.T) {
 		wantErr string
 	}{
 		{
-			desc:    "good environment configs",
+			desc:    "good environment specs",
 			configs: []EnvironmentSpec{createGoodEnvSpec()},
 		},
 		{
-			desc: "duplicate environment config ids",
+			desc:    "empty environment spec id",
+			configs: []EnvironmentSpec{{}},
+			hasErr:  true,
+			wantErr: "environment spec IDs must be non-empty",
+		},
+		{
+			desc: "duplicate environment spec ids",
 			configs: []EnvironmentSpec{
 				{
 					ID: "duplicate-config",
@@ -49,15 +55,56 @@ func TestValidateEnvironmentSpecs(t *testing.T) {
 				},
 			},
 			hasErr:  true,
-			wantErr: "environment config IDs must be unique, got multiple duplicate-config",
+			wantErr: "environment spec IDs must be unique, got multiple duplicate-config",
+		},
+		{
+			desc: "empty API name",
+			configs: []EnvironmentSpec{
+				{
+					ID:   "spec",
+					APIs: []APISpec{{}},
+				},
+			},
+			hasErr:  true,
+			wantErr: "API spec IDs must be non-empty",
+		},
+		{
+			desc: "duplicate API names",
+			configs: []EnvironmentSpec{
+				{
+					ID: "spec",
+					APIs: []APISpec{
+						{
+							ID: "duplicate-api",
+						},
+						{
+							ID: "duplicate-api",
+						},
+					},
+				},
+			},
+			hasErr:  true,
+			wantErr: "API spec IDs within each environment spec must be unique, got multiple duplicate-api",
+		},
+		{
+			desc: "empty operation name",
+			configs: []EnvironmentSpec{
+				{
+					ID:   "spec",
+					APIs: []APISpec{{ID: "api", Operations: []APIOperation{{}}}},
+				},
+			},
+			hasErr:  true,
+			wantErr: "operation names must be non-empty",
 		},
 		{
 			desc: "duplicate operation names",
 			configs: []EnvironmentSpec{
 				{
-					ID: "config",
+					ID: "spec",
 					APIs: []APISpec{
 						{
+							ID: "api",
 							Operations: []APIOperation{
 								{
 									Name: "duplicate-op",
@@ -77,9 +124,10 @@ func TestValidateEnvironmentSpecs(t *testing.T) {
 			desc: "duplicate jwt authentication requirement names",
 			configs: []EnvironmentSpec{
 				{
-					ID: "config",
+					ID: "spec",
 					APIs: []APISpec{
 						{
+							ID: "api",
 							Authentication: AuthenticationRequirement{
 								Requirements: AllAuthenticationRequirements([]AuthenticationRequirement{
 									{
@@ -100,6 +148,106 @@ func TestValidateEnvironmentSpecs(t *testing.T) {
 			},
 			hasErr:  true,
 			wantErr: "JWT authentication requirement names within each API or operation must be unique, got multiple duplicate-jwt",
+		},
+		{
+			desc: "empty JWT authentication name",
+			configs: []EnvironmentSpec{
+				{
+					ID: "spec",
+					APIs: []APISpec{
+						{
+							ID: "api",
+							Authentication: AuthenticationRequirement{
+								Requirements: AllAuthenticationRequirements([]AuthenticationRequirement{
+									{
+										Requirements: JWTAuthentication{},
+									},
+								}),
+							},
+						},
+					},
+				},
+			},
+			hasErr:  true,
+			wantErr: "JWT authentication requirement names must be non-empty",
+		},
+		{
+			desc: "empty header",
+			configs: []EnvironmentSpec{
+				{
+					ID: "spec",
+					APIs: []APISpec{
+						{
+							ID: "api",
+							ConsumerAuthorization: ConsumerAuthorization{
+								In: []APIOperationParameter{
+									{
+										Match: Header(""),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			hasErr:  true,
+			wantErr: "header in API operation parameter match must be non-empty",
+		},
+		{
+			desc: "empty query",
+			configs: []EnvironmentSpec{
+				{
+					ID: "spec",
+					APIs: []APISpec{
+						{
+							ID: "api",
+							Authentication: AuthenticationRequirement{
+								Requirements: AllAuthenticationRequirements([]AuthenticationRequirement{
+									{
+										Requirements: JWTAuthentication{
+											Name: "jwt",
+											In: []APIOperationParameter{
+												{
+													Match: Query(""),
+												},
+											},
+										},
+									},
+								}),
+							},
+						},
+					},
+				},
+			},
+			hasErr:  true,
+			wantErr: "query in API operation parameter match must be non-empty",
+		},
+		{
+			desc: "empty jwt claim name",
+			configs: []EnvironmentSpec{
+				{
+					ID: "spec",
+					APIs: []APISpec{
+						{
+							ID: "api",
+							Operations: []APIOperation{
+								{
+									Name: "op",
+									ConsumerAuthorization: ConsumerAuthorization{
+										In: []APIOperationParameter{
+											{
+												Match: JWTClaim{},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			hasErr:  true,
+			wantErr: "JWT claim name in API operation parameter match must be non-empty",
 		},
 	}
 
