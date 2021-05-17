@@ -30,20 +30,44 @@ import (
 //   * API configs under the same environment config with the same ID,
 //   * JWT authentication requirement under the same API or operation with the same name
 // and report them as errors
-func ValidateEnvironmentSpecs(cs []EnvironmentSpec) error {
+func ValidateEnvironmentSpecs(ess []EnvironmentSpec) error {
 	configIDSet := make(map[string]bool)
-	for _, ec := range cs {
-		if configIDSet[ec.ID] {
-			return fmt.Errorf("environment config IDs must be unique, got multiple %s", ec.ID)
+	for _, es := range ess {
+		if es.ID == "" {
+			return fmt.Errorf("environment spec IDs must be non-empty")
 		}
-		configIDSet[ec.ID] = true
-		for _, api := range ec.APIs {
+		if configIDSet[es.ID] {
+			return fmt.Errorf("environment spec IDs must be unique, got multiple %s", es.ID)
+		}
+		configIDSet[es.ID] = true
+		apiSpecIDSet := make(map[string]bool)
+		for _, api := range es.APIs {
+			if api.ID == "" {
+				return fmt.Errorf("API spec IDs must be non-empty")
+			}
+			if apiSpecIDSet[api.ID] {
+				return fmt.Errorf("API spec IDs within each environment spec must be unique, got multiple %s", api.ID)
+			}
+			apiSpecIDSet[api.ID] = true
+			for _, p := range api.ConsumerAuthorization.In {
+				if err := validateAPIOperationParameter(&p); err != nil {
+					return err
+				}
+			}
 			opNameSet := make(map[string]bool)
 			for _, op := range api.Operations {
+				if op.Name == "" {
+					return fmt.Errorf("operation names must be non-empty")
+				}
 				if opNameSet[op.Name] {
 					return fmt.Errorf("operation names within each API must be unique, got multiple %s", op.Name)
 				}
 				opNameSet[op.Name] = true
+				for _, p := range op.ConsumerAuthorization.In {
+					if err := validateAPIOperationParameter(&p); err != nil {
+						return err
+					}
+				}
 				if err := validateJWTAuthenticationName(&op.Authentication, map[string]bool{}); err != nil {
 					return err
 				}
@@ -56,16 +80,25 @@ func ValidateEnvironmentSpecs(cs []EnvironmentSpec) error {
 	return nil
 }
 
-// validateJWTAuthenticationName checks if the JWTAuthentication within the given
-// AuthenticationRequirement
+// validateJWTAuthenticationName checks if the JWTAuthentication has non-empty and unique
+// name within the given AuthenticationRequirement. It also validates the APIOperationParameter
+// of the JWTAuthentication.
 func validateJWTAuthenticationName(a *AuthenticationRequirement, m map[string]bool) error {
 	var err error
 	switch v := a.Requirements.(type) {
 	case JWTAuthentication:
+		if v.Name == "" {
+			return fmt.Errorf("JWT authentication requirement names must be non-empty")
+		}
 		if m[v.Name] {
 			return fmt.Errorf("JWT authentication requirement names within each API or operation must be unique, got multiple %s", v.Name)
 		}
 		m[v.Name] = true
+		for _, p := range v.In {
+			if err := validateAPIOperationParameter(&p); err != nil {
+				return err
+			}
+		}
 	case AnyAuthenticationRequirements:
 		for _, val := range []AuthenticationRequirement(v) {
 			err = validateJWTAuthenticationName(&val, m)
@@ -76,6 +109,26 @@ func validateJWTAuthenticationName(a *AuthenticationRequirement, m map[string]bo
 		}
 	}
 	return err
+}
+
+// validateAPIOperationParameter checks if all headers and queries are non-empty
+// and JWT claims have non-empty names.
+func validateAPIOperationParameter(p *APIOperationParameter) error {
+	switch v := p.Match.(type) {
+	case Header:
+		if len(string(v)) == 0 {
+			return fmt.Errorf("header in API operation parameter match must be non-empty")
+		}
+	case Query:
+		if len(string(v)) == 0 {
+			return fmt.Errorf("query in API operation parameter match must be non-empty")
+		}
+	case JWTClaim:
+		if v.Name == "" {
+			return fmt.Errorf("JWT claim name in API operation parameter match must be non-empty")
+		}
+	}
+	return nil
 }
 
 // EnvironmentSpecs contains directly inlined Environment configs and references to Environment configs.
@@ -181,15 +234,15 @@ func (a *AuthenticationRequirement) UnmarshalYAML(node *yaml.Node) error {
 	ctr := 0
 	if w.JWT != nil {
 		a.Requirements = *w.JWT
-		ctr += 1
+		ctr++
 	}
 	if w.Any != nil {
 		a.Requirements = *w.Any
-		ctr += 1
+		ctr++
 	}
 	if w.All != nil {
 		a.Requirements = *w.All
-		ctr += 1
+		ctr++
 	}
 	if ctr != 1 {
 		return fmt.Errorf("precisely one of jwt, any or all should be set")
@@ -367,15 +420,15 @@ func (p *APIOperationParameter) UnmarshalYAML(node *yaml.Node) error {
 	}
 	ctr := 0
 	if w.Header != nil {
-		ctr += 1
+		ctr++
 		p.Match = *w.Header
 	}
 	if w.Query != nil {
-		ctr += 1
+		ctr++
 		p.Match = *w.Query
 	}
 	if w.JWTClaim != nil {
-		ctr += 1
+		ctr++
 		p.Match = *w.JWTClaim
 	}
 	if ctr != 1 {

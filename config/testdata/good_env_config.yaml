@@ -1,6 +1,7 @@
 id: good-env-config
 apis:
-- base_path: /v1
+- id: api-1
+  base_path: /v1
   authentication:
     jwt:
       name: foo
