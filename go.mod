@@ -5,16 +5,16 @@ go 1.16
 // replace github.com/apigee/apigee-remote-service-golib/v2 => ../apigee-remote-service-golib
 
 require (
-	github.com/apigee/apigee-remote-service-golib/v2 v2.0.2-0.20210507235313-551e9af389a8
+	github.com/apigee/apigee-remote-service-golib/v2 v2.0.2-0.20210517203257-42d904e31257
 	github.com/envoyproxy/go-control-plane v0.9.9-0.20201210154907-fd9021fe5dad
 	github.com/gogo/googleapis v1.4.1
 	github.com/golang/protobuf v1.5.1
 	github.com/google/go-cmp v0.5.5
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
-	github.com/lestrrat-go/jwx v1.1.6
+	github.com/lestrrat-go/jwx v1.2.0
 	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.9.0
+	github.com/prometheus/client_golang v1.10.0
 	github.com/spf13/cobra v1.1.3
 	github.com/spf13/viper v1.7.0
 	go.uber.org/multierr v1.6.0 // indirect

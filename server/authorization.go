@@ -368,20 +368,13 @@ func (a *AuthorizationServer) createDenyResponse(req *envoy_auth.CheckRequest, e
 			Status: &rpcstatus.Status{
 				Code: int32(code),
 			},
-			// Envoy won't deliver this, so commenting it out for now. See below.
-			// DynamicMetadata: encodeExtAuthzMetadata(api, authContext, false),
-		}
-
-		// Envoy automatically maps the other response status codes,
-		// but not the RESOURCE_EXHAUSTED status, so we force it.
-		if code == rpc.RESOURCE_EXHAUSTED {
-			response.HttpResponse = &envoy_auth.CheckResponse_DeniedResponse{
+			HttpResponse: &envoy_auth.CheckResponse_DeniedResponse{
 				DeniedResponse: &envoy_auth.DeniedHttpResponse{
 					Status: &envoy_type.HttpStatus{
 						Code: tracker.statusCode,
 					},
 				},
-			}
+			},
 		}
 
 		// Envoy does not send metadata to ALS on a reject, so we create the
