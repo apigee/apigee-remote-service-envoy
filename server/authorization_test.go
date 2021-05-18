@@ -57,7 +57,7 @@ func TestAddHeaderTransforms(t *testing.T) {
 	tests := []struct {
 		desc            string
 		requestHeaders  map[string]string
-		appendHeaders   map[string]string
+		appendHeaders   []config.KeyValue
 		setHeaders      map[string]string
 		removeHeaders   []string
 		expectedAdds    int // +1 to include :path
@@ -66,16 +66,19 @@ func TestAddHeaderTransforms(t *testing.T) {
 		{
 			desc:            "test1",
 			requestHeaders:  map[string]string{"remove1": "remove"},
-			appendHeaders:   map[string]string{"append": "append1"},
+			appendHeaders:   []config.KeyValue{{Key: "append", Value: "append1"}},
 			setHeaders:      map[string]string{"set": "set1"},
 			removeHeaders:   []string{"remove1"},
 			expectedAdds:    3,
 			expectedRemoves: 1,
 		},
 		{
-			desc:            "test2",
-			requestHeaders:  map[string]string{"remove1": "remove", "skip": "don't remove"},
-			appendHeaders:   map[string]string{"append": "append1", "append2": "append2"},
+			desc:           "test2",
+			requestHeaders: map[string]string{"remove1": "remove", "skip": "don't remove"},
+			appendHeaders: []config.KeyValue{
+				{Key: "append", Value: "append1"},
+				{Key: "append2", Value: "append2"},
+			},
 			setHeaders:      map[string]string{"set": "set1", "set2": "set2"},
 			removeHeaders:   []string{"remove1", "missing"},
 			expectedAdds:    5,
@@ -106,9 +109,9 @@ func TestAddHeaderTransforms(t *testing.T) {
 				t.Errorf("expected %d header removes got: %d", test.expectedRemoves, len(okResponse.HeadersToRemove))
 			}
 
-			for k, v := range test.appendHeaders {
-				if !hasHeaderAdd(okResponse, k, v, true) {
-					t.Errorf("expected header append: %q: %q", k, v)
+			for _, v := range test.appendHeaders {
+				if !hasHeaderAdd(okResponse, v.Key, v.Value, true) {
+					t.Errorf("expected header append: %q: %q", v.Key, v.Value)
 				}
 			}
 			for k, v := range test.setHeaders {
@@ -780,8 +783,8 @@ func createAuthEnvSpec() config.EnvironmentSpec {
 					SetHeaders: map[string]string{
 						"target": "add",
 					},
-					AppendHeaders: map[string]string{
-						"target": "append",
+					AppendHeaders: []config.KeyValue{
+						{Key: "target", Value: "append"},
 					},
 					RemoveHeaders: []string{
 						"jw*",
