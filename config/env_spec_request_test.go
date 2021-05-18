@@ -42,7 +42,7 @@ func TestNilReceivers(t *testing.T) {
 	s.verifyJWTAuthentication("")
 	s.getAuthenticationRequirement()
 	s.meetsAuthenticatationRequirements(AuthenticationRequirement{})
-	s.getConsumerAuthorization()
+	s.GetConsumerAuthorization()
 }
 
 func TestUnknownAuthenticationRequirementType(t *testing.T) {

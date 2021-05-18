@@ -191,6 +191,13 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 		return a.denied(req, envRequest, tracker, authContext, api), nil
 	case auth.ErrInternalError:
 		return a.internalError(req, envRequest, tracker, err), nil
+	case auth.ErrNetworkError:
+		if envRequest != nil && envRequest.GetConsumerAuthorization().FailOpen {
+			log.Debugf("FailOpen on operation: %v", envRequest.GetOperation().Name)
+			return a.authOK(req, tracker, authContext, api, envRequest), nil
+		} else {
+			return a.internalError(req, envRequest, tracker, err), nil
+		}
 	}
 
 	if len(authContext.APIProducts) == 0 {

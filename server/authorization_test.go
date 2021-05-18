@@ -237,7 +237,7 @@ func TestEnvRequestCheck(t *testing.T) {
 		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.UNAUTHENTICATED))
 	}
 
-	// Can authenticate, cannot authorize
+	// good authentication, bad authorization
 	headers := map[string]string{
 		"jwt": jwtString,
 	}
@@ -249,6 +249,15 @@ func TestEnvRequestCheck(t *testing.T) {
 	}
 	if resp.Status.Code != int32(rpc.PERMISSION_DENIED) {
 		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.PERMISSION_DENIED))
+	}
+
+	// good authentication, authorization network fail w/ FailOpen
+	testAuthMan.sendAuth(nil, libAuth.ErrNetworkError)
+	if resp, err = server.Check(context.Background(), req); err != nil {
+		t.Errorf("should not get error. got: %s", err)
+	}
+	if resp.Status.Code != int32(rpc.OK) {
+		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.OK))
 	}
 
 	// good request
@@ -757,6 +766,7 @@ func createAuthEnvSpec() config.EnvironmentSpec {
 					In: []config.APIOperationParameter{
 						{Match: config.Query("x-api-key")},
 					},
+					FailOpen: true,
 				},
 				Operations: []config.APIOperation{
 					{
