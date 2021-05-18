@@ -193,7 +193,7 @@ type APIOperation struct {
 // HTTPRequestTransformations are rules for modifying HTTP requests.
 type HTTPRequestTransformations struct {
 	// Header values to append. If a specified header is already present in the request, an additional value is added.
-	AppendHeaders map[string]string `yaml:"append_headers,omitempty" mapstructure:"append_headers,omitempty"`
+	AppendHeaders []KeyValue `yaml:"-,omitempty" mapstructure:"-,omitempty"`
 
 	// Header values to set. If a specified header is already present, the value here will overwrite it.
 	SetHeaders map[string]string `yaml:"set_headers,omitempty" mapstructure:"set_headers,omitempty"`
@@ -203,6 +203,68 @@ type HTTPRequestTransformations struct {
 
 	// URLPathTransformations transform the URL path on authorized requests.
 	URLPathTransformations URLPathTransformations `yaml:"set_path,omitempty" mapstructure:"set_path,omitempty"`
+}
+
+type httpRequestTransformationsWrapper struct {
+	AppendHeaders          map[string]interface{} `yaml:"append_headers,omitempty" mapstructure:"append_headers,omitempty"`
+	SetHeaders             map[string]string      `yaml:"set_headers,omitempty" mapstructure:"set_headers,omitempty"`
+	RemoveHeaders          []string               `yaml:"remove_headers,omitempty" mapstructure:"remove_headers,omitempty"`
+	URLPathTransformations URLPathTransformations `yaml:"set_path,omitempty" mapstructure:"set_path,omitempty"`
+}
+
+// UnmarshalYAML implements the yaml.Unmarshaler interface
+func (t *HTTPRequestTransformations) UnmarshalYAML(node *yaml.Node) error {
+	type Unmarsh HTTPRequestTransformations
+	if err := node.Decode((*Unmarsh)(t)); err != nil {
+		return err
+	}
+
+	w := &httpRequestTransformationsWrapper{}
+	if err := node.Decode(w); err != nil {
+		return err
+	}
+
+	for k, v := range w.AppendHeaders {
+		switch x := v.(type) {
+		case string:
+			t.AppendHeaders = append(t.AppendHeaders, KeyValue{Key: k, Value: x})
+		case []interface{}:
+			for _, s := range x {
+				t.AppendHeaders = append(t.AppendHeaders, KeyValue{Key: k, Value: s.(string)})
+			}
+		}
+	}
+
+	return nil
+}
+
+// MarshalYAML implements the yaml.Marshaler interface
+func (t HTTPRequestTransformations) MarshalYAML() (interface{}, error) {
+	w := &httpRequestTransformationsWrapper{
+		AppendHeaders:          make(map[string]interface{}),
+		SetHeaders:             t.SetHeaders,
+		RemoveHeaders:          t.RemoveHeaders,
+		URLPathTransformations: t.URLPathTransformations,
+	}
+
+	// When marshalling, map[string][]string is used exclusively.
+	for _, v := range t.AppendHeaders {
+		if _, ok := w.AppendHeaders[v.Key]; !ok {
+			w.AppendHeaders[v.Key] = []string{v.Value}
+		} else {
+			w.AppendHeaders[v.Key] = append(w.AppendHeaders[v.Key].([]string), v.Value)
+		}
+	}
+
+	return w, nil
+}
+
+// KeyValue contains a key/value pair.
+type KeyValue struct {
+	// Key is the key.
+	Key string
+	// Value is the value.
+	Value string
 }
 
 // URLPathTransformations configure how a request path will be transformed.
