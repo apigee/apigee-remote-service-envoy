@@ -472,6 +472,118 @@ any:
 	}
 }
 
+func TestMarshalHTTPRequestTransformations(t *testing.T) {
+	tests := []struct {
+		desc string
+		in   HTTPRequestTransformations
+		want []byte
+	}{
+		{
+			desc: "valid http request transformations",
+			in: HTTPRequestTransformations{
+				AppendHeaders: []KeyValue{
+					{Key: "myheader", Value: "a-value"},
+					{Key: "myheader", Value: "another-value"},
+				},
+				SetHeaders: map[string]string{
+					"target-header": "target",
+				},
+			},
+			want: []byte(`append_headers:
+    myheader:
+        - a-value
+        - another-value
+set_headers:
+    target-header: target
+`),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			got, err := yaml.Marshal(test.in)
+			if err != nil {
+				t.Fatalf("yaml.Marshal() failed: %v", err)
+			}
+			if diff := cmp.Diff(test.want, got); diff != "" {
+				t.Errorf("yaml.Marshal() returns unexpected diff (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestUnmarshalHTTPRequestTransformations(t *testing.T) {
+	tests := []struct {
+		desc string
+		in   []byte
+		want *HTTPRequestTransformations
+	}{
+		{
+			desc: "valid http request transformations bytes with",
+			in: []byte(`
+append_headers:
+  myheader: a-value
+  anotherheader:
+  - some-value
+  - another-value
+set_headers:
+  target-header: target
+`),
+			want: &HTTPRequestTransformations{
+				AppendHeaders: []KeyValue{
+					{Key: "myheader", Value: "a-value"},
+					{Key: "anotherheader", Value: "some-value"},
+					{Key: "anotherheader", Value: "another-value"},
+				},
+				SetHeaders: map[string]string{
+					"target-header": "target",
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			got := &HTTPRequestTransformations{}
+			if err := yaml.Unmarshal(test.in, got); err != nil {
+				t.Fatalf("yaml.Unmarshal() failed: %v", err)
+			}
+			if diff := cmp.Diff(test.want, got); diff != "" {
+				t.Logf("yaml.Unmarshal() returns unexpected diff (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestUnmarshalHTTPRequestTransformationsError(t *testing.T) {
+	tests := []struct {
+		desc string
+		data []byte
+	}{
+		{
+			desc: "append headers not a map",
+			data: []byte(`
+append_headers: not a map
+`),
+		},
+		{
+			desc: "set headers not a map",
+			data: []byte(`
+set_headers: not a map
+`),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			rt := &HTTPRequestTransformations{}
+			if err := yaml.Unmarshal(test.data, rt); err == nil {
+				t.Errorf("yaml.Unmarshal() returns no error, should have got error")
+			}
+		})
+	}
+}
+
 func TestMarshalAndUnmarshalJWTAuthentication(t *testing.T) {
 	tests := []struct {
 		desc string
@@ -491,7 +603,6 @@ func TestMarshalAndUnmarshalJWTAuthentication(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
 			out, err := yaml.Marshal(test.want)
-			t.Log(string(out))
 			if err != nil {
 				t.Fatalf("yaml.Marshal() returns unexpected: %v", err)
 			}

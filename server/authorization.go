@@ -301,8 +301,8 @@ func addHeaderTransforms(req *authv3.CheckRequest, envRequest *config.Environmen
 			for k, v := range transforms.SetHeaders {
 				addHeaderValueOption(okResponse, k, v, false)
 			}
-			for k, v := range transforms.AppendHeaders {
-				addHeaderValueOption(okResponse, k, v, true)
+			for _, v := range transforms.AppendHeaders {
+				addHeaderValueOption(okResponse, v.Key, v.Value, true)
 			}
 		}
 		if log.DebugEnabled() {
