@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package protostruct supports operations on the protocol buffer Struct message.
 package server
 
 import (
@@ -20,6 +19,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"errors"
+	"fmt"
 	"net/http"
 	"reflect"
 	"testing"
@@ -41,8 +41,6 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// TODO: add TestAddHeaderTransforms
-
 func TestRegister(t *testing.T) {
 	opts := []grpc.ServerOption{}
 	grpcServer := grpc.NewServer(opts...)
@@ -53,6 +51,103 @@ func TestRegister(t *testing.T) {
 		t.Errorf("want: %v, got: %v", h, server.handler)
 	}
 	grpcServer.Stop()
+}
+
+func TestAddHeaderTransforms(t *testing.T) {
+	tests := []struct {
+		desc            string
+		requestHeaders  map[string]string
+		appendHeaders   map[string]string
+		setHeaders      map[string]string
+		removeHeaders   []string
+		expectedAdds    int // +1 to include :path
+		expectedRemoves int
+	}{
+		{
+			desc:            "test1",
+			requestHeaders:  map[string]string{"remove1": "remove"},
+			appendHeaders:   map[string]string{"append": "append1"},
+			setHeaders:      map[string]string{"set": "set1"},
+			removeHeaders:   []string{"remove1"},
+			expectedAdds:    3,
+			expectedRemoves: 1,
+		},
+		{
+			desc:            "test2",
+			requestHeaders:  map[string]string{"remove1": "remove", "skip": "don't remove"},
+			appendHeaders:   map[string]string{"append": "append1", "append2": "append2"},
+			setHeaders:      map[string]string{"set": "set1", "set2": "set2"},
+			removeHeaders:   []string{"remove1", "missing"},
+			expectedAdds:    5,
+			expectedRemoves: 1,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			envSpec := createAuthEnvSpec()
+
+			envSpec.APIs[0].HTTPRequestTransforms = config.HTTPRequestTransformations{
+				AppendHeaders: test.appendHeaders,
+				SetHeaders:    test.setHeaders,
+				RemoveHeaders: test.removeHeaders,
+			}
+			specExt := config.NewEnvironmentSpecExt(&envSpec)
+			envoyReq := testutil.NewEnvoyRequest("GET", "/v1/petstore", test.requestHeaders, nil)
+			specReq := config.NewEnvironmentSpecRequest(nil, specExt, envoyReq)
+			okResponse := &authv3.OkHttpResponse{}
+
+			addHeaderTransforms(envoyReq, specReq, okResponse)
+
+			if test.expectedAdds != len(okResponse.Headers) {
+				t.Errorf("expected %d header adds got: %d", test.expectedAdds, len(okResponse.Headers))
+			}
+			if test.expectedRemoves != len(okResponse.HeadersToRemove) {
+				t.Errorf("expected %d header removes got: %d", test.expectedRemoves, len(okResponse.HeadersToRemove))
+			}
+
+			for k, v := range test.appendHeaders {
+				if !hasHeaderAdd(okResponse, k, v, true) {
+					t.Errorf("expected header append: %q: %q", k, v)
+				}
+			}
+			for k, v := range test.setHeaders {
+				if !hasHeaderAdd(okResponse, k, v, false) {
+					t.Errorf("expected header set: %q: %q", k, v)
+				}
+			}
+			for _, k := range test.removeHeaders {
+				if _, ok := test.requestHeaders[k]; ok && !hasHeaderRemove(okResponse, k) {
+					t.Errorf("expected header remove: %q", k)
+				}
+				if _, ok := test.requestHeaders[k]; !ok && hasHeaderRemove(okResponse, k) {
+					t.Errorf("did not expect header remove: %q", k)
+				}
+			}
+		})
+	}
+}
+
+func hasHeaderAdd(okr *authv3.OkHttpResponse, key, value string, append bool) bool {
+	for _, h := range okr.Headers {
+		arr := []interface{}{h.Header.Key, h.Header.Value, h.Append.Value}
+		fmt.Printf("arr: %v", arr)
+		if key == h.Header.Key &&
+			value == h.Header.Value &&
+			append == h.Append.Value {
+			return true
+		}
+	}
+	return false
+}
+
+func hasHeaderRemove(okr *authv3.OkHttpResponse, key string) bool {
+	for _, h := range okr.HeadersToRemove {
+		if h == key {
+			return true
+		}
+	}
+	return false
 }
 
 func TestEnvRequestCheck(t *testing.T) {
@@ -106,11 +201,32 @@ func TestEnvRequestCheck(t *testing.T) {
 	contextExtensions := map[string]string{
 		envSpecContextKey: specExt.ID,
 	}
+	var req *authv3.CheckRequest
+	var resp *authv3.CheckResponse
+
+	// missing api
+	req = testutil.NewEnvoyRequest(http.MethodGet, "/v2/missing", nil, nil)
+	req.Attributes.ContextExtensions = contextExtensions
+	if resp, err = server.Check(context.Background(), req); err != nil {
+		t.Errorf("should not get error. got: %s", err)
+	}
+	if resp.Status.Code != int32(rpc.NOT_FOUND) {
+		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.NOT_FOUND))
+	}
+
+	// missing operation
+	req = testutil.NewEnvoyRequest(http.MethodGet, "/v1/missing", nil, nil)
+	req.Attributes.ContextExtensions = contextExtensions
+	if resp, err = server.Check(context.Background(), req); err != nil {
+		t.Errorf("should not get error. got: %s", err)
+	}
+	if resp.Status.Code != int32(rpc.NOT_FOUND) {
+		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.NOT_FOUND))
+	}
 
 	// Cannot authenticate
-	req := testutil.NewEnvoyRequest(http.MethodGet, uri, nil, nil)
+	req = testutil.NewEnvoyRequest(http.MethodGet, uri, nil, nil)
 	req.Attributes.ContextExtensions = contextExtensions
-	var resp *authv3.CheckResponse
 	if resp, err = server.Check(context.Background(), req); err != nil {
 		t.Errorf("should not get error. got: %s", err)
 	}
@@ -148,32 +264,15 @@ func TestEnvRequestCheck(t *testing.T) {
 		t.Fatal("must be OkResponse")
 	}
 
-	addTargetHeader := false
-	appendTargetHeader := false
-	pathHeader := ""
-	for _, h := range okr.OkResponse.Headers {
-		if h.Header.Key == "target" {
-			if h.Append.Value {
-				appendTargetHeader = true
-			} else {
-				addTargetHeader = true
-			}
-		} else if h.Header.Key == envoyPathHeader {
-			pathHeader = h.Header.Value
-		}
+	wantPath := "/petstore?x-api-key=foo"
+	if !hasHeaderAdd(okr.OkResponse, ":path", wantPath, false) {
+		t.Errorf(":path header should be: %s", wantPath)
 	}
-	want := "/petstore?x-api-key=foo"
-	if pathHeader != want {
-		t.Errorf(":path header should be: %s", want)
-	}
-	if !addTargetHeader {
+	if !hasHeaderAdd(okr.OkResponse, "target", "add", false) {
 		t.Errorf("add header option not found")
 	}
-	if !appendTargetHeader {
+	if !hasHeaderAdd(okr.OkResponse, "target", "append", true) {
 		t.Errorf("append header option not found")
-	}
-	if okr.OkResponse.HeadersToRemove[0] != "jwt" {
-		t.Errorf("remove header not found")
 	}
 }
 
