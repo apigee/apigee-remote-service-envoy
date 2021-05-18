@@ -51,8 +51,6 @@ const (
 	envoyPathHeader      = ":path"
 )
 
-// TODO: ConsumerAuthorization.FailOpen
-
 // AuthorizationServer server
 type AuthorizationServer struct {
 	handler *Handler
@@ -143,12 +141,14 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 
 		if v, ok := req.Attributes.ContextExtensions[apiContextKey]; ok { // api specified in context metadata
 			api = v
+			log.Debugf("api from context: %s", api)
 		} else {
 			api, ok = req.Attributes.Request.Http.Headers[a.handler.apiHeader]
 			if !ok {
 				log.Debugf("missing api header %s", a.handler.apiHeader)
 				return a.unauthenticated(req, envRequest, tracker), nil
 			}
+			log.Debugf("api from header: %s", api)
 		}
 
 		// check for JWT from Envoy filter
@@ -304,6 +304,26 @@ func addHeaderTransforms(req *authv3.CheckRequest, envRequest *config.Environmen
 			for k, v := range transforms.AppendHeaders {
 				addHeaderValueOption(okResponse, k, v, true)
 			}
+		}
+		if log.DebugEnabled() {
+			var b strings.Builder
+			b.WriteString("Request header mods:\n")
+			if len(okResponse.Headers) > 0 {
+				for _, h := range okResponse.Headers {
+					addAppend := "="
+					if h.Append.Value {
+						addAppend = "+"
+					}
+					b.WriteString(fmt.Sprintf("  %s %q: %q\n", addAppend, h.Header.Key, h.Header.Value))
+				}
+			}
+			if len(okResponse.HeadersToRemove) > 0 {
+				var b strings.Builder
+				for _, h := range okResponse.Headers {
+					b.WriteString(fmt.Sprintf("   - %q: %q\n", h.Header.Key, h.Header.Value))
+				}
+			}
+			log.Debugf(b.String())
 		}
 	}
 }

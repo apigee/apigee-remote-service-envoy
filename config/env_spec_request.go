@@ -122,12 +122,14 @@ func (e *EnvironmentSpecRequest) GetParamValue(param APIOperationParameter) stri
 	var value string
 	switch m := param.Match.(type) {
 	case Header:
-		value = e.request.Attributes.Request.Http.Headers[strings.ToLower(string(m))]
+		key := strings.ToLower(string(m))
+		value = e.request.Attributes.Request.Http.Headers[key]
 		// Per Envoy: If multiple headers share the same key, they are merged per HTTP spec.
 		// So, we're just grabbing the first value (up to any comma).
 		if indx := strings.Index(value, ","); indx > 0 {
 			value = value[:indx]
 		}
+		log.Debugf("param from header %q: %q", key, value)
 	case Query:
 		if e.queryValues == nil {
 			q := strings.SplitN(e.request.Attributes.Request.Http.Path, "?", 2)
@@ -135,10 +137,13 @@ func (e *EnvironmentSpecRequest) GetParamValue(param APIOperationParameter) stri
 				vals, _ := url.ParseQuery(q[1])
 				e.queryValues = vals
 			}
-			value = e.queryValues.Get(string(m))
+			key := string(m)
+			value = e.queryValues.Get(key)
+			log.Debugf("param from query %q: %q", key, value)
 		}
 	case JWTClaim:
 		value = e.getClaimValue(m)
+		log.Debugf("param from claim %q: %q", m, value)
 	}
 	return param.Transformation.Transform(value)
 }
@@ -166,6 +171,7 @@ func (e *EnvironmentSpecRequest) verifyJWTAuthentication(name string) bool {
 	}
 	jwtReq := e.jwtAuthentications[name]
 	if jwtReq == nil {
+		log.Debugf("JWTAuthentication %q not found", name)
 		return false
 	}
 	if result := e.jwtResults[name]; result != nil { // return from cache
@@ -244,8 +250,10 @@ func (req *EnvironmentSpecRequest) getAuthenticationRequirement() (auth Authenti
 		op := req.GetOperation()
 		if op != nil && !op.ConsumerAuthorization.isEmpty() {
 			auth = op.Authentication
+			log.Debugf("using AuthenticationRequirement from operation %q", op.Name)
 		} else if api := req.GetAPISpec(); api != nil {
 			auth = api.Authentication
+			log.Debugf("using AuthenticationRequirement from api %q", api.ID)
 		}
 	}
 	return auth
@@ -256,8 +264,10 @@ func (req *EnvironmentSpecRequest) GetHTTPRequestTransformations() (transforms H
 		op := req.GetOperation()
 		if op != nil && !op.HTTPRequestTransforms.isEmpty() {
 			transforms = op.HTTPRequestTransforms
+			log.Debugf("using HTTPRequestTransforms from operation %q", op.Name)
 		} else if api := req.GetAPISpec(); api != nil {
 			transforms = api.HTTPRequestTransforms
+			log.Debugf("using HTTPRequestTransforms from api %q", api.ID)
 		}
 	}
 	return transforms
@@ -310,8 +320,10 @@ func (req *EnvironmentSpecRequest) GetConsumerAuthorization() (auth ConsumerAuth
 		op := req.GetOperation()
 		if op != nil && !op.ConsumerAuthorization.isEmpty() {
 			auth = op.ConsumerAuthorization
+			log.Debugf("using ConsumerAuthorization from operation %q", op.Name)
 		} else if api := req.GetAPISpec(); api != nil {
 			auth = api.ConsumerAuthorization
+			log.Debugf("using ConsumerAuthorization from api %q", api.ID)
 		}
 	}
 	return auth
