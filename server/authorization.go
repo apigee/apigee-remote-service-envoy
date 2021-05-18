@@ -32,13 +32,13 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/v2/log"
 	"github.com/apigee/apigee-remote-service-golib/v2/product"
 	"github.com/apigee/apigee-remote-service-golib/v2/quota"
-	envoy_core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
-	envoy_auth "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
-	envoy_type "github.com/envoyproxy/go-control-plane/envoy/type/v3"
+	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
+	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
+	typev3 "github.com/envoyproxy/go-control-plane/envoy/type/v3"
 	"github.com/gogo/googleapis/google/rpc"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	rpcstatus "google.golang.org/genproto/googleapis/rpc/status"
+	"google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
@@ -60,12 +60,12 @@ type AuthorizationServer struct {
 
 // Register registers
 func (a *AuthorizationServer) Register(s *grpc.Server, handler *Handler) {
-	envoy_auth.RegisterAuthorizationServer(s, a)
+	authv3.RegisterAuthorizationServer(s, a)
 	a.handler = handler
 }
 
 // Check does check
-func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.CheckRequest) (*envoy_auth.CheckResponse, error) {
+func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequest) (*authv3.CheckResponse, error) {
 
 	var rootContext context.Context = a.handler
 	var err error
@@ -235,10 +235,10 @@ func (a *AuthorizationServer) applyQuotas(ops []product.AuthorizedOperation, aut
 	return
 }
 
-func (a *AuthorizationServer) authOK(req *envoy_auth.CheckRequest, tracker *prometheusRequestMetricTracker,
-	authContext *auth.Context, api string, envRequest *config.EnvironmentSpecRequest) *envoy_auth.CheckResponse {
+func (a *AuthorizationServer) authOK(req *authv3.CheckRequest, tracker *prometheusRequestMetricTracker,
+	authContext *auth.Context, api string, envRequest *config.EnvironmentSpecRequest) *authv3.CheckResponse {
 
-	okResponse := &envoy_auth.OkHttpResponse{}
+	okResponse := &authv3.OkHttpResponse{}
 
 	if a.handler.appendMetadataHeaders {
 		addMetadataHeaders(okResponse, api, authContext)
@@ -247,12 +247,12 @@ func (a *AuthorizationServer) authOK(req *envoy_auth.CheckRequest, tracker *prom
 	addHeaderValueOption(okResponse, headerAuthorized, "true", false)
 	addHeaderTransforms(req, envRequest, okResponse)
 
-	tracker.statusCode = envoy_type.StatusCode_OK
-	return &envoy_auth.CheckResponse{
-		Status: &rpcstatus.Status{
+	tracker.statusCode = typev3.StatusCode_OK
+	return &authv3.CheckResponse{
+		Status: &status.Status{
 			Code: int32(rpc.OK),
 		},
-		HttpResponse: &envoy_auth.CheckResponse_OkResponse{
+		HttpResponse: &authv3.CheckResponse_OkResponse{
 			OkResponse: okResponse,
 		},
 		DynamicMetadata: encodeExtAuthzMetadata(api, authContext, true),
@@ -260,8 +260,8 @@ func (a *AuthorizationServer) authOK(req *envoy_auth.CheckRequest, tracker *prom
 }
 
 // includes any JWTAuthentication.ForwardPayloadHeader requests
-func addHeaderTransforms(req *envoy_auth.CheckRequest, envRequest *config.EnvironmentSpecRequest,
-	okResponse *envoy_auth.OkHttpResponse) {
+func addHeaderTransforms(req *authv3.CheckRequest, envRequest *config.EnvironmentSpecRequest,
+	okResponse *authv3.OkHttpResponse) {
 	if envRequest != nil {
 		if apiOperation := envRequest.GetOperation(); apiOperation != nil {
 
@@ -301,12 +301,12 @@ func addHeaderTransforms(req *envoy_auth.CheckRequest, envRequest *config.Enviro
 	}
 }
 
-func addHeaderValueOption(ok *envoy_auth.OkHttpResponse, key, value string, appnd bool) {
+func addHeaderValueOption(ok *authv3.OkHttpResponse, key, value string, appnd bool) {
 	if value == "" {
 		return
 	}
-	ok.Headers = append(ok.Headers, &envoy_core.HeaderValueOption{
-		Header: &envoy_core.HeaderValue{
+	ok.Headers = append(ok.Headers, &corev3.HeaderValueOption{
+		Header: &corev3.HeaderValue{
 			Key:   key,
 			Value: value,
 		},
@@ -314,63 +314,63 @@ func addHeaderValueOption(ok *envoy_auth.OkHttpResponse, key, value string, appn
 	})
 }
 
-func (a *AuthorizationServer) notFound(req *envoy_auth.CheckRequest, envRequest *config.EnvironmentSpecRequest,
-	tracker *prometheusRequestMetricTracker) *envoy_auth.CheckResponse {
+func (a *AuthorizationServer) notFound(req *authv3.CheckRequest, envRequest *config.EnvironmentSpecRequest,
+	tracker *prometheusRequestMetricTracker) *authv3.CheckResponse {
 	return a.createDenyResponse(req, envRequest, tracker, nil, "", rpc.NOT_FOUND)
 }
 
-func (a *AuthorizationServer) unauthenticated(req *envoy_auth.CheckRequest, envRequest *config.EnvironmentSpecRequest,
-	tracker *prometheusRequestMetricTracker) *envoy_auth.CheckResponse {
+func (a *AuthorizationServer) unauthenticated(req *authv3.CheckRequest, envRequest *config.EnvironmentSpecRequest,
+	tracker *prometheusRequestMetricTracker) *authv3.CheckResponse {
 	return a.createDenyResponse(req, envRequest, tracker, nil, "", rpc.UNAUTHENTICATED)
 }
 
-func (a *AuthorizationServer) internalError(req *envoy_auth.CheckRequest, envRequest *config.EnvironmentSpecRequest,
-	tracker *prometheusRequestMetricTracker, err error) *envoy_auth.CheckResponse {
+func (a *AuthorizationServer) internalError(req *authv3.CheckRequest, envRequest *config.EnvironmentSpecRequest,
+	tracker *prometheusRequestMetricTracker, err error) *authv3.CheckResponse {
 	log.Errorf("sending internal error: %v", err)
 	return a.createDenyResponse(req, envRequest, tracker, nil, "", rpc.INTERNAL)
 }
 
-func (a *AuthorizationServer) denied(req *envoy_auth.CheckRequest, envRequest *config.EnvironmentSpecRequest,
-	tracker *prometheusRequestMetricTracker, authContext *auth.Context, api string) *envoy_auth.CheckResponse {
+func (a *AuthorizationServer) denied(req *authv3.CheckRequest, envRequest *config.EnvironmentSpecRequest,
+	tracker *prometheusRequestMetricTracker, authContext *auth.Context, api string) *authv3.CheckResponse {
 	return a.createDenyResponse(req, envRequest, tracker, authContext, api, rpc.PERMISSION_DENIED)
 }
 
-func (a *AuthorizationServer) quotaExceeded(req *envoy_auth.CheckRequest, envRequest *config.EnvironmentSpecRequest,
-	tracker *prometheusRequestMetricTracker, authContext *auth.Context, api string) *envoy_auth.CheckResponse {
+func (a *AuthorizationServer) quotaExceeded(req *authv3.CheckRequest, envRequest *config.EnvironmentSpecRequest,
+	tracker *prometheusRequestMetricTracker, authContext *auth.Context, api string) *authv3.CheckResponse {
 	return a.createDenyResponse(req, envRequest, tracker, authContext, api, rpc.RESOURCE_EXHAUSTED)
 }
 
-func (a *AuthorizationServer) createDenyResponse(req *envoy_auth.CheckRequest, envRequest *config.EnvironmentSpecRequest,
-	tracker *prometheusRequestMetricTracker, authContext *auth.Context, api string, code rpc.Code) *envoy_auth.CheckResponse {
+func (a *AuthorizationServer) createDenyResponse(req *authv3.CheckRequest, envRequest *config.EnvironmentSpecRequest,
+	tracker *prometheusRequestMetricTracker, authContext *auth.Context, api string, code rpc.Code) *authv3.CheckResponse {
 
 	// use intended code, not OK
 	switch code {
 	case rpc.NOT_FOUND:
-		tracker.statusCode = envoy_type.StatusCode_NotFound
+		tracker.statusCode = typev3.StatusCode_NotFound
 
 	case rpc.UNAUTHENTICATED:
-		tracker.statusCode = envoy_type.StatusCode_Unauthorized
+		tracker.statusCode = typev3.StatusCode_Unauthorized
 
 	case rpc.INTERNAL:
-		tracker.statusCode = envoy_type.StatusCode_InternalServerError
+		tracker.statusCode = typev3.StatusCode_InternalServerError
 
 	case rpc.PERMISSION_DENIED:
-		tracker.statusCode = envoy_type.StatusCode_Forbidden
+		tracker.statusCode = typev3.StatusCode_Forbidden
 
 	case rpc.RESOURCE_EXHAUSTED:
-		tracker.statusCode = envoy_type.StatusCode_TooManyRequests
+		tracker.statusCode = typev3.StatusCode_TooManyRequests
 	}
 
 	if authContext == nil || !a.handler.allowUnauthorized { // send reject to client
 		log.Debugf("sending denied: %s", code.String())
 
-		response := &envoy_auth.CheckResponse{
-			Status: &rpcstatus.Status{
+		response := &authv3.CheckResponse{
+			Status: &status.Status{
 				Code: int32(code),
 			},
-			HttpResponse: &envoy_auth.CheckResponse_DeniedResponse{
-				DeniedResponse: &envoy_auth.DeniedHttpResponse{
-					Status: &envoy_type.HttpStatus{
+			HttpResponse: &authv3.CheckResponse_DeniedResponse{
+				DeniedResponse: &authv3.DeniedHttpResponse{
+					Status: &typev3.HttpStatus{
 						Code: tracker.statusCode,
 					},
 				},
@@ -415,7 +415,7 @@ func (a *AuthorizationServer) createDenyResponse(req *envoy_auth.CheckRequest, e
 		return response
 	}
 
-	okResponse := &envoy_auth.OkHttpResponse{}
+	okResponse := &authv3.OkHttpResponse{}
 
 	if a.handler.appendMetadataHeaders {
 		addMetadataHeaders(okResponse, api, authContext)
@@ -425,11 +425,11 @@ func (a *AuthorizationServer) createDenyResponse(req *envoy_auth.CheckRequest, e
 
 	// allow request to continue upstream
 	log.Debugf("sending ok (actual: %s)", code.String())
-	return &envoy_auth.CheckResponse{
-		Status: &rpcstatus.Status{
+	return &authv3.CheckResponse{
+		Status: &status.Status{
 			Code: int32(rpc.OK),
 		},
-		HttpResponse: &envoy_auth.CheckResponse_OkResponse{
+		HttpResponse: &authv3.CheckResponse_OkResponse{
 			OkResponse: okResponse,
 		},
 		DynamicMetadata: encodeExtAuthzMetadata(api, authContext, false),
@@ -449,7 +449,7 @@ var (
 type prometheusRequestMetricTracker struct {
 	rootContext context.Context
 	startTime   time.Time
-	statusCode  envoy_type.StatusCode
+	statusCode  typev3.StatusCode
 }
 
 // set statusCode before calling record()
@@ -457,7 +457,7 @@ func prometheusRequestTracker(rootContext context.Context) *prometheusRequestMet
 	return &prometheusRequestMetricTracker{
 		rootContext: rootContext,
 		startTime:   time.Now(),
-		statusCode:  envoy_type.StatusCode_InternalServerError,
+		statusCode:  typev3.StatusCode_InternalServerError,
 	}
 }
 
