@@ -295,7 +295,7 @@ func (e *EnvironmentSpecRequest) meetsAuthenticatationRequirements(auth Authenti
 // GetAPIKey uses ConsumerAuthorization of Operation or APISpec as appropriate
 // to retrieve the API Key. This does not check if the request is authenticated.
 func (req *EnvironmentSpecRequest) GetAPIKey() (key string) {
-	auth := req.getConsumerAuthorization()
+	auth := req.GetConsumerAuthorization()
 	for _, authorization := range auth.In {
 		if key = req.GetParamValue(authorization); key != "" {
 			return key
@@ -304,7 +304,8 @@ func (req *EnvironmentSpecRequest) GetAPIKey() (key string) {
 	return ""
 }
 
-func (req *EnvironmentSpecRequest) getConsumerAuthorization() (auth ConsumerAuthorization) {
+// GetConsumerAuthorization returns the ConsumerAuthorization of Operation or APISpec as appropriate
+func (req *EnvironmentSpecRequest) GetConsumerAuthorization() (auth ConsumerAuthorization) {
 	if req != nil {
 		op := req.GetOperation()
 		if op != nil && !op.ConsumerAuthorization.isEmpty() {
