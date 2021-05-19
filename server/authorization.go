@@ -32,6 +32,7 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/v2/log"
 	"github.com/apigee/apigee-remote-service-golib/v2/product"
 	"github.com/apigee/apigee-remote-service-golib/v2/quota"
+	golibutil "github.com/apigee/apigee-remote-service-golib/v2/util"
 	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	typev3 "github.com/envoyproxy/go-control-plane/envoy/type/v3"
@@ -306,26 +307,31 @@ func addHeaderTransforms(req *authv3.CheckRequest, envRequest *config.Environmen
 			}
 		}
 		if log.DebugEnabled() {
-			var b strings.Builder
-			b.WriteString("Request header mods:\n")
-			if len(okResponse.Headers) > 0 {
-				for _, h := range okResponse.Headers {
-					addAppend := "="
-					if h.Append.Value {
-						addAppend = "+"
-					}
-					b.WriteString(fmt.Sprintf("  %s %q: %q\n", addAppend, h.Header.Key, h.Header.Value))
-				}
-			}
-			if len(okResponse.HeadersToRemove) > 0 {
-				var b strings.Builder
-				for _, h := range okResponse.Headers {
-					b.WriteString(fmt.Sprintf("   - %q: %q\n", h.Header.Key, h.Header.Value))
-				}
-			}
-			log.Debugf(b.String())
+			log.Debugf(logHeaderValueOptions(okResponse))
 		}
 	}
+}
+
+func logHeaderValueOptions(okResponse *authv3.OkHttpResponse) string {
+	var b strings.Builder
+	b.WriteString("Request header mods:\n")
+	if len(okResponse.Headers) > 0 {
+		for _, h := range okResponse.Headers {
+			addAppend := "="
+			if h.Append.Value {
+				addAppend = "+"
+			}
+			b.WriteString(fmt.Sprintf("  %s %q: %q\n", addAppend, h.Header.Key,
+				golibutil.Truncate(h.Header.Value, config.TruncateDebugRequestValuesAt)))
+		}
+	}
+	if len(okResponse.HeadersToRemove) > 0 {
+		var b strings.Builder
+		for _, h := range okResponse.HeadersToRemove {
+			b.WriteString(fmt.Sprintf("   - %q\n", h))
+		}
+	}
+	return b.String()
 }
 
 func addHeaderValueOption(ok *authv3.OkHttpResponse, key, value string, appnd bool) {

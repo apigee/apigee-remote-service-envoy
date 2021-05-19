@@ -24,8 +24,11 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
 	"github.com/apigee/apigee-remote-service-golib/v2/auth/jwt"
 	"github.com/apigee/apigee-remote-service-golib/v2/log"
+	"github.com/apigee/apigee-remote-service-golib/v2/util"
 	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 )
+
+const TruncateDebugRequestValuesAt = 5
 
 // NewEnvironmentSpecRequest creates a new EnvironmentSpecRequest
 func NewEnvironmentSpecRequest(authMan auth.Manager, e *EnvironmentSpecExt, req *authv3.CheckRequest) *EnvironmentSpecRequest {
@@ -129,7 +132,7 @@ func (e *EnvironmentSpecRequest) GetParamValue(param APIOperationParameter) stri
 		if indx := strings.Index(value, ","); indx > 0 {
 			value = value[:indx]
 		}
-		log.Debugf("param from header %q: %q", key, value)
+		log.Debugf("param from header %q: %q", key, util.Truncate(value, TruncateDebugRequestValuesAt))
 	case Query:
 		if e.queryValues == nil {
 			q := strings.SplitN(e.request.Attributes.Request.Http.Path, "?", 2)
@@ -139,11 +142,11 @@ func (e *EnvironmentSpecRequest) GetParamValue(param APIOperationParameter) stri
 			}
 			key := string(m)
 			value = e.queryValues.Get(key)
-			log.Debugf("param from query %q: %q", key, value)
+			log.Debugf("param from query %q: %q", key, util.Truncate(value, TruncateDebugRequestValuesAt))
 		}
 	case JWTClaim:
 		value = e.getClaimValue(m)
-		log.Debugf("param from claim %q: %q", m, value)
+		log.Debugf("param from claim %q: %q", m, util.Truncate(value, TruncateDebugRequestValuesAt))
 	}
 	return param.Transformation.Transform(value)
 }

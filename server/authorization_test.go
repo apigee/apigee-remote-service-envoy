@@ -62,6 +62,7 @@ func TestAddHeaderTransforms(t *testing.T) {
 		removeHeaders   []string
 		expectedAdds    int // +1 to include :path
 		expectedRemoves int
+		expectedLog     string
 	}{
 		{
 			desc:            "test1",
@@ -71,6 +72,7 @@ func TestAddHeaderTransforms(t *testing.T) {
 			removeHeaders:   []string{"remove1"},
 			expectedAdds:    3,
 			expectedRemoves: 1,
+			expectedLog:     "Request header mods:\n  = \":path\": \"/pets...\"\n  = \"set\": \"set1\"\n  + \"append\": \"appen...\"\n",
 		},
 		{
 			desc:           "test2",
@@ -83,6 +85,7 @@ func TestAddHeaderTransforms(t *testing.T) {
 			removeHeaders:   []string{"remove1", "missing"},
 			expectedAdds:    5,
 			expectedRemoves: 1,
+			expectedLog:     "Request header mods:\n  = \":path\": \"/pets...\"\n  = \"set\": \"set1\"\n  = \"set2\": \"set2\"\n  + \"append\": \"appen...\"\n  + \"append2\": \"appen...\"\n",
 		},
 	}
 
@@ -126,6 +129,11 @@ func TestAddHeaderTransforms(t *testing.T) {
 				if _, ok := test.requestHeaders[k]; !ok && hasHeaderRemove(okResponse, k) {
 					t.Errorf("did not expect header remove: %q", k)
 				}
+			}
+
+			logged := logHeaderValueOptions(okResponse)
+			if test.expectedLog != logged {
+				t.Errorf("want:%q\n, got:%q\n", test.expectedLog, logged)
 			}
 		})
 	}
@@ -287,6 +295,59 @@ func TestEnvRequestCheck(t *testing.T) {
 		t.Errorf("append header option not found")
 	}
 }
+
+// func TestLogHeaderValueOptions(t *testing.T) {
+// 	tests := []struct {
+// 		desc            string
+// 		requestHeaders  map[string]string
+// 		appendHeaders   []config.KeyValue
+// 		setHeaders      map[string]string
+// 		removeHeaders   []string
+// 		expectedAdds    int // +1 to include :path
+// 		expectedRemoves int
+// 	}{
+// 		{
+// 			desc:            "test1",
+// 			requestHeaders:  map[string]string{"remove1": "remove"},
+// 			appendHeaders:   []config.KeyValue{{Key: "append", Value: "append1"}},
+// 			setHeaders:      map[string]string{"set": "set1"},
+// 			removeHeaders:   []string{"remove1"},
+// 			expectedAdds:    3,
+// 			expectedRemoves: 1,
+// 		},
+// 		{
+// 			desc:           "test2",
+// 			requestHeaders: map[string]string{"remove1": "remove", "skip": "don't remove"},
+// 			appendHeaders: []config.KeyValue{
+// 				{Key: "append", Value: "append1"},
+// 				{Key: "append2", Value: "append2"},
+// 			},
+// 			setHeaders:      map[string]string{"set": "set1", "set2": "set2"},
+// 			removeHeaders:   []string{"remove1", "missing"},
+// 			expectedAdds:    5,
+// 			expectedRemoves: 1,
+// 		},
+// 	}
+
+// 	for _, test := range tests {
+// 		t.Run(test.desc, func(t *testing.T) {
+// 			envSpec := createAuthEnvSpec()
+
+// 			envSpec.APIs[0].HTTPRequestTransforms = config.HTTPRequestTransformations{
+// 				AppendHeaders: test.appendHeaders,
+// 				SetHeaders:    test.setHeaders,
+// 				RemoveHeaders: test.removeHeaders,
+// 			}
+// 			specExt := config.NewEnvironmentSpecExt(&envSpec)
+// 			envoyReq := testutil.NewEnvoyRequest("GET", "/v1/petstore", test.requestHeaders, nil)
+// 			specReq := config.NewEnvironmentSpecRequest(nil, specExt, envoyReq)
+// 			okResponse := &authv3.OkHttpResponse{}
+
+// 			logHeaderValueOptions(okResponse)
+
+// 		})
+// 	}
+// }
 
 func TestGlobalCheck(t *testing.T) {
 
