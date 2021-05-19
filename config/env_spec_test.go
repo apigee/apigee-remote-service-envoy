@@ -69,22 +69,24 @@ func TestValidateEnvironmentSpecs(t *testing.T) {
 			wantErr: "API spec IDs must be non-empty",
 		},
 		{
-			desc: "duplicate API names",
+			desc: "duplicate API basepaths",
 			configs: []EnvironmentSpec{
 				{
 					ID: "spec",
 					APIs: []APISpec{
 						{
-							ID: "duplicate-api",
+							ID:       "api-1",
+							BasePath: "/v1",
 						},
 						{
-							ID: "duplicate-api",
+							ID:       "api-2",
+							BasePath: "/v1",
 						},
 					},
 				},
 			},
 			hasErr:  true,
-			wantErr: "API spec IDs within each environment spec must be unique, got multiple duplicate-api",
+			wantErr: "API spec basepaths within each environment spec must be unique, got multiple /v1",
 		},
 		{
 			desc: "empty operation name",

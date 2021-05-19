@@ -40,15 +40,15 @@ func ValidateEnvironmentSpecs(ess []EnvironmentSpec) error {
 			return fmt.Errorf("environment spec IDs must be unique, got multiple %s", es.ID)
 		}
 		configIDSet[es.ID] = true
-		apiSpecIDSet := make(map[string]bool)
+		basePathsSet := make(map[string]bool)
 		for _, api := range es.APIs {
 			if api.ID == "" {
 				return fmt.Errorf("API spec IDs must be non-empty")
 			}
-			if apiSpecIDSet[api.ID] {
-				return fmt.Errorf("API spec IDs within each environment spec must be unique, got multiple %s", api.ID)
+			if basePathsSet[api.BasePath] {
+				return fmt.Errorf("API spec basepaths within each environment spec must be unique, got multiple %s", api.BasePath)
 			}
-			apiSpecIDSet[api.ID] = true
+			basePathsSet[api.BasePath] = true
 			for _, p := range api.ConsumerAuthorization.In {
 				if err := validateAPIOperationParameter(&p); err != nil {
 					return err
