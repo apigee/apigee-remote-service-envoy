@@ -32,6 +32,7 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/v2/log"
 	"github.com/apigee/apigee-remote-service-golib/v2/product"
 	"github.com/apigee/apigee-remote-service-golib/v2/quota"
+	golibutil "github.com/apigee/apigee-remote-service-golib/v2/util"
 	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	typev3 "github.com/envoyproxy/go-control-plane/envoy/type/v3"
@@ -50,8 +51,6 @@ const (
 	envSpecContextKey    = "apigee_env_config"
 	envoyPathHeader      = ":path"
 )
-
-// TODO: ConsumerAuthorization.FailOpen
 
 // AuthorizationServer server
 type AuthorizationServer struct {
@@ -143,12 +142,14 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 
 		if v, ok := req.Attributes.ContextExtensions[apiContextKey]; ok { // api specified in context metadata
 			api = v
+			log.Debugf("api from context: %s", api)
 		} else {
 			api, ok = req.Attributes.Request.Http.Headers[a.handler.apiHeader]
 			if !ok {
 				log.Debugf("missing api header %s", a.handler.apiHeader)
 				return a.unauthenticated(req, envRequest, tracker), nil
 			}
+			log.Debugf("api from header: %s", api)
 		}
 
 		// check for JWT from Envoy filter
@@ -305,7 +306,32 @@ func addHeaderTransforms(req *authv3.CheckRequest, envRequest *config.Environmen
 				addHeaderValueOption(okResponse, v.Key, v.Value, true)
 			}
 		}
+		if log.DebugEnabled() {
+			log.Debugf(logHeaderValueOptions(okResponse))
+		}
 	}
+}
+
+func logHeaderValueOptions(okResponse *authv3.OkHttpResponse) string {
+	var b strings.Builder
+	b.WriteString("Request header mods:\n")
+	if len(okResponse.Headers) > 0 {
+		for _, h := range okResponse.Headers {
+			addAppend := "="
+			if h.Append.Value {
+				addAppend = "+"
+			}
+			b.WriteString(fmt.Sprintf("  %s %q: %q\n", addAppend, h.Header.Key,
+				golibutil.Truncate(h.Header.Value, config.TruncateDebugRequestValuesAt)))
+		}
+	}
+	if len(okResponse.HeadersToRemove) > 0 {
+		var b strings.Builder
+		for _, h := range okResponse.HeadersToRemove {
+			b.WriteString(fmt.Sprintf("   - %q\n", h))
+		}
+	}
+	return b.String()
 }
 
 func addHeaderValueOption(ok *authv3.OkHttpResponse, key, value string, appnd bool) {

@@ -19,6 +19,7 @@ package config
 import (
 	"strings"
 
+	"github.com/apigee/apigee-remote-service-golib/v2/log"
 	"github.com/apigee/apigee-remote-service-golib/v2/path"
 )
 
@@ -138,5 +139,6 @@ func isEmpty(auth AuthenticationRequirement) bool {
 
 // Transform uses StringTransformation syntax to transform the passed string.
 func (s StringTransformation) Transform(in string) string {
+	log.Debugf("Transform ignored: %#v", s)
 	return in
 }
