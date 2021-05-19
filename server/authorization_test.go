@@ -58,7 +58,7 @@ func TestAddHeaderTransforms(t *testing.T) {
 		desc            string
 		requestHeaders  map[string]string
 		appendHeaders   []config.KeyValue
-		setHeaders      map[string]string
+		setHeaders      map[string]string // don't add > 1 element as log order can change
 		removeHeaders   []string
 		expectedAdds    int // +1 to include :path
 		expectedRemoves int
@@ -81,11 +81,11 @@ func TestAddHeaderTransforms(t *testing.T) {
 				{Key: "append", Value: "append1"},
 				{Key: "append2", Value: "append2"},
 			},
-			setHeaders:      map[string]string{"set": "set1", "set2": "set2"},
+			setHeaders:      map[string]string{"set": "set1"},
 			removeHeaders:   []string{"remove1", "missing"},
-			expectedAdds:    5,
+			expectedAdds:    4,
 			expectedRemoves: 1,
-			expectedLog:     "Request header mods:\n  = \":path\": \"/pets...\"\n  = \"set\": \"set1\"\n  = \"set2\": \"set2\"\n  + \"append\": \"appen...\"\n  + \"append2\": \"appen...\"\n",
+			expectedLog:     "Request header mods:\n  = \":path\": \"/pets...\"\n  = \"set\": \"set1\"\n  + \"append\": \"appen...\"\n  + \"append2\": \"appen...\"\n",
 		},
 	}
 
