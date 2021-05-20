@@ -23,6 +23,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path"
+	"strings"
 	"syscall"
 	"time"
 
@@ -59,6 +61,7 @@ var (
 	configFile          string
 	policySecretPath    string
 	analyticsSecretPath string
+	environmentSpecs    []string
 )
 
 func main() {
@@ -101,6 +104,34 @@ func main() {
 
 			fmt.Printf("apigee-remote-service-envoy version %s %s [%s]\n", version, date, commit)
 
+			// Process the list of files or directories from the command-line flag.
+			// File scheme will be stripped when reading the directories but the values
+			// given by the flag will be assigned to EnvironmentSpecs.References as is.
+			var refs []string
+			for _, v := range environmentSpecs {
+				s := strings.TrimPrefix(v, "file://")
+				info, err := os.Stat(s)
+				if err != nil {
+					log.Errorf("Unable to load file info of %s: %v", s, err)
+					os.Exit(1)
+				}
+				if !info.IsDir() {
+					refs = append(refs, v)
+				} else {
+					entries, err := os.ReadDir(info.Name())
+					if err != nil {
+						log.Errorf("Unable to read %s: %v", info.Name(), err)
+						os.Exit(1)
+					}
+					for _, e := range entries {
+						if !e.IsDir() {
+							refs = append(refs, path.Join(v, e.Name()))
+						}
+					}
+				}
+			}
+			viper.Set(config.EnvironmentSpecsReferences, refs)
+
 			cfg := config.Default()
 			if err := cfg.Load(configFile, policySecretPath, analyticsSecretPath, true); err != nil {
 				log.Errorf("Unable to load config: %s:\n%v", configFile, err)
@@ -119,13 +150,7 @@ func main() {
 	rootCmd.Flags().StringVarP(&configFile, "config", "c", "config.yaml", "Config file")
 	rootCmd.Flags().StringVarP(&policySecretPath, "policy-secret", "p", "/policy-secret", "Policy secret mount point")
 	rootCmd.Flags().StringVarP(&analyticsSecretPath, "analytics-secret", "a", config.DefaultAnalyticsSecretPath, "Analytics secret mount point")
-
-	// Take env config files from the command line flag and bind it to the corresponding field in the config
-	rootCmd.Flags().StringSlice("environment-configs", nil, "Environment-level config files")
-	if err := viper.BindPFlag(config.EnvConfigsURIs, rootCmd.Flags().Lookup("environment-configs")); err != nil {
-		log.Errorf("%v", err)
-		os.Exit(1)
-	}
+	rootCmd.Flags().StringSliceVarP(&environmentSpecs, "environment-specs", "", nil, "A list of environment-spec config files or directories containg the files (no further recursion)")
 
 	rootCmd.SetArgs(os.Args[1:])
 	if err := rootCmd.Execute(); err != nil {
