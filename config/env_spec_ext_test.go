@@ -24,7 +24,10 @@ import (
 func TestNewEnvironmentSpecExt(t *testing.T) {
 
 	envSpec := createGoodEnvSpec()
-	specExt := NewEnvironmentSpecExt(&envSpec)
+	specExt, err := NewEnvironmentSpecExt(&envSpec)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
 
 	if len(specExt.JWTAuthentications()) != 2 {
 		t.Errorf("should be 2")

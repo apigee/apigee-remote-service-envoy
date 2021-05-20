@@ -923,6 +923,13 @@ func createGoodEnvSpec() EnvironmentSpec {
 							In: []APIOperationParameter{
 								{Match: Query("x-api-key2")},
 								{Match: Header("x-api-key2")},
+								{
+									Match: Header("authorization"),
+									Transformation: StringTransformation{
+										Template:     "Bearer {token}",
+										Substitution: "{token}",
+									},
+								},
 							},
 						},
 					},

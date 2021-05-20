@@ -78,7 +78,10 @@ func TestGetAPISpec(t *testing.T) {
 			},
 		},
 	}
-	specExt := NewEnvironmentSpecExt(&envSpec)
+	specExt, err := NewEnvironmentSpecExt(&envSpec)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
 
 	apis := make(map[string]*APISpec)
 	for i := range envSpec.APIs {
@@ -118,7 +121,10 @@ func TestGetAPISpec(t *testing.T) {
 
 func TestGetOperation(t *testing.T) {
 	envSpec := createGoodEnvSpec()
-	specExt := NewEnvironmentSpecExt(&envSpec)
+	specExt, err := NewEnvironmentSpecExt(&envSpec)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
 	if envSpec.APIs[0].ID != "apispec1" {
 		t.Fatalf("incorrect API: %v", envSpec.APIs[0])
 	}
@@ -156,7 +162,10 @@ func TestGetOperation(t *testing.T) {
 
 func TestGetParamValueQuery(t *testing.T) {
 	envSpec := createGoodEnvSpec()
-	specExt := NewEnvironmentSpecExt(&envSpec)
+	specExt, err := NewEnvironmentSpecExt(&envSpec)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
 
 	tests := []struct {
 		desc string
@@ -192,7 +201,10 @@ func TestGetParamValueQuery(t *testing.T) {
 
 func TestGetParamValueHeader(t *testing.T) {
 	envSpec := createGoodEnvSpec()
-	specExt := NewEnvironmentSpecExt(&envSpec)
+	specExt, err := NewEnvironmentSpecExt(&envSpec)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
 
 	tests := []struct {
 		desc    string
@@ -228,7 +240,10 @@ func TestGetParamValueHeader(t *testing.T) {
 
 func TestGetParamValueJWTClaim(t *testing.T) {
 	envSpec := createGoodEnvSpec()
-	specExt := NewEnvironmentSpecExt(&envSpec)
+	specExt, err := NewEnvironmentSpecExt(&envSpec)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
 
 	tests := []struct {
 		desc      string
@@ -281,7 +296,10 @@ func TestGetParamValueJWTClaim(t *testing.T) {
 
 func TestIsAuthenticated(t *testing.T) {
 	envSpec := createGoodEnvSpec()
-	specExt := NewEnvironmentSpecExt(&envSpec)
+	specExt, err := NewEnvironmentSpecExt(&envSpec)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
 
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -356,7 +374,10 @@ func TestIsAuthenticated(t *testing.T) {
 
 func TestGetAPIKey(t *testing.T) {
 	envSpec := createGoodEnvSpec()
-	specExt := NewEnvironmentSpecExt(&envSpec)
+	specExt, err := NewEnvironmentSpecExt(&envSpec)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
 
 	apiKey := "myapikey"
 	tests := []struct {
@@ -371,6 +392,7 @@ func TestGetAPIKey(t *testing.T) {
 		{"op no key", "/v2/petstore", nil, ""},
 		{"op key in query", "/v2/petstore?x-api-key2=" + apiKey, map[string]string{}, apiKey},
 		{"op key in header", "/v2/petstore", map[string]string{"x-api-key2": apiKey}, apiKey},
+		{"op key in bearer", "/v2/petstore", map[string]string{"authorization": "Bearer " + apiKey}, apiKey},
 	}
 
 	for _, test := range tests {

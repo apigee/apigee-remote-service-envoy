@@ -148,7 +148,7 @@ func (e *EnvironmentSpecRequest) GetParamValue(param APIOperationParameter) stri
 		value = e.getClaimValue(m)
 		log.Debugf("param from claim %q: %q", m, util.Truncate(value, TruncateDebugRequestValuesAt))
 	}
-	return param.Transformation.Transform(value)
+	return e.transform(param.Transformation, value)
 }
 
 func (e *EnvironmentSpecRequest) getClaimValue(claim JWTClaim) string {
