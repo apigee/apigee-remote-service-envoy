@@ -360,7 +360,6 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string, 
 	}
 
 	for _, f := range c.EnvironmentSpecs.References {
-		log.Debugf("loading env spec from URI %s", f)
 		if err := c.loadEnvironmentSpec(strings.TrimPrefix(f, "file://")); err != nil {
 			return err
 		}
