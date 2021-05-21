@@ -701,8 +701,8 @@ func TestLoadEnvironmentSpecs(t *testing.T) {
 			if err := c.Load(test.filename, "", "", false); err != nil {
 				t.Errorf("c.Load() returns unexpected: %v", err)
 			}
-			if l := len(c.EnvironmentSpecs.Inline); l != 1 {
-				t.Fatalf("c.Load() results in %d EnvironmentSpec, wanted 1", l)
+			if l := len(c.EnvironmentSpecs.Inline); l != 2 {
+				t.Fatalf("c.Load() results in %d EnvironmentSpec, wanted 2", l)
 			}
 			if diff := cmp.Diff(test.wantEnvSpec, c.EnvironmentSpecs.Inline[0]); diff != "" {
 				t.Errorf("c.Load() results in unexpected EnvironmentSpec diff (-want +got):\n%s", diff)
