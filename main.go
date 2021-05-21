@@ -120,9 +120,10 @@ func main() {
 	rootCmd.Flags().StringVarP(&policySecretPath, "policy-secret", "p", "/policy-secret", "Policy secret mount point")
 	rootCmd.Flags().StringVarP(&analyticsSecretPath, "analytics-secret", "a", config.DefaultAnalyticsSecretPath, "Analytics secret mount point")
 
-	// Take env config files from the command line flag and bind it to the corresponding field in the config
-	rootCmd.Flags().StringSlice("environment-configs", nil, "Environment-level config files")
-	if err := viper.BindPFlag(config.EnvConfigsURIs, rootCmd.Flags().Lookup("environment-configs")); err != nil {
+	// Take environment spec files from the command line flag and bind it to the
+	// corresponding field in the config.
+	rootCmd.Flags().StringSlice("environment-specs", nil, "A list of environment-spec config files or directories containg the files (no further recursion)")
+	if err := viper.BindPFlag(config.EnvironmentSpecsReferences, rootCmd.Flags().Lookup("environment-specs")); err != nil {
 		log.Errorf("%v", err)
 		os.Exit(1)
 	}

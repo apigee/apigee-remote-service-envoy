@@ -64,7 +64,7 @@ const (
 	RemoteServiceJWKS    = "APIGEE.TENANT.JWKS"
 	AnalyticsCredentials = "APIGEE.ANALYTICS.CREDENTIALS_JSON"
 
-	EnvConfigsURIs = "ENVIRONMENT_CONFIGS.REFERENCES"
+	EnvironmentSpecsReferences = "ENVIRONMENT_SPECS.REFERENCES"
 )
 
 func init() {
@@ -359,9 +359,28 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string, 
 		}
 	}
 
-	for _, f := range c.EnvironmentSpecs.References {
-		if err := c.loadEnvironmentSpec(f); err != nil {
+	for _, v := range c.EnvironmentSpecs.References {
+		f := strings.TrimPrefix(v, "file://")
+		info, err := os.Stat(f)
+		if err != nil {
 			return err
+		}
+		if !info.IsDir() {
+			if err := c.loadEnvironmentSpec(f); err != nil {
+				return err
+			}
+		} else {
+			entries, err := os.ReadDir(f)
+			if err != nil {
+				return err
+			}
+			for _, e := range entries {
+				if !e.IsDir() {
+					if err := c.loadEnvironmentSpec(path.Join(f, e.Name())); err != nil {
+						return err
+					}
+				}
+			}
 		}
 	}
 
