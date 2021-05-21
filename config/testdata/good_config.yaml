@@ -11,3 +11,4 @@ tenant:
 environment_specs:
   references:
   - ./testdata/good_env_config.yaml
+  - ./testdata/envspec

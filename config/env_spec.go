@@ -135,6 +135,8 @@ func validateAPIOperationParameter(p *APIOperationParameter) error {
 type EnvironmentSpecs struct {
 	// A list of URIs referencing Environment configurations. Supported schemes:
 	// - `file`: An RFC 8089 file path where the configuration is stored on the local file system, e.g. `file://path/to/config.yaml`.
+	// The URI can refer to a directory, in which case the files directly under it will be read.
+	// Note that subdirectories will not be taken into account.
 	References []string `yaml:"references,omitempty" mapstructure:"references,omitempty"`
 
 	// A list of environment configs. Not supported yet for inline loading.

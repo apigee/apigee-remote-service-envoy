@@ -1,0 +1,4 @@
+id: good-env-config-2
+apis:
+- id: api-1
+  base_path: /v1
