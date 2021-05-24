@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package transform supports StringTransformation.
 package transform
 
 import (
@@ -21,23 +22,28 @@ import (
 	"github.com/alecthomas/participle/v2/lexer/stateful"
 )
 
+// Template is a parsed StringTransformation template.
 type Template struct {
 	Parts []*Part `@@*`
 }
 
+// Part is either a Variable or Static value from a template.
 type Part struct {
 	Variable *Variable `  @@`
 	Static   *Static   `| @@`
 }
 
+// Static is a non-variable value in a template.
 type Static struct {
 	Value string `@String`
 }
 
+// Variable is a replacement value in a template.
 type Variable struct {
 	Name string `"{" @String "}"`
 }
 
+// very simple lexer just separates {variables} from statics
 var lexer = stateful.MustSimple([]stateful.Rule{
 	{
 		Name:    `String`,
@@ -45,14 +51,19 @@ var lexer = stateful.MustSimple([]stateful.Rule{
 	},
 })
 
+// simple parser on the lexer
 var parser = participle.MustBuild(&Template{}, participle.Lexer(lexer))
 
+// Parse a StringTransformation template
 func Parse(val string) (*Template, error) {
 	var template Template
 	err := parser.ParseString("", val, &template)
 	return &template, err
 }
 
+// Substitute uses the passed template Template to identify and extract
+// the Variables from the passed string and replace them using the
+// substitution Template.
 func Substitute(template, substitution *Template, in string) string {
 	replacementMap := make(map[string]string)
 
