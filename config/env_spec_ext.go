@@ -19,18 +19,19 @@ package config
 import (
 	"strings"
 
-	"github.com/apigee/apigee-remote-service-golib/v2/log"
+	"github.com/apigee/apigee-remote-service-envoy/v2/transform"
 	"github.com/apigee/apigee-remote-service-golib/v2/path"
 )
 
-// TODO: add proper algorithm to StringTransform.Transform
 // TODO: add path templating
 
 // NewEnvironmentSpecExt creates an EnvironmentSpecExt
-func NewEnvironmentSpecExt(spec *EnvironmentSpec) *EnvironmentSpecExt {
+func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
 	jwtAuthentications := make(map[string]map[string]*JWTAuthentication)
 	apiPathTree := path.NewTree()
 	opPathTree := path.NewTree()
+	parsedTransformations := make(map[string]*transform.Template)
+
 	for i := range spec.APIs {
 		api := spec.APIs[i]
 
@@ -53,30 +54,45 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) *EnvironmentSpecExt {
 				split = append([]string{api.ID, m.Method}, split...)
 				opPathTree.AddChild(split, 0, &op)
 			}
+
+			for _, in := range op.ConsumerAuthorization.In {
+				template, err := transform.Parse(in.Transformation.Template)
+				parsedTransformations[in.Transformation.Template] = template
+				if err != nil {
+					return nil, err
+				}
+				template, _ = transform.Parse(in.Transformation.Substitution)
+				parsedTransformations[in.Transformation.Substitution] = template
+				if err != nil {
+					return nil, err
+				}
+			}
 		}
 	}
 
 	return &EnvironmentSpecExt{
-		EnvironmentSpec:    spec,
-		jwtAuthentications: jwtAuthentications,
-		apiPathTree:        apiPathTree,
-		opPathTree:         opPathTree,
-	}
+		EnvironmentSpec:       spec,
+		jwtAuthentications:    jwtAuthentications,
+		apiPathTree:           apiPathTree,
+		opPathTree:            opPathTree,
+		parsedTransformations: parsedTransformations,
+	}, nil
 }
 
 // EnvironmentSpecExt extends an EnvironmentSpec to hold cached values.
 // Create using config.NewEnvironmentSpecExt()
 type EnvironmentSpecExt struct {
 	*EnvironmentSpec
-	jwtAuthentications map[string]map[string]*JWTAuthentication // api.ID -> auth.name -> *JWTAuthentication
-	apiPathTree        path.Tree                                // base path -> *APISpec
-	opPathTree         path.Tree                                // api.ID -> method -> sub path -> *Operation
+	jwtAuthentications    map[string]map[string]*JWTAuthentication // api.ID -> auth.name -> *JWTAuthentication
+	apiPathTree           path.Tree                                // base path -> *APISpec
+	opPathTree            path.Tree                                // api.ID -> method -> sub path -> *Operation
+	parsedTransformations map[string]*transform.Template
 }
 
 // JWTAuthentications returns a list of all JWTAuthentications for the Spec
-func (a EnvironmentSpecExt) JWTAuthentications() []*JWTAuthentication {
+func (e EnvironmentSpecExt) JWTAuthentications() []*JWTAuthentication {
 	var auths []*JWTAuthentication
-	for _, m := range a.jwtAuthentications {
+	for _, m := range e.jwtAuthentications {
 		for _, v := range m {
 			auths = append(auths, v)
 		}
@@ -138,7 +154,11 @@ func isEmpty(auth AuthenticationRequirement) bool {
 }
 
 // Transform uses StringTransformation syntax to transform the passed string.
-func (s StringTransformation) Transform(in string) string {
-	log.Debugf("Transform ignored: %#v", s)
-	return in
+func (e EnvironmentSpecExt) transform(s StringTransformation, in string) string {
+	if s.Template == "" && s.Substitution == "" {
+		return in
+	}
+	template := e.parsedTransformations[s.Template]
+	substitution := e.parsedTransformations[s.Substitution]
+	return transform.Substitute(template, substitution, in)
 }

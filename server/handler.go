@@ -150,7 +150,10 @@ func NewHandler(cfg *config.Config) (*Handler, error) {
 	for i := range cfg.EnvironmentSpecs.Inline {
 		// make EnvironmentSpecExt lookup table
 		spec := cfg.EnvironmentSpecs.Inline[i]
-		envSpec := config.NewEnvironmentSpecExt(&spec)
+		envSpec, err := config.NewEnvironmentSpecExt(&spec)
+		if err != nil {
+			return nil, err
+		}
 		environmentSpecsByID[spec.ID] = envSpec
 
 		// make providers array

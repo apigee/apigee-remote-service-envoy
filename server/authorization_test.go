@@ -98,7 +98,10 @@ func TestAddHeaderTransforms(t *testing.T) {
 				SetHeaders:    test.setHeaders,
 				RemoveHeaders: test.removeHeaders,
 			}
-			specExt := config.NewEnvironmentSpecExt(&envSpec)
+			specExt, err := config.NewEnvironmentSpecExt(&envSpec)
+			if err != nil {
+				t.Fatalf("%v", err)
+			}
 			envoyReq := testutil.NewEnvoyRequest("GET", "/v1/petstore", test.requestHeaders, nil)
 			specReq := config.NewEnvironmentSpecRequest(nil, specExt, envoyReq)
 			okResponse := &authv3.OkHttpResponse{}
@@ -163,7 +166,10 @@ func hasHeaderRemove(okr *authv3.OkHttpResponse, key string) bool {
 
 func TestEnvRequestCheck(t *testing.T) {
 	envSpec := createAuthEnvSpec()
-	specExt := config.NewEnvironmentSpecExt(&envSpec)
+	specExt, err := config.NewEnvironmentSpecExt(&envSpec)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
 	environmentSpecsByID := map[string]*config.EnvironmentSpecExt{
 		specExt.ID: specExt,
 	}
