@@ -474,15 +474,14 @@ any:
 	}
 }
 
-func TestMarshalHTTPRequestTransformations(t *testing.T) {
+func TestMarshalAndUnmarshalHTTPRequestTransformations(t *testing.T) {
 	tests := []struct {
 		desc string
-		in   HTTPRequestTransformations
-		want []byte
+		want HTTPRequestTransformations
 	}{
 		{
 			desc: "valid http request transformations",
-			in: HTTPRequestTransformations{
+			want: HTTPRequestTransformations{
 				AppendHeaders: []KeyValue{
 					{Key: "myheader", Value: "a-value"},
 					{Key: "myheader", Value: "another-value"},
@@ -491,24 +490,21 @@ func TestMarshalHTTPRequestTransformations(t *testing.T) {
 					"target-header": "target",
 				},
 			},
-			want: []byte(`append_headers:
-    myheader:
-        - a-value
-        - another-value
-set_headers:
-    target-header: target
-`),
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			got, err := yaml.Marshal(test.in)
+			data, err := yaml.Marshal(test.want)
 			if err != nil {
 				t.Fatalf("yaml.Marshal() failed: %v", err)
 			}
-			if diff := cmp.Diff(test.want, got); diff != "" {
-				t.Errorf("yaml.Marshal() returns unexpected diff (-want +got):\n%s", diff)
+			got := &HTTPRequestTransformations{}
+			if err := yaml.Unmarshal(data, got); err != nil {
+				t.Fatalf("yaml.Unmarshal() failed: %v", err)
+			}
+			if diff := cmp.Diff(&test.want, got); diff != "" {
+				t.Errorf("yaml.Marshal() and yaml.Unmarshal() returns unexpected diff (-want +got):\n%s", diff)
 			}
 		})
 	}
