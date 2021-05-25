@@ -624,6 +624,21 @@ func TestLoadFromEnvironmentVariables(t *testing.T) {
 		t.Errorf("string(c.Analytics.CredentialsJSON) = %s, want %s", s, fakeSA)
 	}
 
+	os.Setenv(envVarKey("TENANT.ORG_NAME"), "test-org")
+	defer os.Setenv(envVarKey("TENANT.ORG_NAME"), "")
+
+	os.Setenv(envVarKey("TENANT.ENV_NAME"), "test-env")
+	defer os.Setenv(envVarKey("TENANT.ENV_NAME"), "")
+
+	os.Setenv(envVarKey("TENANT.REMOTE_SERVICE_API"), "https://runtime.com/remote-service")
+	defer os.Setenv(envVarKey("TENANT.REMOTE_SERVICE_API"), "")
+
+	// no config file but required fields are given in env vars
+	c = Default()
+	if err := c.Load("", "", DefaultAnalyticsSecretPath, true); err != nil {
+		t.Errorf("want no error got %v", err)
+	}
+
 	os.Setenv(RemoteServiceKey, "not a private key")
 	c = Default()
 	if err := c.Load(tf.Name(), "", DefaultAnalyticsSecretPath, true); err == nil {
@@ -631,7 +646,11 @@ func TestLoadFromEnvironmentVariables(t *testing.T) {
 	}
 
 	os.Setenv(RemoteServiceKey, string(pkBytes))
+	defer os.Setenv(RemoteServiceKey, "")
+
 	os.Setenv(RemoteServiceJWKS, "not a jwks")
+	defer os.Setenv(RemoteServiceJWKS, "")
+
 	c = Default()
 	if err := c.Load(tf.Name(), "", DefaultAnalyticsSecretPath, true); err == nil {
 		t.Errorf("c.Load() should have given error on bad jwks")
