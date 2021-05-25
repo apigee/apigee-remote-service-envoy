@@ -27,42 +27,39 @@ import (
 
 // NewEnvironmentSpecExt creates an EnvironmentSpecExt
 func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
-	jwtAuthentications := make(map[string]map[string]*JWTAuthentication)
-	apiPathTree := path.NewTree()
-	opPathTree := path.NewTree()
-	parsedTransformations := make(map[string]*transform.Template)
+	ec := &EnvironmentSpecExt{
+		EnvironmentSpec:       spec,
+		jwtAuthentications:    make(map[string]map[string]*JWTAuthentication),
+		apiPathTree:           path.NewTree(),
+		opPathTree:            path.NewTree(),
+		parsedTransformations: make(map[string]*transform.Template),
+	}
 
 	for i := range spec.APIs {
 		api := spec.APIs[i]
 
-		jwtAuthentications[api.ID] = map[string]*JWTAuthentication{}
-		api.Authentication.mapJWTAuthentications(jwtAuthentications[api.ID])
+		ec.jwtAuthentications[api.ID] = map[string]*JWTAuthentication{}
+		api.Authentication.mapJWTAuthentications(ec.jwtAuthentications[api.ID])
 
 		// tree: base path -> APISpec
 		split := strings.Split(api.BasePath, "/")
 		split = append([]string{"/"}, split...)
-		apiPathTree.AddChild(split, 0, &api)
+		ec.apiPathTree.AddChild(split, 0, &api)
 
 		// tree: api.ID -> method -> path -> APIOperation
 		for i := range api.Operations {
 			op := api.Operations[i]
 
-			op.Authentication.mapJWTAuthentications(jwtAuthentications[api.ID])
+			op.Authentication.mapJWTAuthentications(ec.jwtAuthentications[api.ID])
 
 			for _, m := range op.HTTPMatches {
 				split = strings.Split(m.PathTemplate, "/")
 				split = append([]string{api.ID, m.Method}, split...)
-				opPathTree.AddChild(split, 0, &op)
+				ec.opPathTree.AddChild(split, 0, &op)
 			}
 
 			for _, in := range op.ConsumerAuthorization.In {
-				template, err := transform.Parse(in.Transformation.Template)
-				parsedTransformations[in.Transformation.Template] = template
-				if err != nil {
-					return nil, err
-				}
-				template, _ = transform.Parse(in.Transformation.Substitution)
-				parsedTransformations[in.Transformation.Substitution] = template
+				err := ec.parseAPIOperationParameter(in.Transformation)
 				if err != nil {
 					return nil, err
 				}
@@ -70,13 +67,16 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
 		}
 	}
 
-	return &EnvironmentSpecExt{
-		EnvironmentSpec:       spec,
-		jwtAuthentications:    jwtAuthentications,
-		apiPathTree:           apiPathTree,
-		opPathTree:            opPathTree,
-		parsedTransformations: parsedTransformations,
-	}, nil
+	for _, j := range ec.JWTAuthentications() {
+		for _, in := range j.In {
+			err := ec.parseAPIOperationParameter(in.Transformation)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	return ec, nil
 }
 
 // EnvironmentSpecExt extends an EnvironmentSpec to hold cached values.
@@ -151,6 +151,21 @@ func isEmpty(auth AuthenticationRequirement) bool {
 		}
 	}
 	return true
+}
+
+// parses the StringTransformation and adds to cache
+func (e EnvironmentSpecExt) parseAPIOperationParameter(s StringTransformation) error {
+	if s.Template == "" && s.Substitution == "" {
+		return nil
+	}
+	template, err := transform.Parse(s.Template)
+	e.parsedTransformations[s.Template] = template
+	if err != nil {
+		return err
+	}
+	template, _ = transform.Parse(s.Substitution)
+	e.parsedTransformations[s.Substitution] = template
+	return err
 }
 
 // Transform uses StringTransformation syntax to transform the passed string.
