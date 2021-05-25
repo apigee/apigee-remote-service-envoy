@@ -249,10 +249,17 @@ type Auth struct {
 //     exist but analyticsSecretPath is equal to DefaultAnalyticsSecretPath, the secret CRD named "analytics" in the config file will be looked
 //     for, in which the data with key "client_secret.json" will be used.
 func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string, requireAnalyticsCredentials bool) error {
-	log.Debugf("reading config from: %s", configFile)
-	yamlFile, err := os.ReadFile(configFile)
-	if err != nil {
-		return err
+	var yamlFile []byte
+	var err error
+
+	if configFile != "" {
+		log.Debugf("reading config from: %s", configFile)
+		yamlFile, err = os.ReadFile(configFile)
+		if err != nil {
+			return err
+		}
+	} else {
+		log.Debugf("no config file is given")
 	}
 
 	// attempt load from CRD
@@ -261,7 +268,7 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string, 
 	decoder := yaml.NewDecoder(bytes.NewReader(yamlFile))
 
 	crd := &ConfigMapCRD{}
-	for decoder.Decode(crd) != io.EOF {
+	for len(yamlFile) != 0 && decoder.Decode(crd) != io.EOF {
 		if crd.Kind == "ConfigMap" {
 			configBytes = []byte(crd.Data["config.yaml"])
 			if configBytes != nil {
