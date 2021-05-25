@@ -40,6 +40,10 @@ func TestNewEnvironmentSpecExt(t *testing.T) {
 	if specExt.opPathTree == nil {
 		t.Errorf("must not be nil")
 	}
+
+	if len(specExt.parsedTransformations) != 3 {
+		t.Errorf("expected %d transformations", 3)
+	}
 }
 
 func TestConsumerAuthorizationIsEmpty(t *testing.T) {
