@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync"
 
 	"github.com/apigee/apigee-remote-service-golib/v2/log"
 	"google.golang.org/grpc/health"
@@ -31,12 +32,15 @@ func NewKubeHealth(handler *Handler, health *health.Server) *KubeHealth {
 	}
 	go func() {
 		_ = handler.productMan.Products() // blocks until ready
+		kubeHealth.Lock()
 		kubeHealth.ready = true
+		kubeHealth.Unlock()
 	}()
 	return kubeHealth
 }
 
 type KubeHealth struct {
+	sync.Mutex
 	Handler *Handler
 	Health  *health.Server
 	ready   bool
@@ -44,6 +48,8 @@ type KubeHealth struct {
 
 // nil if ok, error with message if not
 func (h *KubeHealth) error() error {
+	h.Lock()
+	defer h.Unlock()
 	if !h.ready {
 		return fmt.Errorf("products not loaded")
 	}
