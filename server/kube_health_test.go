@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sync"
 	"testing"
 	"time"
 
@@ -30,10 +31,13 @@ import (
 
 func TestKubeHealth(t *testing.T) {
 	fail := true
+	var lock sync.Mutex
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var result = product.APIResponse{
 			APIProducts: []product.APIProduct{},
 		}
+		lock.Lock()
+		defer lock.Unlock()
 		if fail {
 			w.WriteHeader(500)
 			return
@@ -72,7 +76,9 @@ func TestKubeHealth(t *testing.T) {
 		t.Errorf("expected %s, got: %s", exp, err)
 	}
 
+	lock.Lock()
 	fail = false
+	lock.Unlock()
 	// give it a moment to load
 	time.Sleep(250 * time.Millisecond)
 	err = kubeHealth.error()
