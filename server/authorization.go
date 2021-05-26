@@ -293,6 +293,7 @@ func addHeaderTransforms(req *authv3.CheckRequest, envRequest *config.Environmen
 			// header transforms from env config
 			transforms := envRequest.GetHTTPRequestTransformations()
 			for _, rhpat := range transforms.RemoveHeaders {
+				rhpat = strings.ToLower(rhpat)
 				for hdr := range req.Attributes.Request.Http.Headers {
 					if util.SimpleGlobMatch(rhpat, hdr) {
 						okResponse.HeadersToRemove = append(okResponse.HeadersToRemove, hdr)

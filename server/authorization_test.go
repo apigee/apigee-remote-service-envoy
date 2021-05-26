@@ -82,10 +82,20 @@ func TestAddHeaderTransforms(t *testing.T) {
 				{Key: "append2", Value: "append2"},
 			},
 			setHeaders:      map[string]string{"set": "set1"},
-			removeHeaders:   []string{"remove1", "missing"},
+			removeHeaders:   []string{"Remove1", "missing"},
 			expectedAdds:    4,
 			expectedRemoves: 1,
 			expectedLog:     "Request header mods:\n  = \":path\": \"/pets...\"\n  = \"set\": \"set1\"\n  + \"append\": \"appen...\"\n  + \"append2\": \"appen...\"\n",
+		},
+		{
+			desc:            "test3",
+			requestHeaders:  map[string]string{"remove1": "remove", "remove2": "remove", "skip": "don't remove"},
+			appendHeaders:   []config.KeyValue{},
+			setHeaders:      map[string]string{},
+			removeHeaders:   []string{"Remove*"},
+			expectedAdds:    1,
+			expectedRemoves: 2,
+			expectedLog:     "Request header mods:\n  = \":path\": \"/pets...\"\n",
 		},
 	}
 
@@ -136,7 +146,7 @@ func TestAddHeaderTransforms(t *testing.T) {
 
 			logged := logHeaderValueOptions(okResponse)
 			if test.expectedLog != logged {
-				t.Errorf("want:%q\n, got:%q\n", test.expectedLog, logged)
+				t.Errorf("want: %q\n, got: %q\n", test.expectedLog, logged)
 			}
 		})
 	}
