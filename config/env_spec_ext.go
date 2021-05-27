@@ -23,8 +23,6 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/v2/path"
 )
 
-// TODO: add path templating
-
 // NewEnvironmentSpecExt creates an EnvironmentSpecExt
 func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
 	ec := &EnvironmentSpecExt{

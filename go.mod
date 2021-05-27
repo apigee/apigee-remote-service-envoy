@@ -6,7 +6,7 @@ go 1.16
 
 require (
 	github.com/alecthomas/participle/v2 v2.0.0-alpha5
-	github.com/apigee/apigee-remote-service-golib/v2 v2.0.2-0.20210518193103-7585647a8baa
+	github.com/apigee/apigee-remote-service-golib/v2 v2.0.2-0.20210527225657-16cffb91ac56
 	github.com/envoyproxy/go-control-plane v0.9.9-0.20201210154907-fd9021fe5dad
 	github.com/gogo/googleapis v1.4.1
 	github.com/golang/protobuf v1.5.1
