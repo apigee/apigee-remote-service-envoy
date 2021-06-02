@@ -4,9 +4,13 @@ go 1.16
 
 // replace github.com/apigee/apigee-remote-service-golib/v2 => ../apigee-remote-service-golib
 
+// Viper pulls in github.com/hashicorp/hcl which has a MPL license.
+// We don't need or use this library, so replace it with a local shim.
+replace github.com/hashicorp/hcl => ./hcl_shim
+
 require (
 	github.com/alecthomas/participle/v2 v2.0.0-alpha5
-	github.com/apigee/apigee-remote-service-golib/v2 v2.0.2-0.20210527225657-16cffb91ac56
+	github.com/apigee/apigee-remote-service-golib/v2 v2.0.2-0.20210602162200-17af2b43f25c
 	github.com/envoyproxy/go-control-plane v0.9.9-0.20201210154907-fd9021fe5dad
 	github.com/gogo/googleapis v1.4.1
 	github.com/golang/protobuf v1.5.1
