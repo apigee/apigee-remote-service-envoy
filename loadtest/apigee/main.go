@@ -29,7 +29,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/apigee/apigee-remote-service-envoy/v2/server"
+	"github.com/apigee/apigee-remote-service-envoy/v2/config"
 	"github.com/apigee/apigee-remote-service-golib/v2/auth/key"
 	"github.com/apigee/apigee-remote-service-golib/v2/product"
 	"github.com/apigee/apigee-remote-service-golib/v2/quota"
@@ -115,9 +115,9 @@ type (
 	}
 )
 
-func (ts *TestServer) Config() server.Config {
-	return server.Config{
-		Tenant: server.TenantConfig{
+func (ts *TestServer) Config() config.Config {
+	return config.Config{
+		Tenant: config.Tenant{
 			InternalAPI:      ts.URL(),
 			RemoteServiceAPI: ts.URL(),
 			OrgName:          "org",
@@ -355,15 +355,15 @@ func createJWKS(privateKey *rsa.PrivateKey) (*JWKS, error) {
 	return jwks, nil
 }
 
-func makeConfigCRD(config server.Config) (*server.ConfigMapCRD, error) {
-	configYAML, err := yaml.Marshal(config)
+func makeConfigCRD(cfg config.Config) (*config.ConfigMapCRD, error) {
+	configYAML, err := yaml.Marshal(cfg)
 	if err != nil {
 		return nil, err
 	}
-	return &server.ConfigMapCRD{
+	return &config.ConfigMapCRD{
 		APIVersion: "v1",
 		Kind:       "ConfigMap",
-		Metadata: server.Metadata{
+		Metadata: config.Metadata{
 			Name:      "test-apigee-remote-service-envoy",
 			Namespace: "apigee",
 		},
