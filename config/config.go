@@ -190,7 +190,7 @@ type Tenant struct {
 	ClientTimeout    time.Duration `yaml:"client_timeout,omitempty" mapstructure:"client_timeout,omitempty"`
 	TLS              TLSClientSpec `yaml:"tls,omitempty" mapstructure:"tls,omitempty"`
 	// OperationConfigType set to "proxy" switches to Apigee "proxy" type API Product operations from "remoteservice" type
-	OperationConfigType string          `yaml:"operationConfigType,omitempty" mapstructure:"operationConfigType,omitempty"`
+	OperationConfigType string          `yaml:"operation_config_type,omitempty" mapstructure:"operation_config_type,omitempty"`
 	PrivateKey          *rsa.PrivateKey `yaml:"-" json:"-"`
 	PrivateKeyID        string          `yaml:"-" json:"-"`
 	JWKS                jwk.Set         `yaml:"-" json:"-"`
