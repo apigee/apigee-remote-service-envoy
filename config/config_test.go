@@ -764,7 +764,11 @@ func TestValidate(t *testing.T) {
 	// any interference from the test environment
 	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "invalid path")
 
-	c := &Config{}
+	c := &Config{
+		Tenant: Tenant{
+			OperationConfigType: "foo",
+		},
+	}
 	var wantErrs []string
 	var merr *errorset.Error
 
@@ -778,6 +782,7 @@ func TestValidate(t *testing.T) {
 		"tenant.internal_api is required if analytics credentials not given",
 		"tenant.org_name is required",
 		"tenant.env_name is required",
+		`tenant.operationConfigType must be "proxy" or "remoteservice"`,
 	}
 	merr = err.(*errorset.Error)
 	if merr.Len() != len(wantErrs) {
@@ -797,6 +802,7 @@ func TestValidate(t *testing.T) {
 		"tenant.remote_service_api is required",
 		"tenant.org_name is required",
 		"tenant.env_name is required",
+		`tenant.operationConfigType must be "proxy" or "remoteservice"`,
 	}
 	merr = err.(*errorset.Error)
 	if merr.Len() != len(wantErrs) {

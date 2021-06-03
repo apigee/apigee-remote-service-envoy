@@ -134,12 +134,17 @@ func NewHandler(cfg *config.Config) (*Handler, error) {
 		return nil, err
 	}
 
+	var opConfigTypes []string
+	if cfg.Tenant.OperationConfigType != "" {
+		opConfigTypes = append(opConfigTypes, cfg.Tenant.OperationConfigType)
+	}
 	productMan, err := product.NewManager(product.Options{
-		Client:      instrumentedClientFor(cfg, "products", tr),
-		BaseURL:     remoteServiceAPI,
-		RefreshRate: cfg.Products.RefreshRate,
-		Org:         cfg.Tenant.OrgName,
-		Env:         cfg.Tenant.EnvName,
+		Client:               instrumentedClientFor(cfg, "products", tr),
+		BaseURL:              remoteServiceAPI,
+		RefreshRate:          cfg.Products.RefreshRate,
+		Org:                  cfg.Tenant.OrgName,
+		Env:                  cfg.Tenant.EnvName,
+		OperationConfigTypes: opConfigTypes,
 	})
 	if err != nil {
 		return nil, err

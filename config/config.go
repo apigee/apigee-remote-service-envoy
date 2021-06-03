@@ -33,6 +33,7 @@ import (
 	"github.com/apigee/apigee-remote-service-envoy/v2/util"
 	"github.com/apigee/apigee-remote-service-golib/v2/errorset"
 	"github.com/apigee/apigee-remote-service-golib/v2/log"
+	"github.com/apigee/apigee-remote-service-golib/v2/product"
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
@@ -178,16 +179,18 @@ type TLSClientSpec struct {
 	AllowUnverifiedSSLCert bool   `yaml:"allow_unverified_ssl_cert,omitempty" mapstructure:"allow_unverified_ssl_cert,omitempty"`
 }
 
-// Tenant is config relating to an Apigee tentant
+// Tenant is config relating to an Apigee tenant
 type Tenant struct {
-	InternalAPI         string          `yaml:"internal_api,omitempty" mapstructure:"internal_api,omitempty"`
-	RemoteServiceAPI    string          `yaml:"remote_service_api" mapstructure:"remote_service_api"`
-	OrgName             string          `yaml:"org_name" mapstructure:"org_name"`
-	EnvName             string          `yaml:"env_name" mapstructure:"env_name"`
-	Key                 string          `yaml:"key,omitempty" mapstructure:"key,omitempty"`
-	Secret              string          `yaml:"secret,omitempty" mapstructure:"secret,omitempty"`
-	ClientTimeout       time.Duration   `yaml:"client_timeout,omitempty" mapstructure:"client_timeout,omitempty"`
-	TLS                 TLSClientSpec   `yaml:"tls,omitempty" mapstructure:"tls,omitempty"`
+	InternalAPI      string        `yaml:"internal_api,omitempty" mapstructure:"internal_api,omitempty"`
+	RemoteServiceAPI string        `yaml:"remote_service_api" mapstructure:"remote_service_api"`
+	OrgName          string        `yaml:"org_name" mapstructure:"org_name"`
+	EnvName          string        `yaml:"env_name" mapstructure:"env_name"`
+	Key              string        `yaml:"key,omitempty" mapstructure:"key,omitempty"`
+	Secret           string        `yaml:"secret,omitempty" mapstructure:"secret,omitempty"`
+	ClientTimeout    time.Duration `yaml:"client_timeout,omitempty" mapstructure:"client_timeout,omitempty"`
+	TLS              TLSClientSpec `yaml:"tls,omitempty" mapstructure:"tls,omitempty"`
+	// OperationConfigType set to "proxy" switches to Apigee "proxy" type API Product operations from "remoteservice" type
+	OperationConfigType string          `yaml:"operation_config_type,omitempty" mapstructure:"operation_config_type,omitempty"`
 	PrivateKey          *rsa.PrivateKey `yaml:"-" json:"-"`
 	PrivateKeyID        string          `yaml:"-" json:"-"`
 	JWKS                jwk.Set         `yaml:"-" json:"-"`
@@ -488,6 +491,12 @@ func (c *Config) Validate(requireAnalyticsCredentials bool) error {
 	}
 	if c.Tenant.EnvName == "" {
 		errs = errorset.Append(errs, fmt.Errorf("tenant.env_name is required"))
+	}
+	if c.Tenant.OperationConfigType != "" &&
+		c.Tenant.OperationConfigType != product.ProxyOperationConfigType &&
+		c.Tenant.OperationConfigType != product.RemoteOperationConfigType {
+		errs = errorset.Append(errs, fmt.Errorf("tenant.operationConfigType must be %q or %q",
+			product.ProxyOperationConfigType, product.RemoteOperationConfigType))
 	}
 	if (c.Global.TLS.CertFile != "" || c.Global.TLS.KeyFile != "") &&
 		(c.Global.TLS.CertFile == "" || c.Global.TLS.KeyFile == "") {
