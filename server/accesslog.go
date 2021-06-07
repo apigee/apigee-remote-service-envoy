@@ -15,6 +15,7 @@
 package server
 
 import (
+	"context"
 	"io"
 	"strings"
 	"time"
@@ -40,19 +41,28 @@ const (
 type AccessLogServer struct {
 	handler       *Handler
 	streamTimeout time.Duration // the duration for a stream to live
+	context       context.Context
 }
 
 // Register registers
-func (a *AccessLogServer) Register(s *grpc.Server, handler *Handler, d time.Duration) {
+func (a *AccessLogServer) Register(s *grpc.Server, handler *Handler, d time.Duration, ctx context.Context) {
 	als.RegisterAccessLogServiceServer(s, a)
 	a.handler = handler
 	a.streamTimeout = d
+	a.context = ctx
 }
 
 // StreamAccessLogs streams
 func (a *AccessLogServer) StreamAccessLogs(srv als.AccessLogService_StreamAccessLogsServer) error {
-	// set the expiring time
-	endTime := time.Now().Add(a.streamTimeout)
+	go func() {
+		select {
+		case <-srv.Context().Done():
+		case <-a.context.Done():
+			srv.SendAndClose(nil)
+		case <-time.After(a.streamTimeout):
+			srv.SendAndClose(nil)
+		}
+	}()
 
 	for {
 		msg, err := srv.Recv()
@@ -77,11 +87,6 @@ func (a *AccessLogServer) StreamAccessLogs(srv als.AccessLogService_StreamAccess
 
 		case *als.StreamAccessLogsMessage_TcpLogs:
 			log.Infof("TcpLogs not supported: %#v", msg)
-		}
-
-		// close the client stream once the timeout reaches
-		if endTime.Before(time.Now()) {
-			return srv.SendAndClose(nil)
 		}
 	}
 }

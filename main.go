@@ -165,7 +165,8 @@ func serve(cfg *config.Config) {
 	as := &server.AuthorizationServer{}
 	as.Register(grpcServer, rsHandler)
 	ls := &server.AccessLogServer{}
-	ls.Register(grpcServer, rsHandler, cfg.Global.KeepAliveMaxConnectionAge)
+	lsContext, logServiceCancel := context.WithCancel(context.Background())
+	ls.Register(grpcServer, rsHandler, cfg.Global.KeepAliveMaxConnectionAge, lsContext)
 
 	// grpc health
 	grpcHealth := health.NewServer()
@@ -227,6 +228,7 @@ func serve(cfg *config.Config) {
 		log.Infof("shutdown signal: %s", sig)
 		signal.Stop(sigint)
 
+		go logServiceCancel()
 		grpcServer.GracefulStop()
 
 		timeout, cancel := context.WithTimeout(context.Background(), time.Second)

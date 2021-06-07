@@ -317,10 +317,10 @@ func TestStreamAccessLogs(t *testing.T) {
 		t.Fatalf("failed to open client stream: %v", err)
 	}
 	time.Sleep(10 * time.Millisecond)
-	if err := stream.Send(&als.StreamAccessLogsMessage{}); err != nil {
-		t.Error(err)
+	if err := stream.Send(&als.StreamAccessLogsMessage{}); err != io.EOF {
+		t.Error("server should have closed the stream")
 	}
-	if _, err := stream.CloseAndRecv(); err == nil || err == io.EOF {
+	if _, err := stream.CloseAndRecv(); err != nil && err == io.EOF {
 		t.Error("server should have closed the stream and responded nil, but not got error marshalling it")
 	}
 }
@@ -341,7 +341,7 @@ func (tals *testAccessLogService) startAccessLogServer(t *testing.T) *grpc.Serve
 	}
 	server := AccessLogServer{}
 
-	server.Register(srv, h, 5*time.Millisecond)
+	server.Register(srv, h, 5*time.Millisecond, context.Background())
 
 	go func() {
 		if err := srv.Serve(tals.listener); err != nil {
