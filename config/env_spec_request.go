@@ -244,6 +244,7 @@ func mustBeInClaim(value, name string, claims map[string]interface{}) error {
 }
 
 // IsAuthenticated returns true if AuthenticatationRequirements are met for the request
+// Returns true if AuthenticatationRequirements are empty or disabled.
 func (e *EnvironmentSpecRequest) IsAuthenticated() bool {
 	return e.meetsAuthenticatationRequirements(e.getAuthenticationRequirement())
 }
@@ -276,11 +277,12 @@ func (req *EnvironmentSpecRequest) GetHTTPRequestTransformations() (transforms H
 	return transforms
 }
 
+// returns true if auth is empty or disabled
 func (e *EnvironmentSpecRequest) meetsAuthenticatationRequirements(auth AuthenticationRequirement) bool {
 	if e == nil {
 		return false
 	}
-	if auth.Requirements == nil {
+	if auth.Requirements == nil || auth.Disabled {
 		return true
 	}
 	switch a := auth.Requirements.(type) {
@@ -307,11 +309,14 @@ func (e *EnvironmentSpecRequest) meetsAuthenticatationRequirements(auth Authenti
 
 // GetAPIKey uses ConsumerAuthorization of Operation or APISpec as appropriate
 // to retrieve the API Key. This does not check if the request is authenticated.
+// Returns "" if ConsumerAuthorization is disabled.
 func (req *EnvironmentSpecRequest) GetAPIKey() (key string) {
 	auth := req.GetConsumerAuthorization()
-	for _, authorization := range auth.In {
-		if key = req.GetParamValue(authorization); key != "" {
-			return key
+	if !auth.Disabled {
+		for _, authorization := range auth.In {
+			if key = req.GetParamValue(authorization); key != "" {
+				return key
+			}
 		}
 	}
 	return ""

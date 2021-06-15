@@ -279,6 +279,9 @@ type URLPathTransformations struct {
 
 // AuthenticationRequirement defines the authentication requirement. It can be jwt, any or all.
 type AuthenticationRequirement struct {
+	// If Disabled is true, do not process AuthenticationRequirements.
+	Disabled bool `yaml:"disabled,omitempty" mapstructure:"disabled,omitempty"`
+
 	Requirements AuthenticationRequirements `yaml:"-"`
 }
 
@@ -437,6 +440,9 @@ func (RemoteJWKS) jwksSource() {}
 
 // ConsumerAuthorization is the configuration of API consumer authorization.
 type ConsumerAuthorization struct {
+	// If Disabled is true, do not process ConsumerAuthorization requirements.
+	Disabled bool `yaml:"disabled,omitempty" mapstructure:"disabled,omitempty"`
+
 	// Allow requests to be forwarded even if the consumer credential cannot be
 	// verified by the API Key provider due to service unavailability.
 	FailOpen bool `yaml:"fail_open,omitempty" mapstructure:"fail_open,omitempty"`
