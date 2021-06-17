@@ -798,7 +798,7 @@ func createAuthEnvSpec() config.EnvironmentSpec {
 						HTTPMatches: []config.HTTPMatch{
 							{
 								PathTemplate: "/petstore",
-								Method:       "GET",
+								Method:       "",
 							},
 						},
 					},
