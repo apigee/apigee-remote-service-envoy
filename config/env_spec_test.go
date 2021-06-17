@@ -123,6 +123,20 @@ func TestValidateEnvironmentSpecs(t *testing.T) {
 			wantErr: "operation names within each API must be unique, got multiple duplicate-op",
 		},
 		{
+			desc: "bad operation method",
+			configs: []EnvironmentSpec{
+				{
+					ID: "spec",
+					APIs: []APISpec{{ID: "api", Operations: []APIOperation{{
+						Name:        "op",
+						HTTPMatches: []HTTPMatch{{Method: "foo"}},
+					}}}},
+				},
+			},
+			hasErr:  true,
+			wantErr: "operation \"op\" uses an invalid HTTP method \"foo\"",
+		},
+		{
 			desc: "duplicate jwt authentication requirement names",
 			configs: []EnvironmentSpec{
 				{
@@ -910,7 +924,7 @@ func createGoodEnvSpec() EnvironmentSpec {
 						HTTPMatches: []HTTPMatch{
 							{
 								PathTemplate: "/petstore",
-								Method:       "GET",
+								Method:       anyMethod,
 							},
 						},
 						Authentication: AuthenticationRequirement{

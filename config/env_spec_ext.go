@@ -23,6 +23,8 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/v2/path"
 )
 
+const wildcard = "*"
+
 // NewEnvironmentSpecExt creates an EnvironmentSpecExt
 func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
 	ec := &EnvironmentSpecExt{
@@ -52,7 +54,11 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
 
 			for _, m := range op.HTTPMatches {
 				split = strings.Split(m.PathTemplate, "/")
-				split = append([]string{api.ID, m.Method}, split...)
+				method := m.Method
+				if method == anyMethod {
+					method = wildcard
+				}
+				split = append([]string{api.ID, method}, split...)
 				ec.opPathTree.AddChild(split, 0, &op)
 			}
 
