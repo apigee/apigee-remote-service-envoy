@@ -38,9 +38,6 @@ func NewEnvironmentSpecRequest(authMan auth.Manager, e *EnvironmentSpecExt, req 
 		request:            req,
 		jwtResults:         make(map[string]*jwtResult),
 	}
-	if api := esr.GetAPISpec(); api != nil {
-		esr.jwtAuthentications = e.jwtAuthentications[api.ID]
-	}
 	return esr
 }
 
@@ -48,15 +45,14 @@ func NewEnvironmentSpecRequest(authMan auth.Manager, e *EnvironmentSpecExt, req 
 // Create using NewEnvironmentSpecRequest()
 type EnvironmentSpecRequest struct {
 	*EnvironmentSpecExt
-	request            *authv3.CheckRequest
-	authMan            auth.Manager
-	jwtAuthentications map[string]*JWTAuthentication // JWTAuthentication.Name ->
-	jwtResults         map[string]*jwtResult         // JWTAuthentication.Name ->
-	verifier           jwt.Verifier
-	apiSpec            *APISpec
-	operation          *APIOperation
-	queryValues        url.Values
-	operationPath      string
+	request       *authv3.CheckRequest
+	authMan       auth.Manager
+	jwtResults    map[string]*jwtResult // JWTAuthentication.Name ->
+	verifier      jwt.Verifier
+	apiSpec       *APISpec
+	operation     *APIOperation
+	queryValues   url.Values
+	operationPath string
 }
 
 type jwtClaims map[string]interface{}
@@ -165,6 +161,21 @@ func (e *EnvironmentSpecRequest) getClaimValue(claim JWTClaim) string {
 	return ""
 }
 
+// JWTAuthentications returns a list of JWTAuthentication specific to the request.
+func (e *EnvironmentSpecRequest) JWTAuthentications() []*JWTAuthentication {
+	var auths []*JWTAuthentication
+	for _, v := range e.operation.jwtAuthentications {
+		auths = append(auths, v)
+	}
+	if len(auths) != 0 {
+		return auths
+	}
+	for _, v := range e.apiSpec.jwtAuthentications {
+		auths = append(auths, v)
+	}
+	return auths
+}
+
 // looks up the JWTAuthentication by name and runs verification
 // returns true if found and verified
 // any error can be in e.jwtResults[name]
@@ -172,7 +183,12 @@ func (e *EnvironmentSpecRequest) verifyJWTAuthentication(name string) bool {
 	if e == nil {
 		return false
 	}
-	jwtReq := e.jwtAuthentications[name]
+	var jwtReq *JWTAuthentication
+	if len(e.GetOperation().jwtAuthentications) > 0 {
+		jwtReq = e.GetOperation().jwtAuthentications[name]
+	} else {
+		jwtReq = e.GetAPISpec().jwtAuthentications[name]
+	}
 	if jwtReq == nil {
 		log.Debugf("JWTAuthentication %q not found", name)
 		return false

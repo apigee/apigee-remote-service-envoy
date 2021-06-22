@@ -770,7 +770,7 @@ func (q *testQuotaMan) Apply(auth *auth.Context, p product.AuthorizedOperation, 
 }
 
 func createAuthEnvSpec() config.EnvironmentSpec {
-	return config.EnvironmentSpec{
+	envSpecs := []config.EnvironmentSpec{{
 		ID: "good-env-config",
 		APIs: []config.APISpec{
 			{
@@ -816,5 +816,7 @@ func createAuthEnvSpec() config.EnvironmentSpec {
 				},
 			},
 		},
-	}
+	}}
+	_ = config.ValidateEnvironmentSpecs(envSpecs)
+	return envSpecs[0]
 }

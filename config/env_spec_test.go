@@ -852,7 +852,7 @@ func TestParamMatchTypes(t *testing.T) {
 }
 
 func createGoodEnvSpec() EnvironmentSpec {
-	return EnvironmentSpec{
+	envSpecs := []EnvironmentSpec{{
 		ID: "good-env-config",
 		APIs: []APISpec{
 			{
@@ -949,8 +949,27 @@ func createGoodEnvSpec() EnvironmentSpec {
 							},
 						},
 					},
+					{
+						Name: "op-4",
+						HTTPMatches: []HTTPMatch{
+							{
+								PathTemplate: "/petstore/pets",
+								Method:       "GET",
+							},
+						},
+						Authentication: AuthenticationRequirement{
+							Requirements: JWTAuthentication{
+								Name:       "foo",
+								Issuer:     "issuer2",
+								JWKSSource: RemoteJWKS{URL: "url2", CacheDuration: time.Hour},
+								In:         []APIOperationParameter{{Match: Header("jwt")}},
+							},
+						},
+					},
 				},
 			},
 		},
-	}
+	}}
+	_ = ValidateEnvironmentSpecs(envSpecs)
+	return envSpecs[0]
 }

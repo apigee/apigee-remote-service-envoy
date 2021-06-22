@@ -29,6 +29,7 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/v2/auth/jwt"
 	"github.com/apigee/apigee-remote-service-golib/v2/context"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
 func TestNilReceivers(t *testing.T) {
@@ -112,7 +113,7 @@ func TestGetAPISpec(t *testing.T) {
 			specReq := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
 
 			got := specReq.GetAPISpec()
-			if diff := cmp.Diff(test.want, got); diff != "" {
+			if diff := cmp.Diff(test.want, got, cmpopts.IgnoreUnexported(APISpec{})); diff != "" {
 				t.Errorf("diff (-want +got):\n%s", diff)
 			}
 		})
@@ -153,7 +154,7 @@ func TestGetOperation(t *testing.T) {
 			specReq := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
 
 			gotAPI := specReq.GetOperation()
-			if diff := cmp.Diff(test.want, gotAPI); diff != "" {
+			if diff := cmp.Diff(test.want, gotAPI, cmpopts.IgnoreUnexported(APIOperation{})); diff != "" {
 				t.Errorf("diff (-want +got):\n%s", diff)
 			}
 		})
