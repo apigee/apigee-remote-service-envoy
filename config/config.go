@@ -155,7 +155,9 @@ type Config struct {
 	EnvironmentSpecs EnvironmentSpecs `yaml:"environment_specs,omitempty" mapstructure:"environment_specs,omitempty"`
 }
 
-// Global is global configuration for the server
+// Global is configuration for the server including the server's listeners' addresses, keepalive,
+// and TLS settings. None of these settings will affect the client connection to Apigee - all client
+// connection settings must be done in the tenant section.
 type Global struct {
 	APIAddress                string          `yaml:"api_address,omitempty" mapstructure:"api_address,omitempty"`
 	MetricsAddress            string          `yaml:"metrics_address,omitempty" mapstructure:"metrics_address,omitempty"`
