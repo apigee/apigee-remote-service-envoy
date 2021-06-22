@@ -25,6 +25,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const anyMethod = ""
+
+// lookup for all HTTP verbs
+var allMethods = map[string]interface{}{"GET": nil, "POST": nil, "PUT": nil,
+	"PATCH": nil, "DELETE": nil, "HEAD": nil, "OPTIONS": nil, "CONNECT": nil, "TRACE": nil}
+
 // ValidateEnvironmentSpecs checks if there are
 //   * environment configs with the same ID,
 //   * API configs under the same environment config with the same ID,
@@ -70,6 +76,13 @@ func ValidateEnvironmentSpecs(ess []EnvironmentSpec) error {
 				}
 				if err := validateJWTAuthenticationName(&op.Authentication, map[string]bool{}); err != nil {
 					return err
+				}
+				for _, p := range op.HTTPMatches {
+					if p.Method != anyMethod {
+						if _, ok := allMethods[p.Method]; !ok {
+							return fmt.Errorf("operation %q uses an invalid HTTP method %q", op.Name, p.Method)
+						}
+					}
 				}
 			}
 			if err := validateJWTAuthenticationName(&api.Authentication, map[string]bool{}); err != nil {
@@ -334,7 +347,7 @@ func (a AuthenticationRequirement) MarshalYAML() (interface{}, error) {
 	return w, nil
 }
 
-// AuthenticationRequirement is the interface defining the authentication requirement.
+// AuthenticationRequirements is the interface defining the authentication requirement.
 type AuthenticationRequirements interface {
 	authenticationRequirements()
 }
@@ -457,7 +470,9 @@ type HTTPMatch struct {
 	// path variables.
 	PathTemplate string `yaml:"path_template" mapstructure:"path_template"`
 
-	// HTTP method (e.g. GET, POST, PUT, etc.)
+	// HTTP method
+	// Discrete values: "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "CONNECT", "TRACE"
+	// "" matches any request method
 	Method string `yaml:"method,omitempty" mapstructure:"method,omitempty"`
 }
 

@@ -575,11 +575,11 @@ func TestLoadFromEnvironmentVariables(t *testing.T) {
 	os.Setenv(AnalyticsCredentials, fakeSA)
 	defer os.Setenv(AnalyticsCredentials, "")
 
-	os.Setenv(envVarKey("GLOBAL.NAMESPACE"), "test-namespace")
-	defer os.Setenv(envVarKey("GLOBAL.NAMESPACE"), "")
+	os.Setenv(envVarKey("GLOBAL_NAMESPACE"), "test-namespace")
+	defer os.Setenv(envVarKey("GLOBAL_NAMESPACE"), "")
 
-	os.Setenv(envVarKey("TENANT.ORG_NAME"), "test-org")
-	defer os.Setenv(envVarKey("TENANT.ORG_NAME"), "")
+	os.Setenv(envVarKey("TENANT_ORG_NAME"), "test-org")
+	defer os.Setenv(envVarKey("TENANT_ORG_NAME"), "")
 
 	configCRD, policySecretCRD, _, err := makeCRDs()
 	if err != nil {
@@ -624,14 +624,14 @@ func TestLoadFromEnvironmentVariables(t *testing.T) {
 		t.Errorf("string(c.Analytics.CredentialsJSON) = %s, want %s", s, fakeSA)
 	}
 
-	os.Setenv(envVarKey("TENANT.ORG_NAME"), "test-org")
-	defer os.Setenv(envVarKey("TENANT.ORG_NAME"), "")
+	os.Setenv(envVarKey("TENANT_ORG_NAME"), "test-org")
+	defer os.Setenv(envVarKey("TENANT_ORG_NAME"), "")
 
-	os.Setenv(envVarKey("TENANT.ENV_NAME"), "test-env")
-	defer os.Setenv(envVarKey("TENANT.ENV_NAME"), "")
+	os.Setenv(envVarKey("TENANT_ENV_NAME"), "test-env")
+	defer os.Setenv(envVarKey("TENANT_ENV_NAME"), "")
 
-	os.Setenv(envVarKey("TENANT.REMOTE_SERVICE_API"), "https://runtime.com/remote-service")
-	defer os.Setenv(envVarKey("TENANT.REMOTE_SERVICE_API"), "")
+	os.Setenv(envVarKey("TENANT_REMOTE_SERVICE_API"), "https://runtime.com/remote-service")
+	defer os.Setenv(envVarKey("TENANT_REMOTE_SERVICE_API"), "")
 
 	// no config file but required fields are given in env vars
 	c = Default()
