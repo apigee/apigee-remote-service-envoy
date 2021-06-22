@@ -347,7 +347,7 @@ func (a AuthenticationRequirement) MarshalYAML() (interface{}, error) {
 	return w, nil
 }
 
-// AuthenticationRequirement is the interface defining the authentication requirement.
+// AuthenticationRequirements is the interface defining the authentication requirement.
 type AuthenticationRequirements interface {
 	authenticationRequirements()
 }
