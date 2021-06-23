@@ -320,8 +320,8 @@ func TestIsAuthenticated(t *testing.T) {
 		desc string
 		path string
 	}{
-		// {"auth in api", "/v1/petstore"},
-		// {"auth in operation", "/v2/petstore"},
+		{"auth in api", "/v1/petstore"},
+		{"auth in operation", "/v2/petstore"},
 		{"auth in api, no op", "/v3/petstore"},
 	}
 
@@ -529,7 +529,3 @@ func (a *testAuthMan) Authenticate(ctx context.Context, apiKey string, claims ma
 func (a *testAuthMan) ParseJWT(jwtString string, provider jwt.Provider) (map[string]interface{}, error) {
 	return testutil.MockJWTVerifier{}.Parse(jwtString, provider)
 }
-
-// if operation, do that
-// if operation miss, fail
-// if no operation, do no op
