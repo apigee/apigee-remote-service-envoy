@@ -202,6 +202,7 @@ type APISpec struct {
 	// A list of API Operations, names of which must be unique within the API.
 	Operations []APIOperation `yaml:"operations" mapstructure:"operations"`
 
+	// JWTAuthentication.Name -> *JWTAuthentication
 	jwtAuthentications map[string]*JWTAuthentication `yaml:"-" mapstructure:"-"`
 }
 
@@ -222,6 +223,7 @@ type APIOperation struct {
 	// Transformation rules applied to HTTP requests for this Operation. Overrides the rules set at the API level.
 	HTTPRequestTransforms HTTPRequestTransformations `yaml:"http_request_transforms,omitempty" mapstructure:"http_request_transforms,omitempty"`
 
+	// JWTAuthentication.Name -> *JWTAuthentication
 	jwtAuthentications map[string]*JWTAuthentication `yaml:"-" mapstructure:"-"`
 }
 
