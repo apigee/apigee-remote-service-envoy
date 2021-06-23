@@ -28,6 +28,7 @@ import (
 	"github.com/apigee/apigee-remote-service-envoy/v2/util"
 	"github.com/apigee/apigee-remote-service-golib/v2/errorset"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"gopkg.in/yaml.v3"
 )
 
@@ -723,7 +724,7 @@ func TestLoadEnvironmentSpecs(t *testing.T) {
 			if l := len(c.EnvironmentSpecs.Inline); l != 2 {
 				t.Fatalf("c.Load() results in %d EnvironmentSpec, wanted 2", l)
 			}
-			if diff := cmp.Diff(test.wantEnvSpec, c.EnvironmentSpecs.Inline[0]); diff != "" {
+			if diff := cmp.Diff(test.wantEnvSpec, c.EnvironmentSpecs.Inline[0], cmpopts.IgnoreUnexported(APIOperation{}, APISpec{})); diff != "" {
 				t.Errorf("c.Load() results in unexpected EnvironmentSpec diff (-want +got):\n%s", diff)
 			}
 		})

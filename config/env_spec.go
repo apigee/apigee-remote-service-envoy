@@ -35,10 +35,12 @@ var allMethods = map[string]interface{}{"GET": nil, "POST": nil, "PUT": nil,
 //   * environment configs with the same ID,
 //   * API configs under the same environment config with the same ID,
 //   * JWT authentication requirement under the same API or operation with the same name
-// and report them as errors
+// and report them as errors.
+// jwtAuthentications of each API and Operation will be populated upon successful
 func ValidateEnvironmentSpecs(ess []EnvironmentSpec) error {
 	configIDSet := make(map[string]bool)
-	for _, es := range ess {
+	for i := range ess {
+		es := &ess[i]
 		if es.ID == "" {
 			return fmt.Errorf("environment spec IDs must be non-empty")
 		}
@@ -47,7 +49,8 @@ func ValidateEnvironmentSpecs(ess []EnvironmentSpec) error {
 		}
 		configIDSet[es.ID] = true
 		basePathsSet := make(map[string]bool)
-		for _, api := range es.APIs {
+		for j := range es.APIs {
+			api := &es.APIs[j]
 			if api.ID == "" {
 				return fmt.Errorf("API spec IDs must be non-empty")
 			}
@@ -55,13 +58,18 @@ func ValidateEnvironmentSpecs(ess []EnvironmentSpec) error {
 				return fmt.Errorf("API spec basepaths within each environment spec must be unique, got multiple %s", api.BasePath)
 			}
 			basePathsSet[api.BasePath] = true
+			api.jwtAuthentications = make(map[string]*JWTAuthentication)
+			if err := validateJWTAuthenticationName(&api.Authentication, api.jwtAuthentications); err != nil {
+				return err
+			}
 			for _, p := range api.ConsumerAuthorization.In {
-				if err := validateAPIOperationParameter(&p); err != nil {
+				if err := validateAPIOperationParameter(&p, api.jwtAuthentications); err != nil {
 					return err
 				}
 			}
 			opNameSet := make(map[string]bool)
-			for _, op := range api.Operations {
+			for k := range api.Operations {
+				op := &api.Operations[k]
 				if op.Name == "" {
 					return fmt.Errorf("operation names must be non-empty")
 				}
@@ -69,13 +77,14 @@ func ValidateEnvironmentSpecs(ess []EnvironmentSpec) error {
 					return fmt.Errorf("operation names within each API must be unique, got multiple %s", op.Name)
 				}
 				opNameSet[op.Name] = true
+				op.jwtAuthentications = make(map[string]*JWTAuthentication)
+				if err := validateJWTAuthenticationName(&op.Authentication, op.jwtAuthentications); err != nil {
+					return err
+				}
 				for _, p := range op.ConsumerAuthorization.In {
-					if err := validateAPIOperationParameter(&p); err != nil {
+					if err := validateAPIOperationParameter(&p, op.jwtAuthentications, api.jwtAuthentications); err != nil {
 						return err
 					}
-				}
-				if err := validateJWTAuthenticationName(&op.Authentication, map[string]bool{}); err != nil {
-					return err
 				}
 				for _, p := range op.HTTPMatches {
 					if p.Method != anyMethod {
@@ -85,9 +94,6 @@ func ValidateEnvironmentSpecs(ess []EnvironmentSpec) error {
 					}
 				}
 			}
-			if err := validateJWTAuthenticationName(&api.Authentication, map[string]bool{}); err != nil {
-				return err
-			}
 		}
 	}
 	return nil
@@ -95,18 +101,18 @@ func ValidateEnvironmentSpecs(ess []EnvironmentSpec) error {
 
 // validateJWTAuthenticationName checks if the JWTAuthentication has non-empty and unique
 // name within the given AuthenticationRequirement. It also validates the APIOperationParameter
-// of the JWTAuthentication.
-func validateJWTAuthenticationName(a *AuthenticationRequirement, m map[string]bool) error {
+// of the JWTAuthentication. The passed map will be populated.
+func validateJWTAuthenticationName(a *AuthenticationRequirement, m map[string]*JWTAuthentication) error {
 	var err error
 	switch v := a.Requirements.(type) {
 	case JWTAuthentication:
 		if v.Name == "" {
 			return fmt.Errorf("JWT authentication requirement names must be non-empty")
 		}
-		if m[v.Name] {
+		if _, ok := m[v.Name]; ok {
 			return fmt.Errorf("JWT authentication requirement names within each API or operation must be unique, got multiple %s", v.Name)
 		}
-		m[v.Name] = true
+		m[v.Name] = &v
 		for _, p := range v.In {
 			if err := validateAPIOperationParameter(&p); err != nil {
 				return err
@@ -126,7 +132,7 @@ func validateJWTAuthenticationName(a *AuthenticationRequirement, m map[string]bo
 
 // validateAPIOperationParameter checks if all headers and queries are non-empty
 // and JWT claims have non-empty names.
-func validateAPIOperationParameter(p *APIOperationParameter) error {
+func validateAPIOperationParameter(p *APIOperationParameter, maps ...map[string]*JWTAuthentication) error {
 	switch v := p.Match.(type) {
 	case Header:
 		if len(string(v)) == 0 {
@@ -139,6 +145,16 @@ func validateAPIOperationParameter(p *APIOperationParameter) error {
 	case JWTClaim:
 		if v.Name == "" {
 			return fmt.Errorf("JWT claim name in API operation parameter match must be non-empty")
+		}
+		fail := true
+		for _, m := range maps {
+			if _, ok := m[v.Requirement]; ok {
+				fail = false
+				break
+			}
+		}
+		if fail {
+			return fmt.Errorf("JWT claim requirement %q does not exist", v.Requirement)
 		}
 	}
 	return nil
@@ -185,6 +201,9 @@ type APISpec struct {
 
 	// A list of API Operations, names of which must be unique within the API.
 	Operations []APIOperation `yaml:"operations" mapstructure:"operations"`
+
+	// JWTAuthentication.Name -> *JWTAuthentication
+	jwtAuthentications map[string]*JWTAuthentication `yaml:"-" mapstructure:"-"`
 }
 
 // An APIOperation associates a set of rules with a set of request matching settings.
@@ -203,6 +222,9 @@ type APIOperation struct {
 
 	// Transformation rules applied to HTTP requests for this Operation. Overrides the rules set at the API level.
 	HTTPRequestTransforms HTTPRequestTransformations `yaml:"http_request_transforms,omitempty" mapstructure:"http_request_transforms,omitempty"`
+
+	// JWTAuthentication.Name -> *JWTAuthentication
+	jwtAuthentications map[string]*JWTAuthentication `yaml:"-" mapstructure:"-"`
 }
 
 // HTTPRequestTransformations are rules for modifying HTTP requests.

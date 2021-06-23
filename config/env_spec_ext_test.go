@@ -29,8 +29,8 @@ func TestNewEnvironmentSpecExt(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 
-	if len(specExt.JWTAuthentications()) != 2 {
-		t.Errorf("should be 2")
+	if l := len(specExt.JWTAuthentications()); l != 5 {
+		t.Errorf("should be 5 JWTAuthentications, got %d", l)
 	}
 
 	if specExt.apiPathTree == nil {
@@ -101,68 +101,6 @@ func TestAuthorizationRequirementIsEmpty(t *testing.T) {
 			}
 			if test.empty != req.IsEmpty() {
 				t.Errorf("expected empty == %t", test.empty)
-			}
-		})
-	}
-}
-
-func TestAllJWTRequirements(t *testing.T) {
-	tests := []struct {
-		desc  string
-		reqs  AuthenticationRequirements
-		count int
-	}{
-		{"just jwt", JWTAuthentication{}, 1},
-		{"jwt in all", AllAuthenticationRequirements{
-			AuthenticationRequirement{
-				Requirements: JWTAuthentication{
-					Name: "1",
-				},
-			},
-		}, 1},
-		{"jwt in any", AnyAuthenticationRequirements{
-			AuthenticationRequirement{
-				Requirements: JWTAuthentication{
-					Name: "1",
-				},
-			},
-		}, 1},
-		{"nested empty", AnyAuthenticationRequirements{
-			AuthenticationRequirement{
-				Requirements: AllAuthenticationRequirements{
-					AuthenticationRequirement{
-						Requirements: AnyAuthenticationRequirements{},
-					},
-				},
-			},
-		}, 0},
-		{"nested jwts", AllAuthenticationRequirements{
-			AuthenticationRequirement{
-				Requirements: AnyAuthenticationRequirements{
-					AuthenticationRequirement{
-						Requirements: JWTAuthentication{
-							Name: "1",
-						},
-					},
-					AuthenticationRequirement{
-						Requirements: JWTAuthentication{
-							Name: "2",
-						},
-					},
-				},
-			},
-		}, 2},
-	}
-
-	for _, test := range tests {
-		t.Run(test.desc, func(t *testing.T) {
-			req := AuthenticationRequirement{
-				Requirements: test.reqs,
-			}
-			nameMap := map[string]*JWTAuthentication{}
-			req.mapJWTAuthentications(nameMap)
-			if test.count != len(nameMap) {
-				t.Errorf("expected %d, got %d", test.count, len(nameMap))
 			}
 		})
 	}

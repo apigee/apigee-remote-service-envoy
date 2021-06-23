@@ -29,6 +29,7 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/v2/auth/jwt"
 	"github.com/apigee/apigee-remote-service-golib/v2/context"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
 func TestNilReceivers(t *testing.T) {
@@ -112,7 +113,7 @@ func TestGetAPISpec(t *testing.T) {
 			specReq := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
 
 			got := specReq.GetAPISpec()
-			if diff := cmp.Diff(test.want, got); diff != "" {
+			if diff := cmp.Diff(test.want, got, cmpopts.IgnoreUnexported(APISpec{})); diff != "" {
 				t.Errorf("diff (-want +got):\n%s", diff)
 			}
 		})
@@ -153,7 +154,7 @@ func TestGetOperation(t *testing.T) {
 			specReq := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
 
 			gotAPI := specReq.GetOperation()
-			if diff := cmp.Diff(test.want, gotAPI); diff != "" {
+			if diff := cmp.Diff(test.want, gotAPI, cmpopts.IgnoreUnexported(APIOperation{})); diff != "" {
 				t.Errorf("diff (-want +got):\n%s", diff)
 			}
 		})
@@ -479,6 +480,36 @@ func TestGetAPIKey(t *testing.T) {
 
 			if "" != got {
 				t.Errorf("want: %q, got: %q", "", got)
+			}
+		})
+	}
+}
+
+func TestEnvSpecRequestJWTAuthentications(t *testing.T) {
+	tests := []struct {
+		desc   string
+		path   string
+		jwtLen int
+	}{
+		{"auth in api", "/v1/petstore", 1},
+		{"auth in operation", "/v2/petstore/pets", 2},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+
+			// not authenticated
+			envSpec := createGoodEnvSpec()
+			specExt, err := NewEnvironmentSpecExt(&envSpec)
+			if err != nil {
+				t.Fatalf("%v", err)
+			}
+
+			envoyReq := testutil.NewEnvoyRequest(http.MethodGet, test.path, nil, nil)
+			req := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
+
+			if l := len(req.JWTAuthentications()); l != test.jwtLen {
+				t.Errorf("req.JWTAuthentications() = %d, want %d", l, test.jwtLen)
 			}
 		})
 	}

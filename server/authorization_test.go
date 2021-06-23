@@ -228,87 +228,119 @@ func TestEnvRequestCheck(t *testing.T) {
 	contextExtensions := map[string]string{
 		envSpecContextKey: specExt.ID,
 	}
-	var req *authv3.CheckRequest
-	var resp *authv3.CheckResponse
 
-	// missing api
-	req = testutil.NewEnvoyRequest(http.MethodGet, "/v2/missing", nil, nil)
-	req.Attributes.ContextExtensions = contextExtensions
-	if resp, err = server.Check(context.Background(), req); err != nil {
-		t.Errorf("should not get error. got: %s", err)
-	}
-	if resp.Status.Code != int32(rpc.NOT_FOUND) {
-		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.NOT_FOUND))
+	tests := []struct {
+		desc        string
+		method      string
+		path        string
+		headers     map[string]string
+		authContext *auth.Context
+		authErr     error
+		statusCode  int32
+		wantHeaders []string
+		wantValues  []string
+		wantAppends []bool
+	}{
+		{
+			desc:       "missing api",
+			method:     http.MethodGet,
+			path:       "/v2/missing",
+			statusCode: int32(rpc.NOT_FOUND),
+		},
+		{
+			desc:       "missing operation",
+			method:     http.MethodGet,
+			path:       "/v1/missing",
+			statusCode: int32(rpc.NOT_FOUND),
+		},
+		{
+			desc:       "bad authentication",
+			method:     http.MethodGet,
+			path:       uri,
+			statusCode: int32(rpc.UNAUTHENTICATED),
+		},
+		{
+			desc:   "bad authentication because op overrides the auth req",
+			method: http.MethodGet,
+			path:   "/v1/airport",
+			headers: map[string]string{
+				"jwt": jwtString,
+			},
+			statusCode: int32(rpc.UNAUTHENTICATED),
+		},
+		{
+			desc:   "good authentication, bad authorization",
+			method: http.MethodGet,
+			path:   uri,
+			headers: map[string]string{
+				"jwt": jwtString,
+			},
+			authErr:    libAuth.ErrBadAuth,
+			statusCode: int32(rpc.PERMISSION_DENIED),
+		},
+		{
+			desc:   "good authn/z, network failure w/ fail open",
+			method: http.MethodGet,
+			path:   uri,
+			headers: map[string]string{
+				"jwt": jwtString,
+			},
+			authErr:    libAuth.ErrNetworkError,
+			statusCode: int32(rpc.OK),
+		},
+		{
+			desc:   "good request",
+			method: http.MethodGet,
+			path:   uri,
+			headers: map[string]string{
+				"jwt": jwtString,
+			},
+			authContext: &auth.Context{
+				APIProducts: []string{"product1"},
+			},
+			statusCode: int32(rpc.OK),
+			wantHeaders: []string{
+				":path",
+				"target",
+				"target",
+			},
+			wantValues: []string{
+				"/petstore?x-api-key=foo",
+				"add",
+				"append",
+			},
+			wantAppends: []bool{false, false, true},
+		},
 	}
 
-	// missing operation
-	req = testutil.NewEnvoyRequest(http.MethodGet, "/v1/missing", nil, nil)
-	req.Attributes.ContextExtensions = contextExtensions
-	if resp, err = server.Check(context.Background(), req); err != nil {
-		t.Errorf("should not get error. got: %s", err)
-	}
-	if resp.Status.Code != int32(rpc.NOT_FOUND) {
-		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.NOT_FOUND))
-	}
-
-	// Cannot authenticate
-	req = testutil.NewEnvoyRequest(http.MethodGet, uri, nil, nil)
-	req.Attributes.ContextExtensions = contextExtensions
-	if resp, err = server.Check(context.Background(), req); err != nil {
-		t.Errorf("should not get error. got: %s", err)
-	}
-	if resp.Status.Code != int32(rpc.UNAUTHENTICATED) {
-		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.UNAUTHENTICATED))
-	}
-
-	// good authentication, bad authorization
-	headers := map[string]string{
-		"jwt": jwtString,
-	}
-	req = testutil.NewEnvoyRequest(http.MethodGet, uri, headers, nil)
-	req.Attributes.ContextExtensions = contextExtensions
-	testAuthMan.sendAuth(nil, libAuth.ErrBadAuth)
-	if resp, err = server.Check(context.Background(), req); err != nil {
-		t.Errorf("should not get error. got: %s", err)
-	}
-	if resp.Status.Code != int32(rpc.PERMISSION_DENIED) {
-		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.PERMISSION_DENIED))
-	}
-
-	// good authentication, authorization network fail w/ FailOpen
-	testAuthMan.sendAuth(nil, libAuth.ErrNetworkError)
-	if resp, err = server.Check(context.Background(), req); err != nil {
-		t.Errorf("should not get error. got: %s", err)
-	}
-	if resp.Status.Code != int32(rpc.OK) {
-		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.OK))
-	}
-
-	// good request
-	testAuthMan.sendAuth(&auth.Context{
-		APIProducts: []string{"product1"},
-	}, nil)
-	if resp, err = server.Check(context.Background(), req); err != nil {
-		t.Errorf("should not get error. got: %s", err)
-	}
-	if resp.Status.Code != int32(rpc.OK) {
-		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.OK))
-	}
-
-	okr, ok := resp.HttpResponse.(*authv3.CheckResponse_OkResponse)
-	if !ok {
-		t.Fatal("must be OkResponse")
-	}
-
-	wantPath := "/petstore?x-api-key=foo"
-	if !hasHeaderAdd(okr.OkResponse, ":path", wantPath, false) {
-		t.Errorf(":path header should be: %s", wantPath)
-	}
-	if !hasHeaderAdd(okr.OkResponse, "target", "add", false) {
-		t.Errorf("add header option not found")
-	}
-	if !hasHeaderAdd(okr.OkResponse, "target", "append", true) {
-		t.Errorf("append header option not found")
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			req := testutil.NewEnvoyRequest(test.method, test.path, test.headers, nil)
+			req.Attributes.ContextExtensions = contextExtensions
+			testAuthMan.sendAuth(test.authContext, test.authErr)
+			resp, err := server.Check(context.Background(), req)
+			if err != nil {
+				t.Errorf("should not get error. got: %s", err)
+			}
+			if resp.Status.Code != test.statusCode {
+				t.Errorf("got: %d, want: %d", resp.Status.Code, test.statusCode)
+			}
+			if test.statusCode == int32(rpc.OK) {
+				okr, ok := resp.HttpResponse.(*authv3.CheckResponse_OkResponse)
+				if !ok {
+					t.Fatal("must be OkResponse")
+				}
+				for i, h := range test.wantHeaders {
+					if !hasHeaderAdd(okr.OkResponse, h, test.wantValues[i], test.wantAppends[i]) {
+						if test.wantAppends[i] {
+							t.Errorf("%q not appended to header %q", test.wantValues[i], h)
+						} else {
+							t.Errorf("%q header should be: %q", h, test.wantValues[i])
+						}
+					}
+				}
+			}
+		})
 	}
 }
 
@@ -770,7 +802,7 @@ func (q *testQuotaMan) Apply(auth *auth.Context, p product.AuthorizedOperation, 
 }
 
 func createAuthEnvSpec() config.EnvironmentSpec {
-	return config.EnvironmentSpec{
+	envSpecs := []config.EnvironmentSpec{{
 		ID: "good-env-config",
 		APIs: []config.APISpec{
 			{
@@ -802,6 +834,25 @@ func createAuthEnvSpec() config.EnvironmentSpec {
 							},
 						},
 					},
+					{
+						Name: "op2",
+						HTTPMatches: []config.HTTPMatch{
+							{
+								PathTemplate: "/airport",
+								Method:       "",
+							},
+						},
+						Authentication: config.AuthenticationRequirement{
+							Requirements: config.JWTAuthentication{
+								Name:                 "jwt",
+								Issuer:               "issuer",
+								Audiences:            []string{"aud1"},
+								JWKSSource:           config.RemoteJWKS{URL: "url", CacheDuration: time.Hour},
+								In:                   []config.APIOperationParameter{{Match: config.Query("jwt")}},
+								ForwardPayloadHeader: "jwt",
+							},
+						},
+					},
 				},
 				HTTPRequestTransforms: config.HTTPRequestTransformations{
 					SetHeaders: map[string]string{
@@ -816,5 +867,7 @@ func createAuthEnvSpec() config.EnvironmentSpec {
 				},
 			},
 		},
-	}
+	}}
+	_ = config.ValidateEnvironmentSpecs(envSpecs)
+	return envSpecs[0]
 }

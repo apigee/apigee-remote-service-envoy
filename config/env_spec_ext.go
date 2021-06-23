@@ -29,7 +29,6 @@ const wildcard = "*"
 func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
 	ec := &EnvironmentSpecExt{
 		EnvironmentSpec:       spec,
-		jwtAuthentications:    make(map[string]map[string]*JWTAuthentication),
 		apiPathTree:           path.NewTree(),
 		opPathTree:            path.NewTree(),
 		parsedTransformations: make(map[string]*transform.Template),
@@ -37,9 +36,6 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
 
 	for i := range spec.APIs {
 		api := spec.APIs[i]
-
-		ec.jwtAuthentications[api.ID] = map[string]*JWTAuthentication{}
-		api.Authentication.mapJWTAuthentications(ec.jwtAuthentications[api.ID])
 
 		// tree: base path -> APISpec
 		split := strings.Split(api.BasePath, "/")
@@ -49,8 +45,6 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
 		// tree: api.ID -> method -> path -> APIOperation
 		for i := range api.Operations {
 			op := api.Operations[i]
-
-			op.Authentication.mapJWTAuthentications(ec.jwtAuthentications[api.ID])
 
 			for _, m := range op.HTTPMatches {
 				split = strings.Split(m.PathTemplate, "/")
@@ -87,18 +81,22 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
 // Create using config.NewEnvironmentSpecExt()
 type EnvironmentSpecExt struct {
 	*EnvironmentSpec
-	jwtAuthentications    map[string]map[string]*JWTAuthentication // api.ID -> auth.name -> *JWTAuthentication
-	apiPathTree           path.Tree                                // base path -> *APISpec
-	opPathTree            path.Tree                                // api.ID -> method -> sub path -> *Operation
+	apiPathTree           path.Tree // base path -> *APISpec
+	opPathTree            path.Tree // api.ID -> method -> sub path -> *Operation
 	parsedTransformations map[string]*transform.Template
 }
 
 // JWTAuthentications returns a list of all JWTAuthentications for the Spec
 func (e EnvironmentSpecExt) JWTAuthentications() []*JWTAuthentication {
 	var auths []*JWTAuthentication
-	for _, m := range e.jwtAuthentications {
-		for _, v := range m {
+	for _, api := range e.APIs {
+		for _, v := range api.jwtAuthentications {
 			auths = append(auths, v)
+		}
+		for _, op := range api.Operations {
+			for _, v := range op.jwtAuthentications {
+				auths = append(auths, v)
+			}
 		}
 	}
 	return auths
@@ -114,27 +112,6 @@ func (c ConsumerAuthorization) isEmpty() bool {
 
 func (a AuthenticationRequirement) IsEmpty() bool {
 	return isEmpty(a)
-}
-
-// populates passed map with JWTAuthentication.name -> *JWTAuthentication for all enclosing Requirements
-func (a AuthenticationRequirement) mapJWTAuthentications(nameMap map[string]*JWTAuthentication) {
-	mapJWTRequirements(a, nameMap)
-}
-
-// populates passed map with JWTAuthentication.name -> *JWTAuthentication for all enclosing Requirements
-func mapJWTRequirements(auth AuthenticationRequirement, nameMap map[string]*JWTAuthentication) {
-	switch v := auth.Requirements.(type) {
-	case JWTAuthentication:
-		nameMap[v.Name] = &v
-	case AnyAuthenticationRequirements:
-		for _, val := range []AuthenticationRequirement(v) {
-			mapJWTRequirements(val, nameMap)
-		}
-	case AllAuthenticationRequirements:
-		for _, val := range []AuthenticationRequirement(v) {
-			mapJWTRequirements(val, nameMap)
-		}
-	}
 }
 
 func isEmpty(auth AuthenticationRequirement) bool {
