@@ -146,6 +146,7 @@ func TestGetOperation(t *testing.T) {
 		{"petstore/", http.MethodGet, "/v1/petstore/", petstore},
 		{"petstore with query", http.MethodGet, "/v1/petstore?foo=bar", petstore},
 		{"bookshop", http.MethodPost, "/v1/bookshop/", bookshop},
+		{"noop", http.MethodPost, "/v3/bookshop/", synthesizedOperation},
 	}
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
@@ -321,6 +322,7 @@ func TestIsAuthenticated(t *testing.T) {
 	}{
 		{"auth in api", "/v1/petstore"},
 		{"auth in operation", "/v2/petstore"},
+		{"auth in api, no op", "/v3/petstore"},
 	}
 
 	for _, test := range tests {

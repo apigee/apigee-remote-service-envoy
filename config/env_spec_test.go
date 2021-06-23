@@ -1035,6 +1035,25 @@ func createGoodEnvSpec() EnvironmentSpec {
 					},
 				},
 			},
+			{
+				ID:         "no-operations-api",
+				BasePath:   "/v3",
+				Operations: []APIOperation{},
+				Authentication: AuthenticationRequirement{
+					Requirements: JWTAuthentication{
+						Name:       "foo",
+						Issuer:     "issuer",
+						JWKSSource: RemoteJWKS{URL: "url", CacheDuration: time.Hour},
+						In:         []APIOperationParameter{{Match: Header("jwt")}},
+					},
+				},
+				ConsumerAuthorization: ConsumerAuthorization{
+					In: []APIOperationParameter{
+						{Match: Query("x-api-key")},
+						{Match: Header("x-api-key")},
+					},
+				},
+			},
 		},
 	}}
 	_ = ValidateEnvironmentSpecs(envSpecs)

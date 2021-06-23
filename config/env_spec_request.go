@@ -30,6 +30,11 @@ import (
 
 const TruncateDebugRequestValuesAt = 5
 
+// a "match all" operation for apis without operations
+var synthesizedOperation = &APIOperation{
+	Name: "*",
+}
+
 // NewEnvironmentSpecRequest creates a new EnvironmentSpecRequest
 func NewEnvironmentSpecRequest(authMan auth.Manager, e *EnvironmentSpecExt, req *authv3.CheckRequest) *EnvironmentSpecRequest {
 	esr := &EnvironmentSpecRequest{
@@ -100,13 +105,18 @@ func (e *EnvironmentSpecRequest) GetOperation() *APIOperation {
 	}
 	if e.operation == nil {
 		if api := e.GetAPISpec(); api != nil {
-			e.operationPath = strings.TrimPrefix(e.request.Attributes.Request.Http.Path, api.BasePath) // strip base path
-			pathSplits := strings.Split(strings.SplitN(e.operationPath, "?", 2)[0], "/")               // strip querystring and split
-			// prepend method for search
-			pathSplits = append([]string{e.apiSpec.ID, e.request.Attributes.Request.Http.Method}, pathSplits...)
+			if len(api.Operations) == 0 { // if no operations, match any for api
+				e.operationPath = "/"
+				e.operation = synthesizedOperation
+			} else {
+				e.operationPath = strings.TrimPrefix(e.request.Attributes.Request.Http.Path, api.BasePath) // strip base path
+				pathSplits := strings.Split(strings.SplitN(e.operationPath, "?", 2)[0], "/")               // strip querystring and split
+				// prepend method for search
+				pathSplits = append([]string{e.apiSpec.ID, e.request.Attributes.Request.Http.Method}, pathSplits...)
 
-			if result := e.opPathTree.Find(pathSplits, 0); result != nil {
-				e.operation = result.(*APIOperation)
+				if result := e.opPathTree.Find(pathSplits, 0); result != nil {
+					e.operation = result.(*APIOperation)
+				}
 			}
 		}
 	}

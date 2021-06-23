@@ -29,8 +29,8 @@ func TestNewEnvironmentSpecExt(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 
-	if l := len(specExt.JWTAuthentications()); l != 5 {
-		t.Errorf("should be 5 JWTAuthentications, got %d", l)
+	if l := len(specExt.JWTAuthentications()); l != 6 {
+		t.Errorf("should be 6 JWTAuthentications, got %d", l)
 	}
 
 	if specExt.apiPathTree == nil {
