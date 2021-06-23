@@ -39,6 +39,23 @@ func TestValidateEnvironmentSpecs(t *testing.T) {
 			configs: []EnvironmentSpec{createGoodEnvSpec()},
 		},
 		{
+			desc: "good environment specs",
+			configs: []EnvironmentSpec{{
+				ID: "spec",
+				APIs: []APISpec{{
+					ID: "api",
+					Authentication: AuthenticationRequirement{
+						Requirements: JWTAuthentication{Name: "oidc"},
+					},
+					ConsumerAuthorization: ConsumerAuthorization{
+						In: []APIOperationParameter{{
+							Match: JWTClaim{Name: "client_id", Requirement: "oidc"},
+						}},
+					},
+				}},
+			}},
+		},
+		{
 			desc:    "empty environment spec id",
 			configs: []EnvironmentSpec{{}},
 			hasErr:  true,
@@ -264,6 +281,36 @@ func TestValidateEnvironmentSpecs(t *testing.T) {
 			},
 			hasErr:  true,
 			wantErr: "JWT claim name in API operation parameter match must be non-empty",
+		},
+		{
+			desc: "consumer authz refers to non-existing jwt requirement",
+			configs: []EnvironmentSpec{
+				{
+					ID: "spec",
+					APIs: []APISpec{
+						{
+							ID: "api",
+							Operations: []APIOperation{
+								{
+									Name: "op",
+									ConsumerAuthorization: ConsumerAuthorization{
+										In: []APIOperationParameter{
+											{
+												Match: JWTClaim{
+													Name:        "client_id",
+													Requirement: "no-such-thing",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			hasErr:  true,
+			wantErr: "JWT claim requirement \"no-such-thing\" does not exist",
 		},
 	}
 
@@ -918,6 +965,14 @@ func createGoodEnvSpec() EnvironmentSpec {
 			{
 				ID:       "apispec2",
 				BasePath: "/v2",
+				Authentication: AuthenticationRequirement{
+					Requirements: JWTAuthentication{
+						Name:       "foo",
+						Issuer:     "issuer-0",
+						JWKSSource: RemoteJWKS{URL: "url", CacheDuration: time.Hour},
+						In:         []APIOperationParameter{{Match: Header("jwt")}},
+					},
+				},
 				Operations: []APIOperation{
 					{
 						Name: "op-3",
@@ -958,11 +1013,23 @@ func createGoodEnvSpec() EnvironmentSpec {
 							},
 						},
 						Authentication: AuthenticationRequirement{
-							Requirements: JWTAuthentication{
-								Name:       "foo",
-								Issuer:     "issuer2",
-								JWKSSource: RemoteJWKS{URL: "url2", CacheDuration: time.Hour},
-								In:         []APIOperationParameter{{Match: Header("jwt")}},
+							Requirements: AllAuthenticationRequirements{
+								AuthenticationRequirement{
+									Requirements: JWTAuthentication{
+										Name:       "foo",
+										Issuer:     "issuer2",
+										JWKSSource: RemoteJWKS{URL: "url2", CacheDuration: time.Hour},
+										In:         []APIOperationParameter{{Match: Header("jwt")}},
+									},
+								},
+								AuthenticationRequirement{
+									Requirements: JWTAuthentication{
+										Name:       "bar",
+										Issuer:     "issuer2",
+										JWKSSource: RemoteJWKS{URL: "url2", CacheDuration: time.Hour},
+										In:         []APIOperationParameter{{Match: Header("jwt")}},
+									},
+								},
 							},
 						},
 					},

@@ -164,13 +164,13 @@ func (e *EnvironmentSpecRequest) getClaimValue(claim JWTClaim) string {
 // JWTAuthentications returns a list of JWTAuthentication specific to the request.
 func (e *EnvironmentSpecRequest) JWTAuthentications() []*JWTAuthentication {
 	var auths []*JWTAuthentication
-	for _, v := range e.operation.jwtAuthentications {
+	for _, v := range e.GetOperation().jwtAuthentications {
 		auths = append(auths, v)
 	}
 	if len(auths) != 0 {
 		return auths
 	}
-	for _, v := range e.apiSpec.jwtAuthentications {
+	for _, v := range e.GetAPISpec().jwtAuthentications {
 		auths = append(auths, v)
 	}
 	return auths

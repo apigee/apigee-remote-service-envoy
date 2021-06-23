@@ -485,6 +485,36 @@ func TestGetAPIKey(t *testing.T) {
 	}
 }
 
+func TestEnvSpecRequestJWTAuthentications(t *testing.T) {
+	tests := []struct {
+		desc   string
+		path   string
+		jwtLen int
+	}{
+		{"auth in api", "/v1/petstore", 1},
+		{"auth in operation", "/v2/petstore/pets", 2},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+
+			// not authenticated
+			envSpec := createGoodEnvSpec()
+			specExt, err := NewEnvironmentSpecExt(&envSpec)
+			if err != nil {
+				t.Fatalf("%v", err)
+			}
+
+			envoyReq := testutil.NewEnvoyRequest(http.MethodGet, test.path, nil, nil)
+			req := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
+
+			if l := len(req.JWTAuthentications()); l != test.jwtLen {
+				t.Errorf("req.JWTAuthentications() = %d, want %d", l, test.jwtLen)
+			}
+		})
+	}
+}
+
 type testAuthMan struct {
 }
 
