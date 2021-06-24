@@ -46,14 +46,19 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
 		for i := range api.Operations {
 			op := api.Operations[i]
 
-			for _, m := range op.HTTPMatches {
-				split = strings.Split(m.PathTemplate, "/")
-				method := m.Method
-				if method == anyMethod {
-					method = wildcard
-				}
-				split = append([]string{api.ID, method}, split...)
+			if len(op.HTTPMatches) == 0 { // empty is wildcard
+				split = []string{api.ID, wildcard, wildcard}
 				ec.opPathTree.AddChild(split, 0, &op)
+			} else {
+				for _, m := range op.HTTPMatches {
+					split = strings.Split(m.PathTemplate, "/")
+					method := m.Method
+					if method == anyMethod {
+						method = wildcard
+					}
+					split = append([]string{api.ID, method}, split...)
+					ec.opPathTree.AddChild(split, 0, &op)
+				}
 			}
 
 			for _, in := range op.ConsumerAuthorization.In {
