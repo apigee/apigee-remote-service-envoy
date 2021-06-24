@@ -131,6 +131,7 @@ func TestGetOperation(t *testing.T) {
 	}
 	petstore := &envSpec.APIs[0].Operations[0]
 	bookshop := &envSpec.APIs[0].Operations[1]
+	empty := &envSpec.APIs[3].Operations[0]
 
 	tests := []struct {
 		desc   string
@@ -146,7 +147,8 @@ func TestGetOperation(t *testing.T) {
 		{"petstore/", http.MethodGet, "/v1/petstore/", petstore},
 		{"petstore with query", http.MethodGet, "/v1/petstore?foo=bar", petstore},
 		{"bookshop", http.MethodPost, "/v1/bookshop/", bookshop},
-		{"noop", http.MethodPost, "/v3/bookshop/", synthesizedOperation},
+		{"noop", http.MethodPost, "/v3/bookshop/", defaultOperation},
+		{"empty", http.MethodPost, "/v4/whatever/", empty},
 	}
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
