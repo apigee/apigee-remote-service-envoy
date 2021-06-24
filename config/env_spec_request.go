@@ -31,8 +31,8 @@ import (
 const TruncateDebugRequestValuesAt = 5
 
 // a "match all" operation for apis without operations
-var synthesizedOperation = &APIOperation{
-	Name: "*",
+var defaultOperation = &APIOperation{
+	Name: "default",
 }
 
 // NewEnvironmentSpecRequest creates a new EnvironmentSpecRequest
@@ -106,8 +106,7 @@ func (e *EnvironmentSpecRequest) GetOperation() *APIOperation {
 	if e.operation == nil {
 		if api := e.GetAPISpec(); api != nil {
 			if len(api.Operations) == 0 { // if no operations, match any for api
-				e.operationPath = "/"
-				e.operation = synthesizedOperation
+				e.operation = defaultOperation
 			} else {
 				e.operationPath = strings.TrimPrefix(e.request.Attributes.Request.Http.Path, api.BasePath) // strip base path
 				pathSplits := strings.Split(strings.SplitN(e.operationPath, "?", 2)[0], "/")               // strip querystring and split
