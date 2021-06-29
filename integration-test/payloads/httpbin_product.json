@@ -9,7 +9,7 @@
     },
     {
       "name": "apigee-remote-service-targets",
-      "value": "httpbin.org,httpbin.default.svc.cluster.local"
+      "value": "httpbin.org,httpbin.default.svc.cluster.local,proxy1"
     }
   ],
   "description": "httpbin product for test purpose",
