@@ -53,6 +53,7 @@ type Handler struct {
 	jwtProviderKey        string
 	isMultitenant         bool
 	envSpecsByID          map[string]*config.EnvironmentSpecExt
+	operationConfigType   string
 
 	productMan   product.Manager
 	authMan      auth.Manager
@@ -251,6 +252,7 @@ func NewHandler(cfg *config.Config) (*Handler, error) {
 		appendMetadataHeaders: cfg.Auth.AppendMetadataHeaders,
 		isMultitenant:         cfg.Tenant.IsMultitenant(),
 		envSpecsByID:          environmentSpecsByID,
+		operationConfigType:   cfg.Tenant.OperationConfigType,
 	}
 
 	return h, nil

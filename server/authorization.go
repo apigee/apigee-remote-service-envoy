@@ -139,6 +139,10 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 		if !envRequest.IsAuthorizationRequired() {
 			log.Debugf("no authorization required, skipping")
 			return a.authOK(req, tracker, nil, "", envRequest), nil
+
+		// strip the basepath off path
+		if a.handler.operationConfigType == product.ProxyOperationConfigType {
+			path = strings.SplitN(envRequest.GetOperationPath(), "?", 2)[0]
 		}
 
 		apiKey = envRequest.GetAPIKey()
