@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -76,10 +77,10 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 				envFromEnvoy,
 			}
 		} else {
-			err = fmt.Errorf("no %s metadata for multi-tentant mode", envContextKey)
+			err = fmt.Errorf("no %s metadata for multi-tenant mode", envContextKey)
 		}
 	} else if envFromEnvoyExists && envFromEnvoy != rootContext.Environment() {
-		err = fmt.Errorf("%s metadata (%s) disallowed when not in multi-tentant mode", envContextKey, rootContext.Environment())
+		err = fmt.Errorf("%s metadata (%s) disallowed when not in multi-tenant mode", envContextKey, rootContext.Environment())
 	}
 
 	tracker := prometheusRequestTracker(rootContext)
@@ -119,26 +120,31 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 		apiSpec := envRequest.GetAPISpec()
 		if apiSpec == nil {
 			log.Debugf("api not found for environment spec %s", envSpec.ID)
-			return a.notFound(req, envRequest, tracker), nil
+			return a.notFound(req, envRequest, tracker, api), nil
 		}
 		api = apiSpec.ID
 		log.Debugf("api: %s", apiSpec.ID)
 
+		// preflight has no operation or auth check, exit here
+		if envRequest.IsCORSPreflight() {
+			return a.corsPreflightResponse(envRequest, tracker, nil, api), nil
+		}
+
 		operation = envRequest.GetOperation()
 		if operation == nil {
 			log.Debugf("no valid operation found for api %s", apiSpec.ID)
-			return a.notFound(req, envRequest, tracker), nil
+			return a.notFound(req, envRequest, tracker, api), nil
 		}
 		log.Debugf("operation: %s", operation.Name)
 
 		if !envRequest.IsAuthenticated() {
 			log.Debugf("authentication requirements not met")
-			return a.unauthenticated(req, envRequest, tracker), nil
+			return a.unauthenticated(req, envRequest, tracker, api), nil
 		}
 
 		if !envRequest.IsAuthorizationRequired() {
-			log.Debugf("no authorization required, skipping")
-			return a.authOK(req, tracker, nil, "", envRequest), nil
+			log.Debugf("no authorization requirements")
+			return a.authOK(req, tracker, nil, api, envRequest), nil
 		}
 
 		// strip the basepath off path
@@ -157,7 +163,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 			api, ok = req.Attributes.Request.Http.Headers[a.handler.apiHeader]
 			if !ok {
 				log.Debugf("missing api header %s", a.handler.apiHeader)
-				return a.unauthenticated(req, envRequest, tracker), nil
+				return a.unauthenticated(req, envRequest, tracker, api), nil
 			}
 			log.Debugf("api from header: %s", api)
 		}
@@ -197,7 +203,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 	authContext, err := a.handler.authMan.Authenticate(rootContext, apiKey, claims, a.handler.apiKeyClaim)
 	switch err {
 	case auth.ErrNoAuth:
-		return a.unauthenticated(req, envRequest, tracker), nil
+		return a.unauthenticated(req, envRequest, tracker, api), nil
 	case auth.ErrBadAuth:
 		return a.denied(req, envRequest, tracker, authContext, api), nil
 	case auth.ErrInternalError:
@@ -253,17 +259,33 @@ func (a *AuthorizationServer) applyQuotas(ops []product.AuthorizedOperation, aut
 	return
 }
 
-func (a *AuthorizationServer) authOK(req *authv3.CheckRequest, tracker *prometheusRequestMetricTracker,
+func (a *AuthorizationServer) authOK(
+	req *authv3.CheckRequest, tracker *prometheusRequestMetricTracker,
+	authContext *auth.Context, api string,
+	envRequest *config.EnvironmentSpecRequest) *authv3.CheckResponse {
+
+	checkResponse := a.createEnvoyForwarded(req, tracker, authContext, api, envRequest)
+	checkResponse.GetOkResponse().Headers = append(checkResponse.GetOkResponse().Headers, createHeaderValueOption(headerAuthorized, "true", false))
+	return checkResponse
+}
+
+// response sends request on to target
+func (a *AuthorizationServer) createEnvoyForwarded(
+	req *authv3.CheckRequest, tracker *prometheusRequestMetricTracker,
 	authContext *auth.Context, api string, envRequest *config.EnvironmentSpecRequest) *authv3.CheckResponse {
 
 	okResponse := &authv3.OkHttpResponse{}
 
+	// user request header transforms
+	addRequestHeaderTransforms(req, envRequest, okResponse)
+
+	// apigee metadata request headers
 	if a.handler.appendMetadataHeaders {
-		addMetadataHeaders(okResponse, api, authContext)
+		okResponse.Headers = append(okResponse.Headers, metadataHeaders(api, authContext)...)
 	}
 
-	addHeaderValueOption(okResponse, headerAuthorized, "true", false)
-	addHeaderTransforms(req, envRequest, okResponse)
+	// cors response headers
+	okResponse.ResponseHeadersToAdd = append(okResponse.ResponseHeadersToAdd, corsResponseHeaders(envRequest)...)
 
 	tracker.statusCode = typev3.StatusCode_OK
 	return &authv3.CheckResponse{
@@ -277,8 +299,37 @@ func (a *AuthorizationServer) authOK(req *authv3.CheckRequest, tracker *promethe
 	}
 }
 
+// if CORS request, created appropriate response header options
+func corsResponseHeaders(envRequest *config.EnvironmentSpecRequest) (headers []*corev3.HeaderValueOption) {
+	if !envRequest.IsCORSRequest() {
+		return
+	}
+	cors := envRequest.GetAPISpec().Cors
+	appendIfNotEmpty := func(key string, values ...string) {
+		if len(values) == 0 || values[0] == "" {
+			return
+		}
+		headers = append(headers, createHeaderValueOption(key, strings.Join(values, ","), false))
+	}
+	allowedOrigin, vary := envRequest.AllowedOrigin()
+	appendIfNotEmpty(config.CORSAllowOrigin, allowedOrigin)
+	if vary {
+		headers = append(headers, createHeaderValueOption(config.CORSVary, config.CORSVaryOrigin, false))
+	}
+	appendIfNotEmpty(config.CORSAllowHeaders, cors.ExposeHeaders...)
+	appendIfNotEmpty(config.CORSAllowMethods, cors.AllowMethods...)
+	appendIfNotEmpty(config.CORSExposeHeaders, cors.ExposeHeaders...)
+	if cors.MaxAge > 0 {
+		headers = append(headers, createHeaderValueOption(config.CORSMaxAge, strconv.Itoa(cors.MaxAge), false))
+	}
+	if cors.AllowCredentials && allowedOrigin != config.CORSOriginWildcard {
+		headers = append(headers, createHeaderValueOption(config.CORSAllowCredentials, config.CORSAllowCredentialsValue, false))
+	}
+	return
+}
+
 // includes any JWTAuthentication.ForwardPayloadHeader requests
-func addHeaderTransforms(req *authv3.CheckRequest, envRequest *config.EnvironmentSpecRequest,
+func addRequestHeaderTransforms(req *authv3.CheckRequest, envRequest *config.EnvironmentSpecRequest,
 	okResponse *authv3.OkHttpResponse) {
 	if envRequest != nil {
 		if apiOperation := envRequest.GetOperation(); apiOperation != nil {
@@ -293,12 +344,12 @@ func addHeaderTransforms(req *authv3.CheckRequest, envRequest *config.Environmen
 						continue
 					}
 					encodedClaims := base64.URLEncoding.EncodeToString(b)
-					addHeaderValueOption(okResponse, ja.ForwardPayloadHeader, encodedClaims, true)
+					addRequestHeader(okResponse, ja.ForwardPayloadHeader, encodedClaims, true)
 				}
 			}
 
 			// strip proxy base path from request path
-			addHeaderValueOption(okResponse, envoyPathHeader, envRequest.GetOperationPath(), false)
+			addRequestHeader(okResponse, envoyPathHeader, envRequest.GetOperationPath(), false)
 
 			// header transforms from env config
 			transforms := envRequest.GetHTTPRequestTransformations()
@@ -311,10 +362,10 @@ func addHeaderTransforms(req *authv3.CheckRequest, envRequest *config.Environmen
 				}
 			}
 			for k, v := range transforms.SetHeaders {
-				addHeaderValueOption(okResponse, k, v, false)
+				addRequestHeader(okResponse, k, v, false)
 			}
 			for _, v := range transforms.AppendHeaders {
-				addHeaderValueOption(okResponse, v.Key, v.Value, true)
+				addRequestHeader(okResponse, v.Key, v.Value, true)
 			}
 		}
 		if log.DebugEnabled() {
@@ -345,139 +396,144 @@ func logHeaderValueOptions(okResponse *authv3.OkHttpResponse) string {
 	return b.String()
 }
 
-func addHeaderValueOption(ok *authv3.OkHttpResponse, key, value string, appnd bool) {
+func addRequestHeader(ok *authv3.OkHttpResponse, key, value string, appnd bool) {
 	if value == "" {
 		return
 	}
-	ok.Headers = append(ok.Headers, &corev3.HeaderValueOption{
-		Header: &corev3.HeaderValue{
-			Key:   key,
-			Value: value,
-		},
+	ok.Headers = append(ok.Headers, createHeaderValueOption(key, value, appnd))
+}
+
+func createHeaderValueOption(key, value string, appnd bool) *corev3.HeaderValueOption {
+	return &corev3.HeaderValueOption{
+		Header: &corev3.HeaderValue{Key: key, Value: value},
 		Append: wrapperspb.Bool(appnd),
-	})
+	}
+}
+
+func (a *AuthorizationServer) corsPreflightResponse(
+	envRequest *config.EnvironmentSpecRequest,
+	tracker *prometheusRequestMetricTracker,
+	authContext *auth.Context,
+	api string) *authv3.CheckResponse {
+
+	log.Debugf("sending cors preflight for api: %v", envRequest.GetAPISpec().ID)
+	return a.createEnvoyDenied(envRequest.Request, envRequest, tracker, nil, "", rpc.CANCELLED, typev3.StatusCode_NoContent)
 }
 
 func (a *AuthorizationServer) notFound(req *authv3.CheckRequest, envRequest *config.EnvironmentSpecRequest,
-	tracker *prometheusRequestMetricTracker) *authv3.CheckResponse {
-	return a.createDenyResponse(req, envRequest, tracker, nil, "", rpc.NOT_FOUND)
+	tracker *prometheusRequestMetricTracker, api string) *authv3.CheckResponse {
+	return a.createConditionalEnvoyDenied(req, envRequest, tracker, nil, api, rpc.NOT_FOUND)
 }
 
 func (a *AuthorizationServer) unauthenticated(req *authv3.CheckRequest, envRequest *config.EnvironmentSpecRequest,
-	tracker *prometheusRequestMetricTracker) *authv3.CheckResponse {
-	return a.createDenyResponse(req, envRequest, tracker, nil, "", rpc.UNAUTHENTICATED)
+	tracker *prometheusRequestMetricTracker, api string) *authv3.CheckResponse {
+	return a.createConditionalEnvoyDenied(req, envRequest, tracker, nil, "", rpc.UNAUTHENTICATED)
 }
 
 func (a *AuthorizationServer) internalError(req *authv3.CheckRequest, envRequest *config.EnvironmentSpecRequest,
 	tracker *prometheusRequestMetricTracker, err error) *authv3.CheckResponse {
 	log.Errorf("sending internal error: %v", err)
-	return a.createDenyResponse(req, envRequest, tracker, nil, "", rpc.INTERNAL)
+	return a.createConditionalEnvoyDenied(req, envRequest, tracker, nil, "", rpc.INTERNAL)
 }
 
 func (a *AuthorizationServer) denied(req *authv3.CheckRequest, envRequest *config.EnvironmentSpecRequest,
 	tracker *prometheusRequestMetricTracker, authContext *auth.Context, api string) *authv3.CheckResponse {
-	return a.createDenyResponse(req, envRequest, tracker, authContext, api, rpc.PERMISSION_DENIED)
+	return a.createConditionalEnvoyDenied(req, envRequest, tracker, authContext, api, rpc.PERMISSION_DENIED)
 }
 
 func (a *AuthorizationServer) quotaExceeded(req *authv3.CheckRequest, envRequest *config.EnvironmentSpecRequest,
 	tracker *prometheusRequestMetricTracker, authContext *auth.Context, api string) *authv3.CheckResponse {
-	return a.createDenyResponse(req, envRequest, tracker, authContext, api, rpc.RESOURCE_EXHAUSTED)
+	return a.createConditionalEnvoyDenied(req, envRequest, tracker, authContext, api, rpc.RESOURCE_EXHAUSTED)
 }
 
-func (a *AuthorizationServer) createDenyResponse(req *authv3.CheckRequest, envRequest *config.EnvironmentSpecRequest,
-	tracker *prometheusRequestMetricTracker, authContext *auth.Context, api string, code rpc.Code) *authv3.CheckResponse {
+// creates a deny (direct) response if authorization has failed unless
+// handler.allowUnauthorized is true, in which case the request will be
+// allowed to continue
+func (a *AuthorizationServer) createConditionalEnvoyDenied(
+	req *authv3.CheckRequest, envRequest *config.EnvironmentSpecRequest,
+	tracker *prometheusRequestMetricTracker, authContext *auth.Context,
+	api string, code rpc.Code) *authv3.CheckResponse {
 
-	// use intended code, not OK
+	statusCode := typev3.StatusCode_Forbidden
 	switch code {
 	case rpc.NOT_FOUND:
-		tracker.statusCode = typev3.StatusCode_NotFound
-
+		statusCode = typev3.StatusCode_NotFound
 	case rpc.UNAUTHENTICATED:
-		tracker.statusCode = typev3.StatusCode_Unauthorized
-
+		statusCode = typev3.StatusCode_Unauthorized
 	case rpc.INTERNAL:
-		tracker.statusCode = typev3.StatusCode_InternalServerError
-
-	case rpc.PERMISSION_DENIED:
-		tracker.statusCode = typev3.StatusCode_Forbidden
-
+		statusCode = typev3.StatusCode_InternalServerError
 	case rpc.RESOURCE_EXHAUSTED:
-		tracker.statusCode = typev3.StatusCode_TooManyRequests
+		statusCode = typev3.StatusCode_TooManyRequests
 	}
 
-	if authContext == nil || !a.handler.allowUnauthorized { // send reject to client
-		log.Debugf("sending denied: %s", code.String())
-
-		response := &authv3.CheckResponse{
-			Status: &status.Status{
-				Code: int32(code),
-			},
-			HttpResponse: &authv3.CheckResponse_DeniedResponse{
-				DeniedResponse: &authv3.DeniedHttpResponse{
-					Status: &typev3.HttpStatus{
-						Code: tracker.statusCode,
-					},
-				},
-			},
-		}
-
-		// Envoy does not send metadata to ALS on a reject, so we create the
-		// analytics record here and the ALS handler can ignore the metadataless record.
-		if api != "" && authContext != nil {
-			start := req.Attributes.Request.Time.AsTime().UnixNano() / 1000000
-			duration := time.Now().Unix() - tracker.startTime.Unix()
-			sent := start + duration                                                   // use Envoy's start time to calculate
-			requestPath := strings.SplitN(req.Attributes.Request.Http.Path, "?", 2)[0] // Apigee doesn't want query params in requestPath
-			record := analytics.Record{
-				ClientReceivedStartTimestamp: start,
-				ClientReceivedEndTimestamp:   start,
-				TargetSentStartTimestamp:     0,
-				TargetSentEndTimestamp:       0,
-				TargetReceivedStartTimestamp: 0,
-				TargetReceivedEndTimestamp:   0,
-				ClientSentStartTimestamp:     sent,
-				ClientSentEndTimestamp:       sent,
-				APIProxy:                     api,
-				RequestURI:                   req.Attributes.Request.Http.Path,
-				RequestPath:                  requestPath,
-				RequestVerb:                  req.Attributes.Request.Http.Method,
-				UserAgent:                    req.Attributes.Request.Http.Headers["User-Agent"],
-				ResponseStatusCode:           int(code),
-				GatewaySource:                gatewaySource,
-				ClientIP:                     req.Attributes.Request.Http.Headers["X-Forwarded-For"],
-			}
-
-			// this may be more efficient to batch, but changing the golib impl would require
-			// a rewrite as it assumes the same authContext for all records
-			records := []analytics.Record{record}
-			err := a.handler.analyticsMan.SendRecords(authContext, records)
-			if err != nil {
-				log.Warnf("Unable to send ax: %v", err)
-			}
-		}
-
-		return response
+	if authContext != nil && a.handler.allowUnauthorized {
+		log.Debugf("sending ok (actual: %s)", code.String())
+		return a.createEnvoyForwarded(req, tracker, authContext, api, envRequest)
 	}
 
-	okResponse := &authv3.OkHttpResponse{}
+	return a.createEnvoyDenied(req, envRequest, tracker, authContext, api, code, statusCode)
+}
 
-	if a.handler.appendMetadataHeaders {
-		addMetadataHeaders(okResponse, api, authContext)
-	}
+// creates a response that will be sent directly to client
+// also queues an analytics record
+func (a *AuthorizationServer) createEnvoyDenied(req *authv3.CheckRequest, envRequest *config.EnvironmentSpecRequest,
+	tracker *prometheusRequestMetricTracker, authContext *auth.Context, api string, rpcCode rpc.Code, statusCode typev3.StatusCode) *authv3.CheckResponse {
 
-	addHeaderTransforms(req, envRequest, okResponse)
+	// send reject to client
+	log.Debugf("sending downstream: %s", rpcCode.String())
 
-	// allow request to continue upstream
-	log.Debugf("sending ok (actual: %s)", code.String())
-	return &authv3.CheckResponse{
+	tracker.statusCode = statusCode
+
+	response := &authv3.CheckResponse{
 		Status: &status.Status{
-			Code: int32(rpc.OK),
+			Code: int32(rpcCode),
 		},
-		HttpResponse: &authv3.CheckResponse_OkResponse{
-			OkResponse: okResponse,
+		HttpResponse: &authv3.CheckResponse_DeniedResponse{
+			DeniedResponse: &authv3.DeniedHttpResponse{
+				Status: &typev3.HttpStatus{
+					Code: statusCode,
+				},
+				Headers: corsResponseHeaders(envRequest),
+			},
 		},
-		DynamicMetadata: encodeExtAuthzMetadata(api, authContext, false),
 	}
+
+	// Envoy does not send metadata to ALS on a reject, so we create the
+	// analytics record here and the ALS handler can ignore the metadataless record.
+	if authContext != nil && api != "" {
+		start := req.Attributes.Request.Time.AsTime().UnixNano() / 1000000
+		duration := time.Now().Unix() - tracker.startTime.Unix()
+		sent := start + duration                                                   // use Envoy's start time to calculate
+		requestPath := strings.SplitN(req.Attributes.Request.Http.Path, "?", 2)[0] // Apigee doesn't want query params in requestPath
+		record := analytics.Record{
+			ClientReceivedStartTimestamp: start,
+			ClientReceivedEndTimestamp:   start,
+			TargetSentStartTimestamp:     0,
+			TargetSentEndTimestamp:       0,
+			TargetReceivedStartTimestamp: 0,
+			TargetReceivedEndTimestamp:   0,
+			ClientSentStartTimestamp:     sent,
+			ClientSentEndTimestamp:       sent,
+			APIProxy:                     api,
+			RequestURI:                   req.Attributes.Request.Http.Path,
+			RequestPath:                  requestPath,
+			RequestVerb:                  req.Attributes.Request.Http.Method,
+			UserAgent:                    req.Attributes.Request.Http.Headers["User-Agent"],
+			ResponseStatusCode:           int(rpcCode),
+			GatewaySource:                gatewaySource,
+			ClientIP:                     req.Attributes.Request.Http.Headers["X-Forwarded-For"],
+		}
+
+		// this may be more efficient to batch, but changing the golib impl would require
+		// a rewrite as it assumes the same authContext for all records
+		records := []analytics.Record{record}
+		err := a.handler.analyticsMan.SendRecords(authContext, records)
+		if err != nil {
+			log.Warnf("Unable to send ax: %v", err)
+		}
+	}
+
+	return response
 }
 
 // prometheus metrics

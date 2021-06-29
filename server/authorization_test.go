@@ -115,7 +115,7 @@ func TestAddHeaderTransforms(t *testing.T) {
 			specReq := config.NewEnvironmentSpecRequest(nil, specExt, envoyReq)
 			okResponse := &authv3.OkHttpResponse{}
 
-			addHeaderTransforms(envoyReq, specReq, okResponse)
+			addRequestHeaderTransforms(envoyReq, specReq, okResponse)
 
 			if test.expectedAdds != len(okResponse.Headers) {
 				t.Errorf("expected %d header adds got: %d", test.expectedAdds, len(okResponse.Headers))

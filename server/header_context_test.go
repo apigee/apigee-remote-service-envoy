@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
-	envoy_auth "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 )
 
 func TestMetadataHeaders(t *testing.T) {
@@ -42,10 +41,9 @@ func TestMetadataHeaders(t *testing.T) {
 		Scopes:         []string{"scope1", "scope2"},
 	}
 	api := "api"
-	okResponse := &envoy_auth.OkHttpResponse{}
-	addMetadataHeaders(okResponse, api, authContext)
+	mh := metadataHeaders(api, authContext)
 	headers := map[string]string{}
-	for _, o := range okResponse.Headers {
+	for _, o := range mh {
 		headers[o.Header.Key] = o.Header.Value
 	}
 
@@ -76,9 +74,8 @@ func TestMetadataHeaders(t *testing.T) {
 }
 
 func TestMetadataHeadersExceptions(t *testing.T) {
-	okResponse := &envoy_auth.OkHttpResponse{}
-	addMetadataHeaders(okResponse, "api", nil)
-	if okResponse.Headers != nil {
+	mh := metadataHeaders("api", nil)
+	if len(mh) != 0 {
 		t.Errorf("should return nil if no context")
 	}
 

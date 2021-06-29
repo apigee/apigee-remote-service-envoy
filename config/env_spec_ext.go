@@ -17,6 +17,7 @@
 package config
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/apigee/apigee-remote-service-envoy/v2/transform"
@@ -28,21 +29,34 @@ const wildcard = "*"
 // NewEnvironmentSpecExt creates an EnvironmentSpecExt
 func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
 	ec := &EnvironmentSpecExt{
-		EnvironmentSpec:       spec,
-		apiPathTree:           path.NewTree(),
-		opPathTree:            path.NewTree(),
-		parsedTransformations: make(map[string]*transform.Template),
+		EnvironmentSpec:    spec,
+		apiPathTree:        path.NewTree(),
+		opPathTree:         path.NewTree(),
+		compiledTemplates:  make(map[string]*transform.Template),
+		corsVary:           make(map[string]bool, len(spec.APIs)),
+		corsAllowedOrigins: make(map[string]map[string]bool, len(spec.APIs)),
 	}
 
 	for i := range spec.APIs {
 		api := spec.APIs[i]
 
-		// tree: base path -> APISpec
 		split := strings.Split(api.BasePath, "/")
 		split = append([]string{"/"}, split...)
 		ec.apiPathTree.AddChild(split, 0, &api)
 
-		// tree: api.ID -> method -> path -> APIOperation
+		ec.corsVary[api.ID] = len(api.Cors.AllowOriginsRegexes) > 0 || len(api.Cors.AllowOrigins) > 1
+
+		allowedOrigins := make(map[string]bool, len(api.Cors.AllowOrigins))
+		for _, o := range api.Cors.AllowOrigins {
+			allowedOrigins[o] = true
+		}
+		ec.corsAllowedOrigins[api.ID] = allowedOrigins
+
+		ec.compiledRegExps = make(map[string]*regexp.Regexp, len(api.Cors.AllowOriginsRegexes))
+		for _, r := range api.Cors.AllowOriginsRegexes {
+			ec.compiledRegExps[r] = regexp.MustCompile(r)
+		}
+
 		for i := range api.Operations {
 			op := api.Operations[i]
 
@@ -86,9 +100,12 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
 // Create using config.NewEnvironmentSpecExt()
 type EnvironmentSpecExt struct {
 	*EnvironmentSpec
-	apiPathTree           path.Tree // base path -> *APISpec
-	opPathTree            path.Tree // api.ID -> method -> sub path -> *Operation
-	parsedTransformations map[string]*transform.Template
+	apiPathTree        path.Tree                      // base path -> *APISpec
+	opPathTree         path.Tree                      // api.ID -> method -> sub path -> *Operation
+	compiledTemplates  map[string]*transform.Template // string template -> Template
+	corsVary           map[string]bool                // api ID -> true if vary header should be true
+	corsAllowedOrigins map[string]map[string]bool     // api ID -> statically allowed origin -> true
+	compiledRegExps    map[string]*regexp.Regexp      // uncompiled -> compiled
 }
 
 // JWTAuthentications returns a list of all JWTAuthentications for the Spec
@@ -145,12 +162,12 @@ func (e EnvironmentSpecExt) parseAPIOperationParameter(s StringTransformation) e
 		return nil
 	}
 	template, err := transform.Parse(s.Template)
-	e.parsedTransformations[s.Template] = template
+	e.compiledTemplates[s.Template] = template
 	if err != nil {
 		return err
 	}
 	template, _ = transform.Parse(s.Substitution)
-	e.parsedTransformations[s.Substitution] = template
+	e.compiledTemplates[s.Substitution] = template
 	return err
 }
 
@@ -159,7 +176,7 @@ func (e EnvironmentSpecExt) transform(s StringTransformation, in string) string 
 	if s.Template == "" && s.Substitution == "" {
 		return in
 	}
-	template := e.parsedTransformations[s.Template]
-	substitution := e.parsedTransformations[s.Substitution]
+	template := e.compiledTemplates[s.Template]
+	substitution := e.compiledTemplates[s.Substitution]
 	return transform.Substitute(template, substitution, in)
 }
