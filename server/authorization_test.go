@@ -344,6 +344,75 @@ func TestEnvRequestCheck(t *testing.T) {
 	}
 }
 
+func TestBasePathStripping(t *testing.T) {
+	envSpec := createAuthEnvSpec()
+	specExt, err := config.NewEnvironmentSpecExt(&envSpec)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	environmentSpecsByID := map[string]*config.EnvironmentSpecExt{
+		specExt.ID: specExt,
+	}
+
+	testAuthMan := &testAuthMan{}
+	testProductMan := &testProductMan{
+		api:     "api",
+		resolve: true,
+		products: product.ProductsNameMap{
+			"product1": &product.APIProduct{
+				DisplayName: "product1",
+			},
+		},
+		path: "/petstore?x-api-key=foo",
+	}
+	testQuotaMan := &testQuotaMan{}
+	testAnalyticsMan := &testAnalyticsMan{}
+	server := AuthorizationServer{
+		handler: &Handler{
+			authMan:             testAuthMan,
+			productMan:          testProductMan,
+			quotaMan:            testQuotaMan,
+			analyticsMan:        testAnalyticsMan,
+			envSpecsByID:        environmentSpecsByID,
+			operationConfigType: "proxy",
+		},
+	}
+
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jwtClaims := map[string]interface{}{
+		"iss": "issuer",
+		"aud": []string{"aud1", "aud2"},
+	}
+	jwtString, err := testutil.GenerateJWT(privateKey, jwtClaims)
+	if err != nil {
+		t.Fatalf("generateJWT() failed: %v", err)
+	}
+	headers := map[string]string{
+		"jwt": jwtString,
+	}
+
+	uri := "/v1/petstore?x-api-key=foo"
+	contextExtensions := map[string]string{
+		envSpecContextKey: specExt.ID,
+	}
+
+	req := testutil.NewEnvoyRequest("GET", uri, headers, nil)
+	req.Attributes.ContextExtensions = contextExtensions
+	testAuthMan.sendAuth(&auth.Context{
+		APIProducts: []string{"product1"},
+	}, nil)
+	resp, err := server.Check(context.Background(), req)
+	if err != nil {
+		t.Errorf("should not get error. got: %s", err)
+	}
+	if resp.Status.Code != int32(rpc.OK) {
+		t.Errorf("expected status code OK, got %d", resp.Status.Code)
+	}
+}
+
 func TestGlobalCheck(t *testing.T) {
 
 	jwtClaims := &structpb.Struct{
@@ -762,6 +831,7 @@ type testProductMan struct {
 	products map[string]*product.APIProduct
 	api      string
 	resolve  bool
+	path     string
 }
 
 func (p *testProductMan) Close() {}
@@ -773,6 +843,9 @@ func (p *testProductMan) Authorize(ac *auth.Context, api, path, method string) [
 		return nil
 	}
 	if api != p.api {
+		return nil
+	}
+	if p.path != "" && p.path != path {
 		return nil
 	}
 	values := []product.AuthorizedOperation{}

@@ -131,6 +131,11 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 		}
 		log.Debugf("operation: %s", operation.Name)
 
+		// strip the basepath off path
+		if a.handler.operationConfigType == product.ProxyOperationConfigType {
+			path = envRequest.GetOperationPath()
+		}
+
 		if !envRequest.IsAuthenticated() {
 			log.Debugf("authentication requirements not met")
 			return a.unauthenticated(req, envRequest, tracker), nil
