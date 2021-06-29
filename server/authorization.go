@@ -136,6 +136,11 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 			return a.unauthenticated(req, envRequest, tracker), nil
 		}
 
+		// strip the basepath off path
+		if a.handler.operationConfigType == product.ProxyOperationConfigType {
+			path = strings.SplitN(envRequest.GetOperationPath(), "?", 2)[0]
+		}
+
 		apiKey = envRequest.GetAPIKey()
 
 	} else { // global authentication
