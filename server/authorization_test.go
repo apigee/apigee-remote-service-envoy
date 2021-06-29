@@ -355,28 +355,11 @@ func TestBasePathStripping(t *testing.T) {
 	}
 
 	testAuthMan := &testAuthMan{}
-	testProductMan := &testProductMan{
-		api:     "api",
-		resolve: true,
-		products: product.ProductsNameMap{
-			"product1": &product.APIProduct{
-				DisplayName: "product1",
-			},
-		},
-		path: "/petstore?x-api-key=foo",
-	}
+	testAuthMan.sendAuth(&auth.Context{
+		APIProducts: []string{"product1"},
+	}, nil)
 	testQuotaMan := &testQuotaMan{}
 	testAnalyticsMan := &testAnalyticsMan{}
-	server := AuthorizationServer{
-		handler: &Handler{
-			authMan:             testAuthMan,
-			productMan:          testProductMan,
-			quotaMan:            testQuotaMan,
-			analyticsMan:        testAnalyticsMan,
-			envSpecsByID:        environmentSpecsByID,
-			operationConfigType: "proxy",
-		},
-	}
 
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -399,17 +382,59 @@ func TestBasePathStripping(t *testing.T) {
 		envSpecContextKey: specExt.ID,
 	}
 
-	req := testutil.NewEnvoyRequest("GET", uri, headers, nil)
-	req.Attributes.ContextExtensions = contextExtensions
-	testAuthMan.sendAuth(&auth.Context{
-		APIProducts: []string{"product1"},
-	}, nil)
-	resp, err := server.Check(context.Background(), req)
-	if err != nil {
-		t.Errorf("should not get error. got: %s", err)
+	tests := []struct {
+		desc         string
+		opConfigType string
+		path         string
+	}{
+		{
+			desc:         "base path stripped for proxy mode",
+			opConfigType: "proxy",
+			path:         "/petstore",
+		},
+		{
+			desc: "base path not stripped by default",
+			path: "/v1/petstore",
+		},
+		{
+			desc:         "base path not stripped for remoteservice mode",
+			opConfigType: "remoteservice",
+			path:         "/v1/petstore",
+		},
 	}
-	if resp.Status.Code != int32(rpc.OK) {
-		t.Errorf("expected status code OK, got %d", resp.Status.Code)
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			testProductMan := &testProductMan{
+				api:     "api",
+				resolve: true,
+				products: product.ProductsNameMap{
+					"product1": &product.APIProduct{
+						DisplayName: "product1",
+					},
+				},
+				path: test.path,
+			}
+			server := AuthorizationServer{
+				handler: &Handler{
+					authMan:             testAuthMan,
+					productMan:          testProductMan,
+					quotaMan:            testQuotaMan,
+					analyticsMan:        testAnalyticsMan,
+					envSpecsByID:        environmentSpecsByID,
+					operationConfigType: test.opConfigType,
+				},
+			}
+			req := testutil.NewEnvoyRequest("GET", uri, headers, nil)
+			req.Attributes.ContextExtensions = contextExtensions
+			resp, err := server.Check(context.Background(), req)
+			if err != nil {
+				t.Errorf("should not get error. got: %s", err)
+			}
+			if resp.Status.Code != int32(rpc.OK) {
+				t.Errorf("expected status code OK, got %d", resp.Status.Code)
+			}
+		})
 	}
 }
 
