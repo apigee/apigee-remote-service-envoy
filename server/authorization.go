@@ -136,6 +136,11 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 			return a.unauthenticated(req, envRequest, tracker), nil
 		}
 
+		if !envRequest.IsAuthorizationRequired() {
+			log.Debugf("no authorization required, skipping")
+			return a.authOK(req, tracker, nil, "", envRequest), nil
+		}
+
 		apiKey = envRequest.GetAPIKey()
 
 	} else { // global authentication
