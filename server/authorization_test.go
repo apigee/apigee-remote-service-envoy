@@ -19,7 +19,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"errors"
-	"fmt"
 	"net/http"
 	"reflect"
 	"testing"
@@ -154,8 +153,6 @@ func TestAddHeaderTransforms(t *testing.T) {
 
 func hasHeaderAdd(okr *authv3.OkHttpResponse, key, value string, append bool) bool {
 	for _, h := range okr.Headers {
-		arr := []interface{}{h.Header.Key, h.Header.Value, h.Append.Value}
-		fmt.Printf("arr: %v", arr)
 		if key == h.Header.Key &&
 			value == h.Header.Value &&
 			append == h.Append.Value {
@@ -244,7 +241,7 @@ func TestEnvRequestCheck(t *testing.T) {
 		{
 			desc:       "missing api",
 			method:     http.MethodGet,
-			path:       "/v2/missing",
+			path:       "/v0/missing",
 			statusCode: int32(rpc.NOT_FOUND),
 		},
 		{
@@ -306,6 +303,23 @@ func TestEnvRequestCheck(t *testing.T) {
 			},
 			wantValues: []string{
 				"/petstore?x-api-key=foo",
+				"add",
+				"append",
+			},
+			wantAppends: []bool{false, false, true},
+		},
+		{
+			desc:       "no consumerauthorization",
+			method:     http.MethodGet,
+			path:       "/v2/noauthz",
+			statusCode: int32(rpc.OK),
+			wantHeaders: []string{
+				":path",
+				"target",
+				"target",
+			},
+			wantValues: []string{
+				"/noauthz",
 				"add",
 				"append",
 			},
@@ -952,6 +966,21 @@ func createAuthEnvSpec() config.EnvironmentSpec {
 						},
 					},
 				},
+				HTTPRequestTransforms: config.HTTPRequestTransformations{
+					SetHeaders: map[string]string{
+						"target": "add",
+					},
+					AppendHeaders: []config.KeyValue{
+						{Key: "target", Value: "append"},
+					},
+					RemoveHeaders: []string{
+						"jw*",
+					},
+				},
+			},
+			{
+				ID:       "api-without-authorization",
+				BasePath: "/v2",
 				HTTPRequestTransforms: config.HTTPRequestTransformations{
 					SetHeaders: map[string]string{
 						"target": "add",

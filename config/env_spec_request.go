@@ -105,11 +105,11 @@ func (e *EnvironmentSpecRequest) GetOperation() *APIOperation {
 	}
 	if e.operation == nil {
 		if api := e.GetAPISpec(); api != nil {
+			e.operationPath = strings.TrimPrefix(e.request.Attributes.Request.Http.Path, api.BasePath)
 			if len(api.Operations) == 0 { // if no operations, match any for api
 				e.operation = defaultOperation
 			} else {
-				e.operationPath = strings.TrimPrefix(e.request.Attributes.Request.Http.Path, api.BasePath) // strip base path
-				pathSplits := strings.Split(strings.SplitN(e.operationPath, "?", 2)[0], "/")               // strip querystring and split
+				pathSplits := strings.Split(strings.SplitN(e.operationPath, "?", 2)[0], "/") // strip querystring and split
 				// prepend method for search
 				pathSplits = append([]string{e.apiSpec.ID, e.request.Attributes.Request.Http.Method}, pathSplits...)
 
@@ -286,6 +286,12 @@ func (req *EnvironmentSpecRequest) getAuthenticationRequirement() (auth Authenti
 		}
 	}
 	return auth
+}
+
+// IsAuthorizationRequired returns true if Authorization is required.
+func (e *EnvironmentSpecRequest) IsAuthorizationRequired() bool {
+	authz := e.GetConsumerAuthorization()
+	return len(authz.In) > 0 && !authz.Disabled
 }
 
 func (req *EnvironmentSpecRequest) GetHTTPRequestTransformations() (transforms HTTPRequestTransformations) {
