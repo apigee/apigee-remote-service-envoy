@@ -15,7 +15,7 @@
 id: env-spec
 apis:
 - id: proxy1
-  base_path: /v1
+  base_path: /proxy1
   consumer_authorization:
     in:
     - header: x-api-key
@@ -31,29 +31,51 @@ apis:
     consumer_authorization:
       in:
       - query: x-api-key
-  - name: op-3
+  http_request_transforms:
+    set_headers:
+      x-apigee-route: httpbin
+- id: proxy2
+  base_path: /proxy2
+  consumer_authorization:
+    in:
+    - jwt_claim:
+        requirement: foo
+        name: client_id
+  authentication:
+    jwt:
+      name: foo
+      issuer: {{issuer}}
+      in:
+      - query: jwt
+      remote_jwks:
+        url: {{jwks}}
+        cache_duration: 1h
+  operations:
+  - name: op-1
+    http_match:
+    - path_template: /get
+      method: GET
+  - name: op-2
     http_match:
     - path_template: /headers
       method: GET
-    consumer_authorization:
-      in:
-      - jwt_claim:
-          requirement: foo
-          name: client_id
     authentication:
       jwt:
         name: foo
-        issuer: bar
+        issuer: {{issuer}}
         in:
-        - query: x-api-key
+        - header: Authorization
+          transformation:
+            template: "Bearer {token}"
+            substitution: "{token}"
         remote_jwks:
-          url: url
+          url: {{jwks}}
           cache_duration: 1h
   http_request_transforms:
     set_headers:
       x-apigee-route: httpbin
 - id: passthru-proxy
-  basepath: /passthru
-    http_request_transforms:
+  base_path: /passthru
+  http_request_transforms:
     set_headers:
       x-apigee-route: httpbin

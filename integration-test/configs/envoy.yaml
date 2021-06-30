@@ -11,3 +11,123 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+admin:
+  access_log_path: /tmp/envoy_admin.log
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 9000
+
+static_resources:
+  listeners:
+  - address:
+      socket_address: { address: 0.0.0.0, port_value: 8080 }
+
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          route_config:
+            virtual_hosts:
+            - name: default
+              domains: "*"
+              typed_per_filter_config:
+                envoy.filters.http.ext_authz:
+                  "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthzPerRoute
+                  check_settings:
+                    context_extensions:
+                      apigee_env_config: env-spec
+              routes:
+              - match:
+                  prefix: /
+                  headers:
+                  - name: x-apigee-route
+                    exact_match: httpbin
+                route:
+                  cluster: httpbin
+              - match:
+                  prefix: /
+                route:
+                  cluster: black-hole
+
+          http_filters:
+
+          # evaluate Apigee rules
+          - name: envoy.filters.http.ext_authz
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
+              transport_api_version: V3
+              grpc_service:
+                envoy_grpc:
+                  cluster_name: apigee-remote-service-envoy
+                timeout: 1s
+              clear_route_cache: true
+
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+          access_log:
+
+          # collect Apigee analytics
+          - name: envoy.access_loggers.http_grpc
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.access_loggers.grpc.v3.HttpGrpcAccessLogConfig
+              common_config:
+                transport_api_version: V3
+                grpc_service:
+                  envoy_grpc:
+                    cluster_name: apigee-remote-service-envoy
+                log_name: apigee-remote-service-envoy
+              additional_request_headers_to_log:
+              - :authority # default target header
+
+  clusters:
+
+  # define cluster for httpbin.org target
+  - name: httpbin
+    connect_timeout: 2s
+    type: LOGICAL_DNS
+    dns_lookup_family: V4_ONLY
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: httpbin
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: "httpbin.org"
+                port_value: 443
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        sni: "httpbin.org"
+
+  - name: black-hole
+    connect_timeout: 1s
+    type: STRICT_DNS
+    load_assignment:
+      cluster_name: black-hole
+
+  # define cluster for Apigee remote service
+  - name: apigee-remote-service-envoy
+    type: LOGICAL_DNS
+    http2_protocol_options: {}
+    load_assignment:
+      cluster_name: apigee-remote-service-envoy
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: adapter
+                port_value: 5000
+    common_lb_config:
+      healthy_panic_threshold:
+        value: 50.0
+    connect_timeout: 0.5s
