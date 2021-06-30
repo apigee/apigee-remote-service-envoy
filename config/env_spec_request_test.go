@@ -137,18 +137,19 @@ func TestGetOperation(t *testing.T) {
 		desc   string
 		method string
 		path   string
+		opPath string
 		want   *APIOperation
 	}{
-		{"root", http.MethodGet, "/", nil},
-		{"basepath", http.MethodGet, "/v1", nil},
-		{"base slash", http.MethodGet, "/v1/", nil},
-		{"petstore wrong method", http.MethodPost, "/v1/petstore/", nil},
-		{"petstore", http.MethodGet, "/v1/petstore", petstore},
-		{"petstore/", http.MethodGet, "/v1/petstore/", petstore},
-		{"petstore with query", http.MethodGet, "/v1/petstore?foo=bar", petstore},
-		{"bookshop", http.MethodPost, "/v1/bookshop/", bookshop},
-		{"noop", http.MethodPost, "/v3/bookshop/", defaultOperation},
-		{"empty", http.MethodPost, "/v4/whatever/", empty},
+		{"root", http.MethodGet, "/", "", nil},
+		{"basepath", http.MethodGet, "/v1", "", nil},
+		{"base slash", http.MethodGet, "/v1/", "/", nil},
+		{"petstore wrong method", http.MethodPost, "/v1/petstore/", "/petstore/", nil},
+		{"petstore", http.MethodGet, "/v1/petstore", "/petstore", petstore},
+		{"petstore/", http.MethodGet, "/v1/petstore/", "/petstore/", petstore},
+		{"petstore with query", http.MethodGet, "/v1/petstore?foo=bar", "/petstore?foo=bar", petstore},
+		{"bookshop", http.MethodPost, "/v1/bookshop/", "/bookshop/", bookshop},
+		{"noop", http.MethodPost, "/v3/bookshop/", "/bookshop/", defaultOperation},
+		{"empty", http.MethodPost, "/v4/whatever/", "/whatever/", empty},
 	}
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
@@ -156,9 +157,13 @@ func TestGetOperation(t *testing.T) {
 			envoyReq := testutil.NewEnvoyRequest(test.method, test.path, nil, nil)
 			specReq := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
 
-			gotAPI := specReq.GetOperation()
-			if diff := cmp.Diff(test.want, gotAPI, cmpopts.IgnoreUnexported(APIOperation{})); diff != "" {
+			gotOperation := specReq.GetOperation()
+			if diff := cmp.Diff(test.want, gotOperation, cmpopts.IgnoreUnexported(APIOperation{})); diff != "" {
 				t.Errorf("diff (-want +got):\n%s", diff)
+			}
+
+			if test.opPath != specReq.operationPath {
+				t.Errorf("want %q, got %q", test.opPath, specReq.operationPath)
 			}
 		})
 	}
