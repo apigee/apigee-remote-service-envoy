@@ -121,8 +121,7 @@ setEnvironmentVariables cgsaas-env
 
 {
   cleanUpApigee
-  docker stop envoy
-  docker stop adapter
+  docker stop adapter && docker stop envoy && docker stop target
 } || {
   echo -e "\n Apigee resources do not all exist."
 }
@@ -143,10 +142,10 @@ docker logs adapter
 applyToCluster istio-samples
 runIstioTests
 
-docker stop envoy && docker stop adapter
+docker stop adapter && docker stop envoy && docker stop target
 runEnvSpecTest $CGSAAS_ENVOY_TAG $ADAPTER_IMAGE_TAG
 
-docker stop envoy && docker stop adapter
+docker stop adapter && docker stop envoy && docker stop target
 runEnvoyMultiEnvTest $CGSAAS_ENVOY_TAG $ADAPTER_IMAGE_TAG
 
 # Displaying logs of Envoy adapter running in k8s

@@ -45,9 +45,9 @@ static_resources:
                   prefix: /
                   headers:
                   - name: x-apigee-route
-                    exact_match: httpbin
+                    exact_match: target
                 route:
-                  cluster: httpbin
+                  cluster: target
               - match:
                   prefix: /
                 route:
@@ -88,25 +88,20 @@ static_resources:
   clusters:
 
   # define cluster for httpbin.org target
-  - name: httpbin
+  - name: target
     connect_timeout: 2s
     type: LOGICAL_DNS
     dns_lookup_family: V4_ONLY
     lb_policy: ROUND_ROBIN
     load_assignment:
-      cluster_name: httpbin
+      cluster_name: target
       endpoints:
       - lb_endpoints:
         - endpoint:
             address:
               socket_address:
-                address: "httpbin.org"
-                port_value: 443
-    transport_socket:
-      name: envoy.transport_sockets.tls
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-        sni: "httpbin.org"
+                address: target
+                port_value: 8888
 
   - name: black-hole
     connect_timeout: 1s
