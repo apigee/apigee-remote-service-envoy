@@ -144,10 +144,10 @@ applyToCluster istio-samples
 runIstioTests
 
 docker stop envoy && docker stop adapter
-runEnvoyMultiEnvTest $CGSAAS_ENVOY_TAG $ADAPTER_IMAGE_TAG
+runEnvSpecTest $CGSAAS_ENVOY_TAG $ADAPTER_IMAGE_TAG
 
 docker stop envoy && docker stop adapter
-runEnvSpecTest $CGSAAS_ENVOY_TAG $ADAPTER_IMAGE_TAG
+runEnvoyMultiEnvTest $CGSAAS_ENVOY_TAG $ADAPTER_IMAGE_TAG
 
 # Displaying logs of Envoy adapter running in k8s
 kubectl logs -n apigee $(kubectl get pods -n apigee -o jsonpath={.items..metadata.name})
