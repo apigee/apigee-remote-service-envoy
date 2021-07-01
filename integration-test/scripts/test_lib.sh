@@ -91,6 +91,44 @@ function callTargetWithAPIKey {
 }
 
 ################################################################################
+# Call Local Target With APIKey in query param
+################################################################################
+function callTargetWithAPIKeyInQueryParam {
+  if [[ -z $3 ]] ; then
+    HOST=httpbin.org
+  else
+    HOST=$3
+  fi
+
+  if [[ -z $4 ]] ; then
+    RESOURCE_PATH=/headers
+  else
+    RESOURCE_PATH=$4
+  fi
+
+  if [[ -z $5 ]] ; then
+    METHOD=GET
+  else
+    METHOD=$5
+  fi
+
+  STATUS_CODE=$(docker run --network=host curlimages/curl:7.72.0 -X $METHOD \
+    --silent -o /dev/stderr -w "%{http_code}" \
+    "localhost:8080${RESOURCE_PATH}?x-api-key=${1}" -Hhost:$HOST)
+
+  if [[ ! -z $2 ]] ; then
+    if [[ $STATUS_CODE -ne $2 ]] ; then
+      echo -e "\nError calling local target with API key in query param: expected status $2; got $STATUS_CODE"
+      exit 2
+    else 
+      echo -e "\nCalling local target with API key in query param got $STATUS_CODE as expected"
+    fi
+  else
+    echo -e "\nCalling local target with API key in query param got $STATUS_CODE"
+  fi
+}
+
+################################################################################
 # call Local Target With JWT
 ################################################################################
 function callTargetWithJWT {
@@ -126,6 +164,44 @@ function callTargetWithJWT {
     fi
   else
     echo -e "\nCalling local target with JWT got $STATUS_CODE"
+  fi
+}
+
+################################################################################
+# Call Local Target With JWT in query param
+################################################################################
+function callTargetWithJWTInQueryParam {
+  if [[ -z $3 ]] ; then
+    HOST=httpbin.org
+  else
+    HOST=$3
+  fi
+
+  if [[ -z $4 ]] ; then
+    RESOURCE_PATH=/headers
+  else
+    RESOURCE_PATH=$4
+  fi
+
+  if [[ -z $5 ]] ; then
+    METHOD=GET
+  else
+    METHOD=$5
+  fi
+
+  STATUS_CODE=$(docker run --network=host curlimages/curl:7.72.0 -X $METHOD \
+    --silent -o /dev/stderr -w "%{http_code}" \
+    "localhost:8080${RESOURCE_PATH}?jwt=${1}")
+
+  if [[ ! -z $2 ]] ; then
+    if [[ $STATUS_CODE -ne $2 ]] ; then
+      echo -e "\nError calling local target with JWT in query param: expected status $2; got $STATUS_CODE"
+      exit 3
+    else 
+      echo -e "\nCalling local target with JWT in query param got $STATUS_CODE as expected"
+    fi
+  else
+    echo -e "\nCalling local target with JWT in query param got $STATUS_CODE"
   fi
 }
 
@@ -224,6 +300,26 @@ function startDockerContainer {
       --name=adapter --network=apigee \
       -p 5000:5000 -p 5001:5001 --rm -d \
       apigee-envoy-adapter:${2} -c /config.yaml -l DEBUG
+}
+
+################################################################################
+# Start Envoy and Adapter docker containers for environment spec
+################################################################################
+function startDockerContainerForEnvSpec {
+    docker network create apigee || echo "apigee net already exists."
+
+    echo -e "\nStarting Envoy docker container..."
+    docker run -v ${BUILD_DIR}/configs/envoy.yaml:/envoy.yaml \
+      --name=envoy --network=apigee \
+      -p 8080:8080 --rm -d \
+      docker.io/envoyproxy/envoy:${1} -c /envoy.yaml -l debug
+
+    echo -e "\nStarting Adapter docker container..."
+    docker run -v $PWD/config.yaml:/config.yaml \
+      -v ${BUILD_DIR}/configs/env_spec.yaml:/env_spec.yaml \
+      --name=adapter --network=apigee \
+      -p 5000:5000 -p 5001:5001 --rm -d \
+      apigee-envoy-adapter:${2} -c /config.yaml --environment-specs /env_spec.yaml -l DEBUG
 }
 
 ################################################################################
@@ -387,6 +483,47 @@ function runEnvoyMultiEnvTest {
   } || { # exit on failure
     exit 7
   }
+}
+
+################################################################################
+# Run tests handling environment spec
+################################################################################
+function runEnvSpecTest {
+  sed -i -e "s/{{issuer}}/https:\/\/${ORG}-${ENV}.apigee.net\/remote-token\/token/g" ${BUILD_DIR}/configs/env_spec.yaml
+  sed -i -e "s/{{jwks}}/https:\/\/${ORG}-${ENV}.apigee.net\/remote-token\/certs/g" ${BUILD_DIR}/configs/env_spec.yaml
+
+  startDockerContainerForEnvSpec ${1} ${2}
+
+  # make sure quota is restored
+  sleep 60
+
+  echo -e "\nGood call: GET /proxy1/get with API key in header"
+  callTargetWithAPIKey $APIKEY 200 "" /proxy1/get
+  echo -e "\nGood call: GET /proxy1/get with bad key in header"
+  callTargetWithAPIKey APIKEY 403 "" /proxy1/get
+  echo -e "\nMethod not matched: POST /proxy1/get with API key in header"
+  callTargetWithAPIKey $APIKEY 404 "" /proxy1/get POST
+  echo -e "\nCredential in wrong place: GET /proxy1/get with API key in query param"
+  callTargetWithAPIKeyInQueryParam $APIKEY 401 "" /proxy1/get
+  echo -e "\nGood call: GET /proxy1/anything with API key in query param"
+  callTargetWithAPIKeyInQueryParam $APIKEY 200 "" /proxy1/anything
+  echo -e "\nCredential in wrong place: GET /proxy1/anything with API key in header"
+  callTargetWithAPIKey $APIKEY 401 "" /proxy1/anything
+  
+  echo -e "\nMissing JWT: GET /proxy2/get with API key in header"
+  callTargetWithAPIKey $APIKEY 401 "" /proxy2/get
+  JWT=$($CLI token create -c config.yaml -i $APIKEY -s $APISECRET)
+  sleep 30 # skew for JWT
+  echo -e "\nGood call: GET /proxy2/get with JWT in query param"
+  callTargetWithJWTInQueryParam $JWT 200 "" /proxy2/get
+  echo -e "\nCredential in wrong place: GET /proxy2/get with JWT in the header"
+  callTargetWithJWT $JWT 401 "" /proxy2/get
+  echo -e "\nGood call: GET /proxy2/headers with JWT in the header"
+  callTargetWithJWT $JWT 200 "" /proxy2/headers
+
+  echo -e "\nGood call: GET /passthru/get"
+  callTargetWithAPIKey "" 200 "" /passthru/get
+
 }
 
 ################################################################################
