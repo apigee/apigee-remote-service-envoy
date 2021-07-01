@@ -489,6 +489,7 @@ function runEnvoyMultiEnvTest {
 # Run tests handling environment spec
 ################################################################################
 function runEnvSpecTest {
+  chmod 644 ${BUILD_DIR}/configs/*
   sed -i -e "s/{{issuer}}/https:\/\/${ORG}-${ENV}.apigee.net\/remote-token\/token/g" ${BUILD_DIR}/configs/env_spec.yaml
   sed -i -e "s/{{jwks}}/https:\/\/${ORG}-${ENV}.apigee.net\/remote-token\/certs/g" ${BUILD_DIR}/configs/env_spec.yaml
 
