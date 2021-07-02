@@ -44,7 +44,8 @@ function generateEnvoySampleConfigurations {
   fi
   {
     $CLI samples create -c config.yaml --out native-samples \
-      --template ${1} --adapter-host adapter -f
+      --template ${1} --adapter-host adapter --host target \
+      --port 8888 -f
     chmod 644 native-samples/envoy-config.yaml
   } || { # exit directly if cli encounters any error
     exit 1
@@ -300,6 +301,11 @@ function startDockerContainer {
       --name=adapter --network=apigee \
       -p 5000:5000 -p 5001:5001 --rm -d \
       apigee-envoy-adapter:${2} -c /config.yaml -l DEBUG
+
+    echo -e "\nStarting Target docker container..."
+    docker run -p 8888:8888 --rm -d \
+      --name=target --network=apigee \
+      apigee-target:test -addr 0.0.0.0:8888
 }
 
 ################################################################################
@@ -320,6 +326,11 @@ function startDockerContainerForEnvSpec {
       --name=adapter --network=apigee \
       -p 5000:5000 -p 5001:5001 --rm -d \
       apigee-envoy-adapter:${2} -c /config.yaml --environment-specs /env_spec.yaml -l DEBUG
+
+    echo -e "\nStarting Target docker container..."
+    docker run -p 8888:8888 --rm -d \
+      --name=target --network=apigee \
+      apigee-target:test -addr 0.0.0.0:8888
 }
 
 ################################################################################
@@ -457,8 +468,7 @@ function runEnvoyMultiEnvTest {
     callTargetWithAPIKey $PROD_APIKEY 403
     callTargetWithAPIKey $APIKEY 200
 
-    docker stop adapter
-    docker stop envoy
+    docker stop adapter && docker stop envoy && docker stop target
 
     cp native-samples/envoy-config.yaml.bak native-samples/envoy-config.yaml
     match="domains: \"\*\""
@@ -519,8 +529,8 @@ function runEnvSpecTest {
   callTargetWithJWTInQueryParam $JWT 200 "" /proxy2/get
   echo -e "\nCredential in wrong place: GET /proxy2/get with JWT in the header"
   callTargetWithJWT $JWT 401 "" /proxy2/get
-  echo -e "\nGood call: GET /proxy2/headers with JWT in the header"
-  callTargetWithJWT $JWT 200 "" /proxy2/headers
+  echo -e "\nGood call: GET /proxy2/checkHeaders with JWT in the header"
+  callTargetWithJWT $JWT 200 "" /proxy2/checkHeaders
 
   echo -e "\nGood call: GET /passthru/get"
   callTargetWithAPIKey "" 200 "" /passthru/get

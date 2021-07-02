@@ -45,20 +45,27 @@ func main() {
 		Handler: ts.Handler(),
 	}
 
-	fmt.Printf("URL: %s", ts.URL())
+	fmt.Printf("URL: %s\n", ts.URL())
 	_ = ts.srv.ListenAndServe()
 	select {} // forever
 }
 
-type (
-	TestServer struct {
-		srv *http.Server
-	}
-)
+type TestServer struct {
+	srv *http.Server
+}
 
 func (ts *TestServer) Handler() http.Handler {
 	m := http.NewServeMux()
 	m.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("OK"))
+	})
+	// Check for header transformation in integration tests
+	m.HandleFunc("/checkHeaders", func(w http.ResponseWriter, r *http.Request) {
+		hdr, ok := r.Header[http.CanonicalHeaderKey("x-integration-test")]
+		if !ok || len(hdr) != 1 || hdr[0] != "integration" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 		_, _ = w.Write([]byte("OK"))
 	})
 	return m
