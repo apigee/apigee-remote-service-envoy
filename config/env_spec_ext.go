@@ -35,6 +35,7 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
 		compiledTemplates:  make(map[string]*transform.Template),
 		corsVary:           make(map[string]bool, len(spec.APIs)),
 		corsAllowedOrigins: make(map[string]map[string]bool, len(spec.APIs)),
+		compiledRegExps:    make(map[string]*regexp.Regexp),
 	}
 
 	for i := range spec.APIs {
@@ -52,7 +53,6 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
 		}
 		ec.corsAllowedOrigins[api.ID] = allowedOrigins
 
-		ec.compiledRegExps = make(map[string]*regexp.Regexp, len(api.Cors.AllowOriginsRegexes))
 		for _, r := range api.Cors.AllowOriginsRegexes {
 			ec.compiledRegExps[r] = regexp.MustCompile(r)
 		}
