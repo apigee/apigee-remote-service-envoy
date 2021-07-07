@@ -1,0 +1,85 @@
+# Copyright 2020 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+id: env-spec
+apis:
+- id: proxy1
+  base_path: /proxy1
+  consumer_authorization:
+    in:
+    - header: x-api-key
+  operations:
+  - name: op-1
+    http_match:
+    - path_template: /get
+      method: GET
+  - name: op-2
+    http_match:
+    - path_template: /anything
+      method: GET
+    consumer_authorization:
+      in:
+      - query: x-api-key
+  http_request_transforms:
+    set_headers:
+      x-apigee-route: target
+- id: proxy2
+  base_path: /proxy2
+  consumer_authorization:
+    in:
+    - jwt_claim:
+        requirement: foo
+        name: client_id
+  authentication:
+    jwt:
+      name: foo
+      issuer: {{issuer}}
+      in:
+      - query: jwt
+      remote_jwks:
+        url: {{jwks}}
+        cache_duration: 1h
+  operations:
+  - name: op-1
+    http_match:
+    - path_template: /get
+      method: GET
+  - name: op-2
+    http_match:
+    - path_template: /checkHeaders
+      method: GET
+    http_request_transforms:
+      set_headers:
+        x-apigee-route: target
+        x-integration-test: integration
+    authentication:
+      jwt:
+        name: foo
+        issuer: {{issuer}}
+        in:
+        - header: Authorization
+          transformation:
+            template: "Bearer {token}"
+            substitution: "{token}"
+        remote_jwks:
+          url: {{jwks}}
+          cache_duration: 1h
+  http_request_transforms:
+    set_headers:
+      x-apigee-route: target
+- id: passthru-proxy
+  base_path: /passthru
+  http_request_transforms:
+    set_headers:
+      x-apigee-route: target

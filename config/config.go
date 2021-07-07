@@ -65,7 +65,7 @@ const (
 	RemoteServiceJWKS    = "APIGEE_TENANT_JWKS"
 	AnalyticsCredentials = "APIGEE_ANALYTICS_CREDENTIALS_JSON"
 
-	EnvironmentSpecsReferences = "ENVIRONMENT_SPECS_REFERENCES"
+	EnvironmentSpecsReferences = "ENVIRONMENT_SPECS.REFERENCES"
 )
 
 func init() {
