@@ -390,16 +390,16 @@ func (e *EnvironmentSpecRequest) GetConsumerAuthorization() (auth ConsumerAuthor
 	return auth
 }
 
-// IsCORSRequest returns true if request is a CORS request
+// IsCORSRequest returns true if request is a CORS request and there is a CORS Policy
 func (e *EnvironmentSpecRequest) IsCORSRequest() bool {
-	if e == nil {
+	if e == nil || e.GetAPISpec() == nil {
 		return false
 	}
 	origin := e.Request.Attributes.Request.Http.Headers[CORSOriginHeader]
 	return origin != "" && !e.GetAPISpec().Cors.IsEmpty()
 }
 
-// IsCORSPreflight
+// IsCORSPreflight returns true if IsCORSRequest() is true and is OPTIONS methodd
 func (e *EnvironmentSpecRequest) IsCORSPreflight() bool {
 	return e.IsCORSRequest() && e.Request.Attributes.Request.Http.Method == http.MethodOptions
 }
@@ -434,5 +434,6 @@ func (e *EnvironmentSpecRequest) AllowedOrigin() (origin string, vary bool) {
 		return
 	}
 
-	return "", false
+	origin = ""
+	return
 }

@@ -45,17 +45,21 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
 		split = append([]string{"/"}, split...)
 		ec.apiPathTree.AddChild(split, 0, &api)
 
-		ec.corsVary[api.ID] = len(api.Cors.AllowOriginsRegexes) > 0 || len(api.Cors.AllowOrigins) > 1
-
+		var mustVary = false
 		allowedOrigins := make(map[string]bool, len(api.Cors.AllowOrigins))
 		for _, o := range api.Cors.AllowOrigins {
 			allowedOrigins[o] = true
+			if o == wildcard {
+				mustVary = true
+			}
 		}
 		ec.corsAllowedOrigins[api.ID] = allowedOrigins
 
 		for _, r := range api.Cors.AllowOriginsRegexes {
 			ec.compiledRegExps[r] = regexp.MustCompile(r)
 		}
+
+		ec.corsVary[api.ID] = mustVary || len(api.Cors.AllowOriginsRegexes) > 0 || len(api.Cors.AllowOrigins) > 1
 
 		for i := range api.Operations {
 			op := api.Operations[i]

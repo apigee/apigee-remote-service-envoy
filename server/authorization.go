@@ -316,7 +316,7 @@ func corsResponseHeaders(envRequest *config.EnvironmentSpecRequest) (headers []*
 	if vary {
 		headers = append(headers, createHeaderValueOption(config.CORSVary, config.CORSVaryOrigin, false))
 	}
-	appendIfNotEmpty(config.CORSAllowHeaders, cors.ExposeHeaders...)
+	appendIfNotEmpty(config.CORSAllowHeaders, cors.AllowHeaders...)
 	appendIfNotEmpty(config.CORSAllowMethods, cors.AllowMethods...)
 	appendIfNotEmpty(config.CORSExposeHeaders, cors.ExposeHeaders...)
 	if cors.MaxAge > 0 {

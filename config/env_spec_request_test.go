@@ -524,6 +524,122 @@ func TestEnvSpecRequestJWTAuthentications(t *testing.T) {
 	}
 }
 
+func TestIsCors(t *testing.T) {
+	tests := []struct {
+		desc         string
+		method       string
+		path         string
+		originHeader string
+		isCors       bool
+		isPreflight  bool
+	}{
+		{"not CORS request", http.MethodOptions, "/v1/petstore", "", false, false},
+		{"CORS preflight", http.MethodOptions, "/v1/petstore", "origin", true, true},
+		{"CORS main", http.MethodGet, "/v1/petstore", "origin", true, false},
+		{"no CORS policy", http.MethodGet, "/v2/petstore", "origin", false, false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+
+			envSpec := createGoodEnvSpec()
+			specExt, err := NewEnvironmentSpecExt(&envSpec)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			headers := map[string]string{CORSOriginHeader: test.originHeader}
+			envoyReq := testutil.NewEnvoyRequest(test.method, test.path, headers, nil)
+			req := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
+
+			if test.isPreflight != req.IsCORSPreflight() {
+				t.Errorf("want isPreflight %v, got %v", test.isPreflight, req.IsCORSPreflight())
+			}
+			if test.isCors != req.IsCORSRequest() {
+				t.Errorf("want isCors %v, got %v", test.isCors, req.IsCORSRequest())
+			}
+		})
+	}
+}
+
+func TestAllowedOrigin(t *testing.T) {
+	tests := []struct {
+		desc                string
+		allowOrigins        []string
+		allowOriginsRegexes []string
+		requestOrigin       string
+		wantOrigin          string
+		wantVary            bool
+	}{
+		{
+			desc:                "nothing",
+			allowOrigins:        []string{},
+			allowOriginsRegexes: []string{},
+			requestOrigin:       "",
+			wantOrigin:          "",
+			wantVary:            false,
+		},
+		{
+			desc:                "wildcard",
+			allowOrigins:        []string{"*"},
+			allowOriginsRegexes: []string{},
+			requestOrigin:       "origin",
+			wantOrigin:          "*",
+			wantVary:            true,
+		},
+		{
+			desc:                "exact",
+			allowOrigins:        []string{"foo", "origin"},
+			allowOriginsRegexes: []string{},
+			requestOrigin:       "origin",
+			wantOrigin:          "origin",
+			wantVary:            true,
+		},
+		{
+			desc:                "regex",
+			allowOrigins:        []string{},
+			allowOriginsRegexes: []string{"bar", "ori"},
+			requestOrigin:       "origin",
+			wantOrigin:          "origin",
+			wantVary:            true,
+		},
+		{
+			desc:                "no match",
+			allowOrigins:        []string{"foo"},
+			allowOriginsRegexes: []string{"bar"},
+			requestOrigin:       "origin",
+			wantOrigin:          "",
+			wantVary:            true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+
+			envSpec := createGoodEnvSpec()
+			envSpec.APIs[0].Cors.AllowOrigins = test.allowOrigins
+			envSpec.APIs[0].Cors.AllowOriginsRegexes = test.allowOriginsRegexes
+			specExt, err := NewEnvironmentSpecExt(&envSpec)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			headers := map[string]string{CORSOriginHeader: test.requestOrigin}
+			envoyReq := testutil.NewEnvoyRequest(http.MethodOptions, "/v1/petstore", headers, nil)
+			req := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
+
+			origin, vary := req.AllowedOrigin()
+			if test.wantOrigin != origin {
+				t.Errorf("want %v, got %v", test.wantOrigin, origin)
+			}
+			if test.wantVary != vary {
+				t.Errorf("want vary %v, got %v", test.wantVary, vary)
+			}
+
+		})
+	}
+}
+
 type testAuthMan struct {
 }
 
