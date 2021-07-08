@@ -33,6 +33,7 @@ import (
 	apigeeContext "github.com/apigee/apigee-remote-service-golib/v2/context"
 	"github.com/apigee/apigee-remote-service-golib/v2/product"
 	"github.com/apigee/apigee-remote-service-golib/v2/quota"
+	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	"github.com/gogo/googleapis/google/rpc"
 	"google.golang.org/grpc"
@@ -115,7 +116,7 @@ func TestAddHeaderTransforms(t *testing.T) {
 			specReq := config.NewEnvironmentSpecRequest(nil, specExt, envoyReq)
 			okResponse := &authv3.OkHttpResponse{}
 
-			addHeaderTransforms(envoyReq, specReq, okResponse)
+			addRequestHeaderTransforms(envoyReq, specReq, okResponse)
 
 			if test.expectedAdds != len(okResponse.Headers) {
 				t.Errorf("expected %d header adds got: %d", test.expectedAdds, len(okResponse.Headers))
@@ -125,12 +126,12 @@ func TestAddHeaderTransforms(t *testing.T) {
 			}
 
 			for _, v := range test.appendHeaders {
-				if !hasHeaderAdd(okResponse, v.Key, v.Value, true) {
+				if !hasHeaderAdd(okResponse.Headers, v.Key, v.Value, true) {
 					t.Errorf("expected header append: %q: %q", v.Key, v.Value)
 				}
 			}
 			for k, v := range test.setHeaders {
-				if !hasHeaderAdd(okResponse, k, v, false) {
+				if !hasHeaderAdd(okResponse.Headers, k, v, false) {
 					t.Errorf("expected header set: %q: %q", k, v)
 				}
 			}
@@ -151,8 +152,8 @@ func TestAddHeaderTransforms(t *testing.T) {
 	}
 }
 
-func hasHeaderAdd(okr *authv3.OkHttpResponse, key, value string, append bool) bool {
-	for _, h := range okr.Headers {
+func hasHeaderAdd(headers []*corev3.HeaderValueOption, key, value string, append bool) bool {
+	for _, h := range headers {
 		if key == h.Header.Key &&
 			value == h.Header.Value &&
 			append == h.Append.Value {
@@ -345,7 +346,7 @@ func TestEnvRequestCheck(t *testing.T) {
 					t.Fatal("must be OkResponse")
 				}
 				for i, h := range test.wantHeaders {
-					if !hasHeaderAdd(okr.OkResponse, h, test.wantValues[i], test.wantAppends[i]) {
+					if !hasHeaderAdd(okr.OkResponse.Headers, h, test.wantValues[i], test.wantAppends[i]) {
 						if test.wantAppends[i] {
 							t.Errorf("%q not appended to header %q", test.wantValues[i], h)
 						} else {
@@ -833,6 +834,72 @@ func TestImmediateAnalytics(t *testing.T) {
 	}
 }
 
+func TestCORSResponseHeaders(t *testing.T) {
+	tests := []struct {
+		desc          string
+		requestOrigin string
+		setHeaders    map[string]string
+	}{
+		{
+			desc:          "not cors",
+			requestOrigin: "",
+			setHeaders:    map[string]string{},
+		},
+		{
+			desc:          "origin",
+			requestOrigin: "origin",
+			setHeaders: map[string]string{
+				config.CORSAllowOrigin:      "origin",
+				config.CORSAllowHeaders:     "AllowHeaders",
+				config.CORSExposeHeaders:    "ExposeHeaders",
+				config.CORSAllowMethods:     "AllowMethods",
+				config.CORSMaxAge:           "42",
+				config.CORSAllowCredentials: "true",
+				config.CORSVary:             config.CORSVaryOrigin,
+			},
+		},
+		{
+			desc:          "wildcard",
+			requestOrigin: "foo",
+			setHeaders: map[string]string{
+				config.CORSAllowOrigin:   "*",
+				config.CORSAllowHeaders:  "AllowHeaders",
+				config.CORSExposeHeaders: "ExposeHeaders",
+				config.CORSAllowMethods:  "AllowMethods",
+				config.CORSMaxAge:        "42",
+				config.CORSVary:          config.CORSVaryOrigin,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+
+			envSpec := createAuthEnvSpec()
+			specExt, err := config.NewEnvironmentSpecExt(&envSpec)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			headers := map[string]string{config.CORSOriginHeader: test.requestOrigin}
+			envoyReq := testutil.NewEnvoyRequest(http.MethodOptions, "/v1/petstore", headers, nil)
+			req := config.NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
+
+			headerOptions := corsResponseHeaders(req)
+
+			if len(test.setHeaders) != len(headerOptions) {
+				t.Errorf("expected %d headers, got: %d: %v", len(test.setHeaders), len(headerOptions), headerOptions)
+			}
+
+			for k, v := range test.setHeaders {
+				if !hasHeaderAdd(headerOptions, k, v, false) {
+					t.Errorf("expected header set: %q: %q", k, v)
+				}
+			}
+		})
+	}
+}
+
 type testAuthMan struct {
 	ctx             apigeeContext.Context
 	apiKey          string
@@ -976,6 +1043,14 @@ func createAuthEnvSpec() config.EnvironmentSpec {
 					RemoveHeaders: []string{
 						"jw*",
 					},
+				},
+				Cors: config.CorsPolicy{
+					AllowOrigins:     []string{"origin", "*"},
+					AllowHeaders:     []string{"AllowHeaders"},
+					AllowMethods:     []string{"AllowMethods"},
+					ExposeHeaders:    []string{"ExposeHeaders"},
+					MaxAge:           42,
+					AllowCredentials: true,
 				},
 			},
 			{

@@ -887,6 +887,31 @@ func TestJWKSSourceTypes(t *testing.T) {
 	j.jwksSource()
 }
 
+func TestCORSPolicy(t *testing.T) {
+	tests := []struct {
+		desc                string
+		allowOrigins        []string
+		allowOriginsRegexes []string
+		wantEmpty           bool
+	}{
+		{"empty", []string{}, []string{}, true},
+		{"allowOrigins", []string{"*"}, []string{}, false},
+		{"allowOriginRegexes", []string{}, []string{"*"}, false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			c := CorsPolicy{
+				AllowOrigins:        test.allowOrigins,
+				AllowOriginsRegexes: test.allowOriginsRegexes,
+			}
+			if test.wantEmpty != c.IsEmpty() {
+				t.Errorf("want %v got %v", test.wantEmpty, c.IsEmpty())
+			}
+		})
+	}
+}
+
 func TestParamMatchTypes(t *testing.T) {
 	h := Header("header")
 	h.paramMatch()
@@ -960,6 +985,9 @@ func createGoodEnvSpec() EnvironmentSpec {
 					URLPathTransformations: URLPathTransformations{
 						AddPrefix: "/target_prefix/",
 					},
+				},
+				Cors: CorsPolicy{
+					AllowOrigins: []string{"*"},
 				},
 			},
 			{

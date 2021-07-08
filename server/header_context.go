@@ -20,23 +20,24 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
 	"github.com/apigee/apigee-remote-service-golib/v2/context"
 	"github.com/apigee/apigee-remote-service-golib/v2/log"
-	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
+	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 )
 
-func addMetadataHeaders(okResponse *authv3.OkHttpResponse, api string, ac *auth.Context) {
+func metadataHeaders(api string, ac *auth.Context) (headers []*corev3.HeaderValueOption) {
 	if ac == nil {
 		return
 	}
 
-	addHeaderValueOption(okResponse, headerAccessToken, ac.AccessToken, false)
-	addHeaderValueOption(okResponse, headerAPI, api, false)
-	addHeaderValueOption(okResponse, headerAPIProducts, strings.Join(ac.APIProducts, ","), false)
-	addHeaderValueOption(okResponse, headerApplication, ac.Application, false)
-	addHeaderValueOption(okResponse, headerClientID, ac.ClientID, false)
-	addHeaderValueOption(okResponse, headerDeveloperEmail, ac.DeveloperEmail, false)
-	addHeaderValueOption(okResponse, headerEnvironment, ac.Environment(), false)
-	addHeaderValueOption(okResponse, headerOrganization, ac.Organization(), false)
-	addHeaderValueOption(okResponse, headerScope, strings.Join(ac.Scopes, " "), false)
+	headers = append(headers, createHeaderValueOption(headerAccessToken, ac.AccessToken, false))
+	headers = append(headers, createHeaderValueOption(headerAPI, api, false))
+	headers = append(headers, createHeaderValueOption(headerAPIProducts, strings.Join(ac.APIProducts, ","), false))
+	headers = append(headers, createHeaderValueOption(headerApplication, ac.Application, false))
+	headers = append(headers, createHeaderValueOption(headerClientID, ac.ClientID, false))
+	headers = append(headers, createHeaderValueOption(headerDeveloperEmail, ac.DeveloperEmail, false))
+	headers = append(headers, createHeaderValueOption(headerEnvironment, ac.Environment(), false))
+	headers = append(headers, createHeaderValueOption(headerOrganization, ac.Organization(), false))
+	headers = append(headers, createHeaderValueOption(headerScope, strings.Join(ac.Scopes, " "), false))
+	return
 }
 
 func (h *Handler) decodeMetadataHeaders(headers map[string]string) (string, *auth.Context) {
