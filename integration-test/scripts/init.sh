@@ -22,3 +22,4 @@ set -e
 
 buildRemoteServiceCLI
 buildAdapterDocker
+buildTargetDocker

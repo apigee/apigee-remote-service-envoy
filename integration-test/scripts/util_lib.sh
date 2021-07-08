@@ -41,6 +41,15 @@ function buildAdapterDocker {
 }
 
 ################################################################################
+# Build Target Docker Image from source code
+################################################################################
+function buildTargetDocker {
+  cd ${REPOS_DIR}/apigee-remote-service-envoy/loadtest/target
+  docker build -t apigee-target:test .
+  cd -
+}
+
+################################################################################
 # Fetching environment variables from secrets in the GCP project
 ################################################################################
 function setEnvironmentVariables {
