@@ -900,33 +900,6 @@ func TestCORSResponseHeaders(t *testing.T) {
 	}
 }
 
-/*
-	if !envRequest.IsCORSRequest() {
-		return
-	}
-	cors := envRequest.GetAPISpec().Cors
-	appendIfNotEmpty := func(key string, values ...string) {
-		if len(values) == 0 || values[0] == "" {
-			return
-		}
-		headers = append(headers, createHeaderValueOption(key, strings.Join(values, ","), false))
-	}
-	allowedOrigin, vary := envRequest.AllowedOrigin()
-	appendIfNotEmpty(config.CORSAllowOrigin, allowedOrigin)
-	if vary {
-		headers = append(headers, createHeaderValueOption(config.CORSVary, config.CORSVaryOrigin, false))
-	}
-	appendIfNotEmpty(config.CORSAllowHeaders, cors.ExposeHeaders...)
-	appendIfNotEmpty(config.CORSAllowMethods, cors.AllowMethods...)
-	appendIfNotEmpty(config.CORSExposeHeaders, cors.ExposeHeaders...)
-	if cors.MaxAge > 0 {
-		headers = append(headers, createHeaderValueOption(config.CORSMaxAge, strconv.Itoa(cors.MaxAge), false))
-	}
-	if cors.AllowCredentials && allowedOrigin != config.CORSOriginWildcard {
-		headers = append(headers, createHeaderValueOption(config.CORSAllowCredentials, config.CORSAllowCredentialsValue, false))
-	}
-*/
-
 type testAuthMan struct {
 	ctx             apigeeContext.Context
 	apiKey          string
