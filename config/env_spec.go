@@ -607,6 +607,7 @@ type StringTransformation struct {
 	Substitution string `yaml:"substitution,omitempty" mapstructure:"substitution,omitempty"`
 }
 
+// CorsPolicy defines CORS behavior and headers.
 type CorsPolicy struct {
 	// Specifies the list of origins that will be allowed to do CORS requests. An
 	// origin is allowed if it exactly matches any value in the list.
@@ -640,6 +641,7 @@ type CorsPolicy struct {
 	AllowCredentials bool `yaml:"allow_credentials,omitempty" mapstructure:"allow_credentials,omitempty"`
 }
 
+// IsEmpty returns true if there is no valid CORS policy to apply.
 func (c CorsPolicy) IsEmpty() bool {
 	return len(c.AllowOrigins) == 0 && len(c.AllowOriginsRegexes) == 0
 }
