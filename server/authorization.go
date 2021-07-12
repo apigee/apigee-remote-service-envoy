@@ -287,6 +287,10 @@ func (a *AuthorizationServer) createEnvoyForwarded(
 	// cors response headers
 	okResponse.ResponseHeadersToAdd = append(okResponse.ResponseHeadersToAdd, corsResponseHeaders(envRequest)...)
 
+	if log.DebugEnabled() {
+		log.Debugf(printHeaderMods(okResponse))
+	}
+
 	tracker.statusCode = typev3.StatusCode_OK
 	return &authv3.CheckResponse{
 		Status: &status.Status{
@@ -368,30 +372,34 @@ func addRequestHeaderTransforms(req *authv3.CheckRequest, envRequest *config.Env
 				addRequestHeader(okResponse, v.Key, v.Value, true)
 			}
 		}
-		if log.DebugEnabled() {
-			log.Debugf(logHeaderValueOptions(okResponse))
-		}
 	}
 }
 
-func logHeaderValueOptions(okResponse *authv3.OkHttpResponse) string {
-	var b strings.Builder
-	b.WriteString("Request header mods:\n")
-	if len(okResponse.Headers) > 0 {
-		for _, h := range okResponse.Headers {
-			addAppend := "="
-			if h.Append.Value {
-				addAppend = "+"
+func printHeaderMods(okResponse *authv3.OkHttpResponse) string {
+	printHeaderValueOptions := func(indent string, b *strings.Builder, options []*corev3.HeaderValueOption) {
+		if len(options) > 0 {
+			for _, h := range options {
+				addAppend := "="
+				if h.Append.Value {
+					addAppend = "+"
+				}
+				b.WriteString(fmt.Sprintf("%s%s %q: %q\n", indent, addAppend, h.Header.Key,
+					golibutil.Truncate(h.Header.Value, config.TruncateDebugRequestValuesAt)))
 			}
-			b.WriteString(fmt.Sprintf("  %s %q: %q\n", addAppend, h.Header.Key,
-				golibutil.Truncate(h.Header.Value, config.TruncateDebugRequestValuesAt)))
 		}
 	}
-	if len(okResponse.HeadersToRemove) > 0 {
-		var b strings.Builder
+
+	var b strings.Builder
+	if len(okResponse.Headers) > 0 || len(okResponse.HeadersToRemove) > 0 {
+		b.WriteString("Request header mods:\n")
+		printHeaderValueOptions("  ", &b, okResponse.Headers)
 		for _, h := range okResponse.HeadersToRemove {
 			b.WriteString(fmt.Sprintf("   - %q\n", h))
 		}
+	}
+	if len(okResponse.ResponseHeadersToAdd) > 0 {
+		b.WriteString("Response header mods:\n")
+		printHeaderValueOptions("  ", &b, okResponse.ResponseHeadersToAdd)
 	}
 	return b.String()
 }

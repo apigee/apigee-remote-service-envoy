@@ -72,7 +72,7 @@ func TestAddHeaderTransforms(t *testing.T) {
 			removeHeaders:   []string{"remove1"},
 			expectedAdds:    3,
 			expectedRemoves: 1,
-			expectedLog:     "Request header mods:\n  = \":path\": \"/pets...\"\n  = \"set\": \"set1\"\n  + \"append\": \"appen...\"\n",
+			expectedLog:     "Request header mods:\n  = \":path\": \"/pets...\"\n  = \"set\": \"set1\"\n  + \"append\": \"appen...\"\n   - \"remove1\"\n",
 		},
 		{
 			desc:           "test2",
@@ -85,7 +85,7 @@ func TestAddHeaderTransforms(t *testing.T) {
 			removeHeaders:   []string{"Remove1", "missing"},
 			expectedAdds:    4,
 			expectedRemoves: 1,
-			expectedLog:     "Request header mods:\n  = \":path\": \"/pets...\"\n  = \"set\": \"set1\"\n  + \"append\": \"appen...\"\n  + \"append2\": \"appen...\"\n",
+			expectedLog:     "Request header mods:\n  = \":path\": \"/pets...\"\n  = \"set\": \"set1\"\n  + \"append\": \"appen...\"\n  + \"append2\": \"appen...\"\n   - \"remove1\"\n",
 		},
 		{
 			desc:            "test3",
@@ -95,7 +95,7 @@ func TestAddHeaderTransforms(t *testing.T) {
 			removeHeaders:   []string{"Remove*"},
 			expectedAdds:    1,
 			expectedRemoves: 2,
-			expectedLog:     "Request header mods:\n  = \":path\": \"/pets...\"\n",
+			expectedLog:     "Request header mods:\n  = \":path\": \"/pets...\"\n   - \"remove1\"\n   - \"remove2\"\n",
 		},
 	}
 
@@ -144,7 +144,7 @@ func TestAddHeaderTransforms(t *testing.T) {
 				}
 			}
 
-			logged := logHeaderValueOptions(okResponse)
+			logged := printHeaderMods(okResponse)
 			if test.expectedLog != logged {
 				t.Errorf("want: %q\n, got: %q\n", test.expectedLog, logged)
 			}
