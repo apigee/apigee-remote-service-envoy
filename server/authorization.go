@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -378,6 +379,7 @@ func addRequestHeaderTransforms(req *authv3.CheckRequest, envRequest *config.Env
 func printHeaderMods(okResponse *authv3.OkHttpResponse) string {
 	printHeaderValueOptions := func(indent string, b *strings.Builder, options []*corev3.HeaderValueOption) {
 		if len(options) > 0 {
+			sort.Sort(SortHeadersByKey(options))
 			for _, h := range options {
 				addAppend := "="
 				if h.Append.Value {
@@ -393,6 +395,7 @@ func printHeaderMods(okResponse *authv3.OkHttpResponse) string {
 	if len(okResponse.Headers) > 0 || len(okResponse.HeadersToRemove) > 0 {
 		b.WriteString("Request header mods:\n")
 		printHeaderValueOptions("  ", &b, okResponse.Headers)
+		sort.Strings(okResponse.HeadersToRemove)
 		for _, h := range okResponse.HeadersToRemove {
 			b.WriteString(fmt.Sprintf("   - %q\n", h))
 		}
@@ -584,3 +587,11 @@ type multitenantContext struct {
 func (o *multitenantContext) Environment() string {
 	return o.env
 }
+
+// SortHeadersByKey implements sort.Interface for []*HeaderValueOption
+// based on the Header.Key field.
+type SortHeadersByKey []*corev3.HeaderValueOption
+
+func (h SortHeadersByKey) Len() int           { return len(h) }
+func (h SortHeadersByKey) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+func (h SortHeadersByKey) Less(i, j int) bool { return h[i].Header.Key < h[j].Header.Key }
