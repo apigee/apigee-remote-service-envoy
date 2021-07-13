@@ -72,7 +72,7 @@ func TestAddHeaderTransforms(t *testing.T) {
 			removeHeaders:   []string{"remove1"},
 			expectedAdds:    3,
 			expectedRemoves: 1,
-			expectedLog:     "Request header mods:\n  = \":path\": \"/pets...\"\n  = \"set\": \"set1\"\n  + \"append\": \"appen...\"\n",
+			expectedLog:     "Request header mods:\n  = \":path\": \"/pets...\"\n  + \"append\": \"appen...\"\n  = \"set\": \"set1\"\n   - \"remove1\"\n",
 		},
 		{
 			desc:           "test2",
@@ -85,7 +85,7 @@ func TestAddHeaderTransforms(t *testing.T) {
 			removeHeaders:   []string{"Remove1", "missing"},
 			expectedAdds:    4,
 			expectedRemoves: 1,
-			expectedLog:     "Request header mods:\n  = \":path\": \"/pets...\"\n  = \"set\": \"set1\"\n  + \"append\": \"appen...\"\n  + \"append2\": \"appen...\"\n",
+			expectedLog:     "Request header mods:\n  = \":path\": \"/pets...\"\n  + \"append\": \"appen...\"\n  + \"append2\": \"appen...\"\n  = \"set\": \"set1\"\n   - \"remove1\"\n",
 		},
 		{
 			desc:            "test3",
@@ -95,7 +95,7 @@ func TestAddHeaderTransforms(t *testing.T) {
 			removeHeaders:   []string{"Remove*"},
 			expectedAdds:    1,
 			expectedRemoves: 2,
-			expectedLog:     "Request header mods:\n  = \":path\": \"/pets...\"\n",
+			expectedLog:     "Request header mods:\n  = \":path\": \"/pets...\"\n   - \"remove1\"\n   - \"remove2\"\n",
 		},
 	}
 
@@ -144,7 +144,7 @@ func TestAddHeaderTransforms(t *testing.T) {
 				}
 			}
 
-			logged := logHeaderValueOptions(okResponse)
+			logged := printHeaderMods(okResponse)
 			if test.expectedLog != logged {
 				t.Errorf("want: %q\n, got: %q\n", test.expectedLog, logged)
 			}
@@ -839,11 +839,13 @@ func TestCORSResponseHeaders(t *testing.T) {
 		desc          string
 		requestOrigin string
 		setHeaders    map[string]string
+		expectedLog   string
 	}{
 		{
 			desc:          "not cors",
 			requestOrigin: "",
 			setHeaders:    map[string]string{},
+			expectedLog:   "",
 		},
 		{
 			desc:          "origin",
@@ -857,6 +859,7 @@ func TestCORSResponseHeaders(t *testing.T) {
 				config.CORSAllowCredentials: "true",
 				config.CORSVary:             config.CORSVaryOrigin,
 			},
+			expectedLog: "Response header mods:\n  = \"access-control-allow-credentials\": \"true\"\n  = \"access-control-allow-headers\": \"Allow...\"\n  = \"access-control-allow-methods\": \"Allow...\"\n  = \"access-control-allow-origin\": \"origi...\"\n  = \"access-control-expose-headers\": \"Expos...\"\n  = \"access-control-max-age\": \"42\"\n  = \"vary\": \"Origi...\"\n",
 		},
 		{
 			desc:          "wildcard",
@@ -869,6 +872,7 @@ func TestCORSResponseHeaders(t *testing.T) {
 				config.CORSMaxAge:        "42",
 				config.CORSVary:          config.CORSVaryOrigin,
 			},
+			expectedLog: "Response header mods:\n  = \"access-control-allow-headers\": \"Allow...\"\n  = \"access-control-allow-methods\": \"Allow...\"\n  = \"access-control-allow-origin\": \"*\"\n  = \"access-control-expose-headers\": \"Expos...\"\n  = \"access-control-max-age\": \"42\"\n  = \"vary\": \"Origi...\"\n",
 		},
 	}
 
@@ -895,6 +899,12 @@ func TestCORSResponseHeaders(t *testing.T) {
 				if !hasHeaderAdd(headerOptions, k, v, false) {
 					t.Errorf("expected header set: %q: %q", k, v)
 				}
+			}
+
+			okResponse := &authv3.OkHttpResponse{ResponseHeadersToAdd: headerOptions}
+			logged := printHeaderMods(okResponse)
+			if test.expectedLog != logged {
+				t.Errorf("want: %q\n, got: %q\n", test.expectedLog, logged)
 			}
 		})
 	}
