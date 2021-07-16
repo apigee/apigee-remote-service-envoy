@@ -33,6 +33,7 @@ import (
 	apigeeContext "github.com/apigee/apigee-remote-service-golib/v2/context"
 	"github.com/apigee/apigee-remote-service-golib/v2/product"
 	"github.com/apigee/apigee-remote-service-golib/v2/quota"
+	"github.com/apigee/apigee-remote-service-golib/v2/util"
 	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	"github.com/gogo/googleapis/google/rpc"
@@ -206,6 +207,7 @@ func TestEnvRequestCheck(t *testing.T) {
 			appendMetadataHeaders: true,
 			analyticsMan:          testAnalyticsMan,
 			envSpecsByID:          environmentSpecsByID,
+			ready:                 util.NewAtomicBool(true),
 		},
 	}
 
@@ -438,6 +440,7 @@ func TestBasePathStripping(t *testing.T) {
 					analyticsMan:        testAnalyticsMan,
 					envSpecsByID:        environmentSpecsByID,
 					operationConfigType: test.opConfigType,
+					ready:               util.NewAtomicBool(true),
 				},
 			}
 			req := testutil.NewEnvoyRequest("GET", uri, headers, nil)
@@ -505,12 +508,22 @@ func TestGlobalCheck(t *testing.T) {
 			jwtProviderKey:        "apigee",
 			appendMetadataHeaders: true,
 			analyticsMan:          testAnalyticsMan,
+			ready:                 util.NewAtomicBool(false),
 		},
 	}
 
-	// no api header
+	// not ready
 	var resp *authv3.CheckResponse
 	var err error
+	if resp, err = server.Check(context.Background(), req); err != nil {
+		t.Errorf("should not get error. got: %s", err)
+	}
+	if resp.Status.Code != int32(rpc.UNAVAILABLE) {
+		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.UNAVAILABLE))
+	}
+	server.handler.ready.SetTrue()
+
+	// no api header
 	if resp, err = server.Check(context.Background(), req); err != nil {
 		t.Errorf("should not get error. got: %s", err)
 	}
@@ -772,6 +785,7 @@ func TestImmediateAnalytics(t *testing.T) {
 			analyticsMan:          testAnalyticsMan,
 			jwtProviderKey:        "apigee",
 			appendMetadataHeaders: true,
+			ready:                 util.NewAtomicBool(true),
 		},
 	}
 
