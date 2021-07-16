@@ -67,6 +67,9 @@ func (a *AuthorizationServer) Register(s *grpc.Server, handler *Handler) {
 
 // Check does check
 func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequest) (*authv3.CheckResponse, error) {
+	if !a.handler.Ready() {
+		return a.unavailable(req), nil
+	}
 
 	var rootContext context.Context = a.handler
 	var err error
@@ -306,7 +309,7 @@ func (a *AuthorizationServer) createEnvoyForwarded(
 
 // if CORS request, created appropriate response header options
 func corsResponseHeaders(envRequest *config.EnvironmentSpecRequest) (headers []*corev3.HeaderValueOption) {
-	if !envRequest.IsCORSRequest() {
+	if envRequest == nil || !envRequest.IsCORSRequest() {
 		return
 	}
 	cors := envRequest.GetAPISpec().Cors
@@ -441,6 +444,11 @@ func (a *AuthorizationServer) unauthenticated(req *authv3.CheckRequest, envReque
 	return a.createConditionalEnvoyDenied(req, envRequest, tracker, nil, "", rpc.UNAUTHENTICATED)
 }
 
+func (a *AuthorizationServer) unavailable(req *authv3.CheckRequest) *authv3.CheckResponse {
+	log.Errorf("sending service unavailable")
+	return a.createConditionalEnvoyDenied(req, nil, nil, nil, "", rpc.UNAVAILABLE)
+}
+
 func (a *AuthorizationServer) internalError(req *authv3.CheckRequest, envRequest *config.EnvironmentSpecRequest,
 	tracker *prometheusRequestMetricTracker, err error) *authv3.CheckResponse {
 	log.Errorf("sending internal error: %v", err)
@@ -475,6 +483,8 @@ func (a *AuthorizationServer) createConditionalEnvoyDenied(
 		statusCode = typev3.StatusCode_InternalServerError
 	case rpc.RESOURCE_EXHAUSTED:
 		statusCode = typev3.StatusCode_TooManyRequests
+	case rpc.UNAVAILABLE:
+		statusCode = typev3.StatusCode_ServiceUnavailable
 	}
 
 	if authContext != nil && a.handler.allowUnauthorized {
@@ -493,7 +503,9 @@ func (a *AuthorizationServer) createEnvoyDenied(req *authv3.CheckRequest, envReq
 	// send reject to client
 	log.Debugf("sending downstream: %s", rpcCode.String())
 
-	tracker.statusCode = statusCode
+	if tracker != nil {
+		tracker.statusCode = statusCode
+	}
 
 	response := &authv3.CheckResponse{
 		Status: &status.Status{

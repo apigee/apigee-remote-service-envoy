@@ -32,6 +32,7 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/v2/log"
 	"github.com/apigee/apigee-remote-service-golib/v2/product"
 	"github.com/apigee/apigee-remote-service-golib/v2/quota"
+	"github.com/apigee/apigee-remote-service-golib/v2/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -54,6 +55,7 @@ type Handler struct {
 	isMultitenant         bool
 	envSpecsByID          map[string]*config.EnvironmentSpecExt
 	operationConfigType   string
+	ready                 *util.AtomicBool
 
 	productMan   product.Manager
 	authMan      auth.Manager
@@ -97,6 +99,11 @@ func (h *Handler) Organization() string {
 // Environment is the tenant environment (or "*" for multitenant)
 func (h *Handler) Environment() string {
 	return h.envName
+}
+
+// Ready returns true if the handler is ready to process requests
+func (h *Handler) Ready() bool {
+	return h.ready.IsTrue()
 }
 
 // NewHandler creates a handler
@@ -253,9 +260,18 @@ func NewHandler(cfg *config.Config) (*Handler, error) {
 		isMultitenant:         cfg.Tenant.IsMultitenant(),
 		envSpecsByID:          environmentSpecsByID,
 		operationConfigType:   cfg.Tenant.OperationConfigType,
+		ready:                 util.NewAtomicBool(false),
 	}
+	h.setReadyWhenReady()
 
 	return h, nil
+}
+
+func (h Handler) setReadyWhenReady() {
+	go func() {
+		_ = h.productMan.Products() // blocks until loaded
+		h.ready.SetTrue()
+	}()
 }
 
 // instrumentedClientFor returns a http.Client with a given RoundTripper
