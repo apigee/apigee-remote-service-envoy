@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/apigee/apigee-remote-service-golib/v2/product"
+	"github.com/apigee/apigee-remote-service-golib/v2/util"
 	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/health/grpc_health_v1"
 )
@@ -67,7 +68,9 @@ func TestKubeHealth(t *testing.T) {
 	grpcHealth := health.NewServer()
 	handler := &Handler{
 		productMan: productMan,
+		ready:      util.NewAtomicBool(false),
 	}
+	handler.setReadyWhenReady()
 
 	kubeHealth := NewKubeHealth(handler, grpcHealth)
 	err = kubeHealth.error()

@@ -9,13 +9,15 @@
     },
     {
       "name": "apigee-remote-service-targets",
-      "value": "httpbin.org,httpbin.default.svc.cluster.local"
+      "value": "httpbin.org,httpbin.default.svc.cluster.local,proxy1,proxy2"
     }
   ],
   "description": "httpbin product for test purpose",
   "apiResources": [
     "/httpbin/headers",
-    "/headers"
+    "/headers",
+    "/proxy1",
+    "/proxy2"
   ],
   "environments": [
     "test"

@@ -202,6 +202,9 @@ type APISpec struct {
 	// A list of API Operations, names of which must be unique within the API.
 	Operations []APIOperation `yaml:"operations" mapstructure:"operations"`
 
+	// CORS Policy
+	Cors CorsPolicy `yaml:"cors,omitempty" mapstructure:"cors,omitempty"`
+
 	// JWTAuthentication.Name -> *JWTAuthentication
 	jwtAuthentications map[string]*JWTAuthentication `yaml:"-" mapstructure:"-"`
 }
@@ -602,4 +605,43 @@ type StringTransformation struct {
 
 	// Substitution string, optionally using variables declared in the template.
 	Substitution string `yaml:"substitution,omitempty" mapstructure:"substitution,omitempty"`
+}
+
+// CorsPolicy defines CORS behavior and headers.
+type CorsPolicy struct {
+	// Specifies the list of origins that will be allowed to do CORS requests. An
+	// origin is allowed if it exactly matches any value in the list.
+	// This translates to the `Access-Control-Allow-Origin` header.
+	// If AllowOrigins includes "*", it will be sent as a last resort.
+	AllowOrigins []string `yaml:"allow_origins,omitempty" mapstructure:"allow_origins,omitempty"`
+
+	// Specifies the regular expression patterns that match allowed origins. For
+	// regular expression grammar please see github.com/google/re2/wiki/Syntax. An
+	// origin is allowed if it matches any pattern in the list.
+	// This translates to the `Access-Control-Allow-Origin` header.
+	AllowOriginsRegexes []string `yaml:"allow_origins_regexes,omitempty" mapstructure:"allow_origins_regexes,omitempty"`
+
+	// Specifies the content for the `Access-Control-Allow-Headers` header.
+	AllowHeaders []string `yaml:"allow_headers,omitempty" mapstructure:"allow_headers,omitempty"`
+
+	// Specifies the content for the `Access-Control-Allow-Methods` header.
+	AllowMethods []string `yaml:"allow_methods,omitempty" mapstructure:"allow_methods,omitempty"`
+
+	// Specifies the content for the `Access-Control-Expose-Headers` header.
+	ExposeHeaders []string `yaml:"expose_headers,omitempty" mapstructure:"expose_headers,omitempty"`
+
+	// Specifies how long results of a preflight request can be cached in seconds.
+	// This translates to the `Access-Control-Max-Age` header.
+	MaxAge int `yaml:"max_age,omitempty" mapstructure:"max_age,omitempty"`
+
+	// In response to a preflight request, setting this to true indicates that the
+	// actual request can include user credentials. This translates to the
+	// `Access-Control-Allow-Credentials` header.
+	// If Access-Control-Allow-Origin header is set to "*", this is forced to false.
+	AllowCredentials bool `yaml:"allow_credentials,omitempty" mapstructure:"allow_credentials,omitempty"`
+}
+
+// IsEmpty returns true if there is no valid CORS policy to apply.
+func (c CorsPolicy) IsEmpty() bool {
+	return len(c.AllowOrigins) == 0 && len(c.AllowOriginsRegexes) == 0
 }

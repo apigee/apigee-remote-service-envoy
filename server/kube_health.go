@@ -30,12 +30,6 @@ func NewKubeHealth(handler *Handler, health *health.Server) *KubeHealth {
 		Handler: handler,
 		Health:  health,
 	}
-	go func() {
-		_ = handler.productMan.Products() // blocks until ready
-		kubeHealth.Lock()
-		kubeHealth.ready = true
-		kubeHealth.Unlock()
-	}()
 	return kubeHealth
 }
 
@@ -43,14 +37,11 @@ type KubeHealth struct {
 	sync.Mutex
 	Handler *Handler
 	Health  *health.Server
-	ready   bool
 }
 
 // nil if ok, error with message if not
 func (h *KubeHealth) error() error {
-	h.Lock()
-	defer h.Unlock()
-	if !h.ready {
+	if !h.Handler.Ready() {
 		return fmt.Errorf("products not loaded")
 	}
 	in := &grpc_health_v1.HealthCheckRequest{}
