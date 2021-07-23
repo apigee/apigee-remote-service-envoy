@@ -212,10 +212,7 @@ func NewHandler(cfg *config.Config) (*Handler, error) {
 		analyticsClient = clientAuthorizedByCredentials(cfg, "analytics", cfg.Analytics.Credentials)
 		// overwrite the internalAPI to the GCP managed host if not initialized yet
 		if internalAPI == nil {
-			internalAPI, err = url.Parse(config.GCPExperienceBase)
-			if err != nil {
-				return nil, err
-			}
+			internalAPI, _ = url.Parse(config.GCPExperienceBase)
 		}
 	} else {
 		log.Debugf("analytics http client not using GCP authorization")
