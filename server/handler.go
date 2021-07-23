@@ -210,8 +210,10 @@ func NewHandler(cfg *config.Config) (*Handler, error) {
 	if cfg.Analytics.Credentials != nil {
 		// Attempts to get an authorized http client with given analytics credentials
 		analyticsClient = clientAuthorizedByCredentials(cfg, "analytics", cfg.Analytics.Credentials)
-		// overwrite the internalAPI to the GCP managed host
-		internalAPI, _ = url.Parse(config.GCPExperienceBase)
+		// overwrite the internalAPI to the GCP managed host if not initialized yet
+		if internalAPI == nil {
+			internalAPI, _ = url.Parse(config.GCPExperienceBase)
+		}
 	} else {
 		log.Debugf("analytics http client not using GCP authorization")
 		tlsConfig := config.TLSClientSpec{ // only use AllowUnverifiedSSLCert first
