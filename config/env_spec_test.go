@@ -939,13 +939,15 @@ func createGoodEnvSpec() EnvironmentSpec {
 										Name:       "foo",
 										Issuer:     "issuer",
 										JWKSSource: RemoteJWKS{URL: "url", CacheDuration: time.Hour},
-										In: []APIOperationParameter{{
-											Match: Header("jwt"),
-											Transformation: StringTransformation{
-												Template:     "{identity}",
-												Substitution: "{identity}",
+										In: []APIOperationParameter{
+											{
+												Match: Header("jwt"),
+												Transformation: StringTransformation{
+													Template:     "{identity}",
+													Substitution: "{identity}",
+												},
 											},
-										}},
+										},
 									},
 								},
 							},
@@ -998,7 +1000,10 @@ func createGoodEnvSpec() EnvironmentSpec {
 						Name:       "foo",
 						Issuer:     "issuer-0",
 						JWKSSource: RemoteJWKS{URL: "url", CacheDuration: time.Hour},
-						In:         []APIOperationParameter{{Match: Header("jwt")}},
+						In: []APIOperationParameter{
+							{Match: Header("jwt")},
+							{Match: Header("x-custom-auth-token")},
+						},
 					},
 				},
 				Operations: []APIOperation{
