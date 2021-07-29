@@ -431,7 +431,7 @@ func (a *AuthorizationServer) corsPreflightResponse(
 	api string) *authv3.CheckResponse {
 
 	log.Debugf("sending cors preflight for api: %v", envRequest.GetAPISpec().ID)
-	return a.createEnvoyDenied(envRequest.Request, envRequest, tracker, nil, "", rpc.CANCELLED, typev3.StatusCode_NoContent)
+	return a.createEnvoyDenied(envRequest.Request, envRequest, tracker, authContext, api, rpc.CANCELLED, typev3.StatusCode_NoContent)
 }
 
 func (a *AuthorizationServer) notFound(req *authv3.CheckRequest, envRequest *config.EnvironmentSpecRequest,
@@ -441,7 +441,7 @@ func (a *AuthorizationServer) notFound(req *authv3.CheckRequest, envRequest *con
 
 func (a *AuthorizationServer) unauthenticated(req *authv3.CheckRequest, envRequest *config.EnvironmentSpecRequest,
 	tracker *prometheusRequestMetricTracker, api string) *authv3.CheckResponse {
-	return a.createConditionalEnvoyDenied(req, envRequest, tracker, nil, "", rpc.UNAUTHENTICATED)
+	return a.createConditionalEnvoyDenied(req, envRequest, tracker, nil, api, rpc.UNAUTHENTICATED)
 }
 
 func (a *AuthorizationServer) unavailable(req *authv3.CheckRequest) *authv3.CheckResponse {
@@ -523,7 +523,12 @@ func (a *AuthorizationServer) createEnvoyDenied(req *authv3.CheckRequest, envReq
 
 	// Envoy does not send metadata to ALS on a reject, so we create the
 	// analytics record here and the ALS handler can ignore the metadataless record.
-	if authContext != nil && api != "" {
+	if tracker != nil { // if no tracker, we don't even have org and env context
+		if authContext == nil {
+			authContext = &auth.Context{
+				Context: tracker.rootContext,
+			}
+		}
 		start := req.Attributes.Request.Time.AsTime().UnixNano() / 1000000
 		duration := time.Now().Unix() - tracker.startTime.Unix()
 		sent := start + duration                                                   // use Envoy's start time to calculate
