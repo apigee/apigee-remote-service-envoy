@@ -263,11 +263,13 @@ func (e *EnvironmentSpecRequest) verifyJWTAuthentication(name string) bool {
 		}
 
 		setResult(claims, err)
-		if err != nil {
-			return false
+		// First match wins
+		if err == nil {
+			return true
 		}
 	}
-	return true
+
+	return false
 }
 
 // returns error if passed value is not in claim as string or []string
@@ -368,6 +370,7 @@ func (e *EnvironmentSpecRequest) GetAPIKey() (key string) {
 	if !auth.Disabled {
 		for _, authorization := range auth.In {
 			if key = e.GetParamValue(authorization); key != "" {
+				// First match wins.
 				return key
 			}
 		}
