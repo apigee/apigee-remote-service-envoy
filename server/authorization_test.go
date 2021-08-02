@@ -240,24 +240,28 @@ func TestEnvRequestCheck(t *testing.T) {
 		wantHeaders []string
 		wantValues  []string
 		wantAppends []bool
+		immediateAX int
 	}{
 		{
-			desc:       "missing api",
-			method:     http.MethodGet,
-			path:       "/v0/missing",
-			statusCode: int32(rpc.NOT_FOUND),
+			desc:        "missing api",
+			method:      http.MethodGet,
+			path:        "/v0/missing",
+			statusCode:  int32(rpc.NOT_FOUND),
+			immediateAX: 1,
 		},
 		{
-			desc:       "missing operation",
-			method:     http.MethodGet,
-			path:       "/v1/missing",
-			statusCode: int32(rpc.NOT_FOUND),
+			desc:        "missing operation",
+			method:      http.MethodGet,
+			path:        "/v1/missing",
+			statusCode:  int32(rpc.NOT_FOUND),
+			immediateAX: 1,
 		},
 		{
-			desc:       "bad authentication",
-			method:     http.MethodGet,
-			path:       uri,
-			statusCode: int32(rpc.UNAUTHENTICATED),
+			desc:        "bad authentication",
+			method:      http.MethodGet,
+			path:        uri,
+			statusCode:  int32(rpc.UNAUTHENTICATED),
+			immediateAX: 1,
 		},
 		{
 			desc:   "bad authentication because op overrides the auth req",
@@ -266,7 +270,8 @@ func TestEnvRequestCheck(t *testing.T) {
 			headers: map[string]string{
 				"jwt": jwtString,
 			},
-			statusCode: int32(rpc.UNAUTHENTICATED),
+			statusCode:  int32(rpc.UNAUTHENTICATED),
+			immediateAX: 1,
 		},
 		{
 			desc:   "good authentication, bad authorization",
@@ -275,8 +280,9 @@ func TestEnvRequestCheck(t *testing.T) {
 			headers: map[string]string{
 				"jwt": jwtString,
 			},
-			authErr:    libAuth.ErrBadAuth,
-			statusCode: int32(rpc.PERMISSION_DENIED),
+			authErr:     libAuth.ErrBadAuth,
+			statusCode:  int32(rpc.PERMISSION_DENIED),
+			immediateAX: 1,
 		},
 		{
 			desc:   "good authn/z, network failure w/ fail open",
@@ -285,8 +291,9 @@ func TestEnvRequestCheck(t *testing.T) {
 			headers: map[string]string{
 				"jwt": jwtString,
 			},
-			authErr:    libAuth.ErrNetworkError,
-			statusCode: int32(rpc.OK),
+			authErr:     libAuth.ErrNetworkError,
+			statusCode:  int32(rpc.OK),
+			immediateAX: 0,
 		},
 		{
 			desc:   "good request",
@@ -310,9 +317,10 @@ func TestEnvRequestCheck(t *testing.T) {
 				"append",
 			},
 			wantAppends: []bool{false, false, true},
+			immediateAX: 0,
 		},
 		{
-			desc:       "no consumerauthorization",
+			desc:       "no consumerauthorization required",
 			method:     http.MethodGet,
 			path:       "/v2/noauthz",
 			statusCode: int32(rpc.OK),
@@ -327,6 +335,7 @@ func TestEnvRequestCheck(t *testing.T) {
 				"append",
 			},
 			wantAppends: []bool{false, false, true},
+			immediateAX: 0,
 		},
 	}
 
@@ -342,6 +351,10 @@ func TestEnvRequestCheck(t *testing.T) {
 			if resp.Status.Code != test.statusCode {
 				t.Errorf("got: %d, want: %d", resp.Status.Code, test.statusCode)
 			}
+			if len(testAnalyticsMan.records) != test.immediateAX {
+				t.Errorf("want %d immediate analytics record, got: %d", test.immediateAX, len(testAnalyticsMan.records))
+			}
+			testAnalyticsMan.records = []analytics.Record{}
 			if test.statusCode == int32(rpc.OK) {
 				okr, ok := resp.HttpResponse.(*authv3.CheckResponse_OkResponse)
 				if !ok {

@@ -453,9 +453,10 @@ func (c *Config) loadEnvironmentSpec(f string) error {
 	return nil
 }
 
-// IsGCPManaged is true for hybrid and NG SaaS
+// IsGCPManaged is true for Apigee X and Hybrid
 func (c *Config) IsGCPManaged() bool {
-	return c.Tenant.InternalAPI == ""
+	// Empty InternalAPI will be default to GCP managed.
+	return c.Tenant.InternalAPI == "" || strings.HasSuffix(c.Tenant.InternalAPI, "googleapis.com")
 }
 
 // IsApigeeManaged is true for legacy SaaS
@@ -475,7 +476,7 @@ func (c *Config) Validate(requireAnalyticsCredentials bool) error {
 		errs = errorset.Append(errs, fmt.Errorf("tenant.remote_service_api is required"))
 	}
 	if len(c.Analytics.CredentialsJSON) == 0 {
-		if c.Tenant.InternalAPI == "" && requireAnalyticsCredentials {
+		if c.IsGCPManaged() && requireAnalyticsCredentials {
 			cred, err := google.FindDefaultCredentials(context.Background(), ApigeeAPIScope)
 			if err != nil {
 				errs = errorset.Append(errs, fmt.Errorf("tenant.internal_api is required if analytics credentials not given"))
@@ -484,8 +485,8 @@ func (c *Config) Validate(requireAnalyticsCredentials bool) error {
 			}
 		}
 	} else {
-		if c.Tenant.InternalAPI != "" {
-			errs = errorset.Append(errs, fmt.Errorf("tenant.internal_api and analytics credentials are mutually exclusive"))
+		if !c.IsGCPManaged() {
+			errs = errorset.Append(errs, fmt.Errorf("non-gcp tenant.internal_api and analytics credentials are mutually exclusive"))
 		}
 	}
 	if c.Tenant.OrgName == "" {
