@@ -317,6 +317,7 @@ func TestIsAuthenticated(t *testing.T) {
 	jwtClaims := map[string]interface{}{
 		"key": "value",
 		"iss": "issuer",
+		"aud": []string{"foo", "bar"},
 	}
 	jwtString, err := testutil.GenerateJWT(privateKey, jwtClaims)
 	if err != nil {
@@ -330,6 +331,7 @@ func TestIsAuthenticated(t *testing.T) {
 		{"auth in api", "/v1/petstore"},
 		{"auth in operation", "/v2/petstore"},
 		{"auth in api, no op", "/v3/petstore"},
+		{"auth in operation, aud claim has partial match", "/v1/airport"},
 	}
 
 	for _, test := range tests {
@@ -339,7 +341,7 @@ func TestIsAuthenticated(t *testing.T) {
 			req := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
 
 			if req.IsAuthenticated() {
-				t.Errorf("IsAuthenticated should be false")
+				t.Fatalf("IsAuthenticated should be false")
 			}
 
 			// internal: err should be cached

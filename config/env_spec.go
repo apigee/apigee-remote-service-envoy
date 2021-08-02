@@ -398,7 +398,9 @@ type JWTAuthentication struct {
 	// The JWKS source.
 	JWKSSource JWKSSource `yaml:"-"`
 
-	// Audiences contains a list of audiences.
+	// Audiences contains a list of audiences allowed to access.
+	// A JWT containing any of these audiences will be accepted.
+	// If not specified, the audiences in JWT will not be checked.
 	Audiences []string `yaml:"audiences,omitempty" mapstructure:"audiences,omitempty"`
 
 	// Header name that will contain decoded JWT payload in requests forwarded to
