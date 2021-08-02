@@ -133,11 +133,11 @@ func (h HTTPRequestTransformations) isEmpty() bool {
 }
 
 func (c ConsumerAuthorization) isEmpty() bool {
-	return len(c.In) == 0
+	return !c.Disabled && len(c.In) == 0
 }
 
 func (a AuthenticationRequirement) IsEmpty() bool {
-	return isEmpty(a)
+	return !a.Disabled && isEmpty(a)
 }
 
 func isEmpty(auth AuthenticationRequirement) bool {
