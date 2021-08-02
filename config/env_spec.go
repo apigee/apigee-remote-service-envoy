@@ -324,9 +324,10 @@ type AuthenticationRequirement struct {
 }
 
 type authenticationRequirementWrapper struct {
-	JWT *JWTAuthentication             `yaml:"jwt,omitempty" mapstructure:"jwt,omitempty"`
-	Any *AnyAuthenticationRequirements `yaml:"any,omitempty" mapstructure:"any,omitempty"`
-	All *AllAuthenticationRequirements `yaml:"all,omitempty" mapstructure:"all,omitempty"`
+	Disabled bool                           `yaml:"disabled,omitempty" mapstructure:"disabled,omitempty"`
+	JWT      *JWTAuthentication             `yaml:"jwt,omitempty" mapstructure:"jwt,omitempty"`
+	Any      *AnyAuthenticationRequirements `yaml:"any,omitempty" mapstructure:"any,omitempty"`
+	All      *AllAuthenticationRequirements `yaml:"all,omitempty" mapstructure:"all,omitempty"`
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface
@@ -335,6 +336,7 @@ func (a *AuthenticationRequirement) UnmarshalYAML(node *yaml.Node) error {
 	if err := node.Decode(w); err != nil {
 		return err
 	}
+	a.Disabled = w.Disabled
 
 	ctr := 0
 	if w.JWT != nil {
@@ -358,7 +360,9 @@ func (a *AuthenticationRequirement) UnmarshalYAML(node *yaml.Node) error {
 
 // MarshalYAML implements the yaml.Marshaler interface
 func (a AuthenticationRequirement) MarshalYAML() (interface{}, error) {
-	w := authenticationRequirementWrapper{}
+	w := authenticationRequirementWrapper{
+		Disabled: a.Disabled,
+	}
 
 	switch v := a.Requirements.(type) {
 	case JWTAuthentication:

@@ -411,7 +411,7 @@ func TestAuthenticationRequirementDisabled(t *testing.T) {
 				t.Errorf("IsAuthenticated should be false")
 			}
 
-			// both tests disabled at API Level, api hit should be ok
+			// both operations disabled at API Level, api hit should be ok
 			envSpec = createGoodEnvSpec()
 			envSpec.APIs[0].Authentication.Disabled = true
 			envSpec.APIs[1].Authentication.Disabled = true
@@ -426,7 +426,7 @@ func TestAuthenticationRequirementDisabled(t *testing.T) {
 				t.Errorf("IsAuthenticated should be %t", test.api)
 			}
 
-			// both tests disabled at operation Level, only operation hit should be ok
+			// both operations disabled, both operations should be ok
 			envSpec = createGoodEnvSpec()
 			envSpec.APIs[0].Operations[0].Authentication.Disabled = true
 			envSpec.APIs[1].Operations[0].Authentication.Disabled = true
@@ -437,8 +437,8 @@ func TestAuthenticationRequirementDisabled(t *testing.T) {
 			envoyReq = testutil.NewEnvoyRequest(http.MethodGet, test.path, nil, nil)
 			req = NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
 
-			if req.IsAuthenticated() == test.api {
-				t.Errorf("IsAuthenticated should be %t", !test.api)
+			if !req.IsAuthenticated() {
+				t.Errorf("IsAuthenticated should be true")
 			}
 		})
 	}
@@ -446,10 +446,6 @@ func TestAuthenticationRequirementDisabled(t *testing.T) {
 
 func TestGetAPIKey(t *testing.T) {
 	envSpec := createGoodEnvSpec()
-	specExt, err := NewEnvironmentSpecExt(&envSpec)
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
 
 	apiKey := "myapikey"
 	tests := []struct {
@@ -469,9 +465,15 @@ func TestGetAPIKey(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
+			envoyReq := testutil.NewEnvoyRequest(http.MethodGet, test.path, test.headers, nil)
 
 			// enabled
-			envoyReq := testutil.NewEnvoyRequest(http.MethodGet, test.path, test.headers, nil)
+			envSpec.APIs[0].ConsumerAuthorization.Disabled = false
+			envSpec.APIs[1].Operations[0].ConsumerAuthorization.Disabled = false
+			specExt, err := NewEnvironmentSpecExt(&envSpec)
+			if err != nil {
+				t.Fatalf("%v", err)
+			}
 			req := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
 			got := req.GetAPIKey()
 
@@ -482,7 +484,7 @@ func TestGetAPIKey(t *testing.T) {
 			// disabled
 			envSpec.APIs[0].ConsumerAuthorization.Disabled = true
 			envSpec.APIs[1].Operations[0].ConsumerAuthorization.Disabled = true
-			specExt, err := NewEnvironmentSpecExt(&envSpec)
+			specExt, err = NewEnvironmentSpecExt(&envSpec)
 			if err != nil {
 				t.Fatalf("%v", err)
 			}

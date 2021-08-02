@@ -68,14 +68,15 @@ func NewEnvironmentSpecRequest(authMan auth.Manager, e *EnvironmentSpecExt, req 
 // Create using NewEnvironmentSpecRequest()
 type EnvironmentSpecRequest struct {
 	*EnvironmentSpecExt
-	Request       *authv3.CheckRequest
-	authMan       auth.Manager
-	jwtResults    map[string]*jwtResult // JWTAuthentication.Name ->
-	verifier      jwt.Verifier
-	apiSpec       *APISpec
-	operation     *APIOperation
-	queryValues   url.Values
-	operationPath string
+	Request               *authv3.CheckRequest
+	authMan               auth.Manager
+	jwtResults            map[string]*jwtResult // JWTAuthentication.Name ->
+	verifier              jwt.Verifier
+	apiSpec               *APISpec
+	operation             *APIOperation
+	queryValues           url.Values
+	operationPath         string
+	consumerAuthorization *ConsumerAuthorization
 }
 
 type jwtClaims map[string]interface{}
@@ -307,7 +308,7 @@ func (e *EnvironmentSpecRequest) IsAuthenticated() bool {
 func (e *EnvironmentSpecRequest) getAuthenticationRequirement() (auth AuthenticationRequirement) {
 	if e != nil {
 		op := e.GetOperation()
-		if op != nil && !op.ConsumerAuthorization.isEmpty() {
+		if op != nil && !op.Authentication.IsEmpty() {
 			auth = op.Authentication
 			log.Debugf("using AuthenticationRequirement from operation %q", op.Name)
 		} else if api := e.GetAPISpec(); api != nil {
@@ -320,8 +321,7 @@ func (e *EnvironmentSpecRequest) getAuthenticationRequirement() (auth Authentica
 
 // IsAuthorizationRequired returns true if Authorization is required.
 func (e *EnvironmentSpecRequest) IsAuthorizationRequired() bool {
-	authz := e.GetConsumerAuthorization()
-	return len(authz.In) > 0 && !authz.Disabled
+	return !e.GetConsumerAuthorization().isEmpty()
 }
 
 func (e *EnvironmentSpecRequest) GetHTTPRequestTransformations() (transforms HTTPRequestTransformations) {
@@ -387,16 +387,26 @@ func (e *EnvironmentSpecRequest) GetAPIKey() (key string) {
 // GetConsumerAuthorization returns the ConsumerAuthorization of Operation or APISpec as appropriate
 func (e *EnvironmentSpecRequest) GetConsumerAuthorization() (auth ConsumerAuthorization) {
 	if e != nil {
-		op := e.GetOperation()
-		if op != nil && !op.ConsumerAuthorization.isEmpty() {
-			auth = op.ConsumerAuthorization
-			log.Debugf("using ConsumerAuthorization from operation %q", op.Name)
-		} else if api := e.GetAPISpec(); api != nil {
-			auth = api.ConsumerAuthorization
-			log.Debugf("using ConsumerAuthorization from api %q", api.ID)
+		if e.consumerAuthorization == nil {
+			// use operation if valid
+			if op := e.GetOperation(); op != nil && !op.ConsumerAuthorization.isEmpty() {
+				log.Debugf("using ConsumerAuthorization from operation %q", op.Name)
+				e.consumerAuthorization = &op.ConsumerAuthorization
+				return op.ConsumerAuthorization
+			}
+			// if op auth not valid, use api's
+			if api := e.GetAPISpec(); !api.ConsumerAuthorization.Disabled {
+				log.Debugf("using ConsumerAuthorization from api %q", e.GetAPISpec().ID)
+				e.consumerAuthorization = &api.ConsumerAuthorization
+				return api.ConsumerAuthorization
+			} else {
+				log.Debugf("no enabled ConsumerAuthorization for api %q", e.GetAPISpec().ID)
+				e.consumerAuthorization = &ConsumerAuthorization{}
+			}
 		}
+		return *e.consumerAuthorization
 	}
-	return auth
+	return
 }
 
 // IsCORSRequest returns true if request is a CORS request and there is a CORS Policy

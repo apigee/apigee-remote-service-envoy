@@ -333,6 +333,7 @@ func TestMarshalAndUnmarshalAuthenticationRequirement(t *testing.T) {
 		{
 			desc: "valid jwt",
 			want: &AuthenticationRequirement{
+				Disabled: true,
 				Requirements: JWTAuthentication{
 					Name:       "foo",
 					Issuer:     "bar",
@@ -344,6 +345,7 @@ func TestMarshalAndUnmarshalAuthenticationRequirement(t *testing.T) {
 		{
 			desc: "valid any enclosing jwt",
 			want: &AuthenticationRequirement{
+				Disabled: true,
 				Requirements: AnyAuthenticationRequirements([]AuthenticationRequirement{
 					{
 						Requirements: JWTAuthentication{
@@ -367,6 +369,7 @@ func TestMarshalAndUnmarshalAuthenticationRequirement(t *testing.T) {
 		{
 			desc: "valid all enclosing jwt",
 			want: &AuthenticationRequirement{
+				Disabled: true,
 				Requirements: AllAuthenticationRequirements([]AuthenticationRequirement{
 					{
 						Requirements: JWTAuthentication{
@@ -390,10 +393,12 @@ func TestMarshalAndUnmarshalAuthenticationRequirement(t *testing.T) {
 		{
 			desc: "valid any enclosing all and jwt",
 			want: &AuthenticationRequirement{
+				Disabled: true,
 				Requirements: AnyAuthenticationRequirements([]AuthenticationRequirement{
 					{
 						Requirements: AllAuthenticationRequirements([]AuthenticationRequirement{
 							{
+								Disabled: true,
 								Requirements: JWTAuthentication{
 									Name:       "foo",
 									Issuer:     "bar",
