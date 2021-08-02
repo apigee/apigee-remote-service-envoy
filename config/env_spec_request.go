@@ -264,7 +264,6 @@ func (e *EnvironmentSpecRequest) verifyJWTAuthentication(name string) bool {
 			}
 			// No intersection exists, break and return false.
 			if err != nil {
-				log.Errorf("jwt aud claim error = %v", err)
 				break
 			}
 		}
