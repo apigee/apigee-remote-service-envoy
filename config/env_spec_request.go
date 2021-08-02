@@ -256,9 +256,16 @@ func (e *EnvironmentSpecRequest) verifyJWTAuthentication(name string) bool {
 		if err == nil {
 			for _, aud := range jwtReq.Audiences {
 				err = mustBeInClaim(aud, "aud", claims)
-				if err != nil {
+				// Any intersection between allowed audiences and
+				// those in the "aud" claim is accepted.
+				if err == nil {
 					break
 				}
+			}
+			// No intersection exists, break and return false.
+			if err != nil {
+				log.Errorf("jwt aud claim error = %v", err)
+				break
 			}
 		}
 

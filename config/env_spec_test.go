@@ -979,6 +979,28 @@ func createGoodEnvSpec() EnvironmentSpec {
 							},
 						},
 					},
+					{
+						Name: "op-3",
+						HTTPMatches: []HTTPMatch{
+							{
+								PathTemplate: "/airport",
+								Method:       "GET",
+							},
+						},
+						Authentication: AuthenticationRequirement{
+							Requirements: JWTAuthentication{
+								Name:       "foo",
+								Issuer:     "issuer",
+								Audiences:  []string{"foo", "bac"},
+								JWKSSource: RemoteJWKS{URL: "url", CacheDuration: time.Hour},
+								In: []APIOperationParameter{
+									{
+										Match: Header("jwt"),
+									},
+								},
+							},
+						},
+					},
 				},
 				HTTPRequestTransforms: HTTPRequestTransformations{
 					SetHeaders: map[string]string{
