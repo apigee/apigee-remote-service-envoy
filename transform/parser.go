@@ -24,23 +24,23 @@ import (
 
 // Template is a parsed StringTransformation template.
 type Template struct {
-	Parts []*Part `@@*`
+	Parts []*Part `parser:" @@*"`
 }
 
 // Part is either a Variable or Static value from a template.
 type Part struct {
-	Variable *Variable `  @@`
-	Static   *Static   `| @@`
+	Variable *Variable `parser:" @@"`
+	Static   *Static   `parser:" | @@"`
 }
 
 // Static is a non-variable value in a template.
 type Static struct {
-	Value string `@String`
+	Value string `parser:" @String"`
 }
 
 // Variable is a replacement value in a template.
 type Variable struct {
-	Name string `"{" @String "}"`
+	Name string `parser:" '{' @String '}'"`
 }
 
 // very simple lexer just separates {variables} from statics
