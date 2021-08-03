@@ -351,7 +351,7 @@ func (a *AuthenticationRequirement) UnmarshalYAML(node *yaml.Node) error {
 		a.Requirements = *w.All
 		ctr++
 	}
-	if ctr != 1 {
+	if !w.Disabled && ctr != 1 {
 		return fmt.Errorf("precisely one of jwt, any or all should be set")
 	}
 
