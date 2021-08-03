@@ -526,12 +526,37 @@ any:
 `),
 			wantErr: "precisely one of jwt, any or all should be set",
 		},
+		{
+			desc: "disabled:true should eliminate validation err",
+			data: []byte(`
+disabled: true
+all:
+- jwt:
+    name: foo
+    issuer: bar
+    in:
+    - header: header
+    remote_jwks:
+      url: url1
+      cache_duration: 1h
+any:
+- jwt:
+    name: foo
+    issuer: bar
+    in:
+    - header: header
+    remote_jwks:
+      url: url1
+      cache_duration: 1h
+`),
+			wantErr: "",
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
 			a := &AuthenticationRequirement{}
-			if err := yaml.Unmarshal(test.data, a); err == nil {
+			if err := yaml.Unmarshal(test.data, a); test.wantErr != "" && err == nil {
 				t.Errorf("yaml.Unmarshal() returns no error, should have got error")
 			} else if test.wantErr != "" && err.Error() != test.wantErr {
 				t.Errorf("yaml.Unmarshal() returns error %v, want %s", err, test.wantErr)
