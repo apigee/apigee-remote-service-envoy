@@ -1104,6 +1104,9 @@ func createAuthEnvSpec() config.EnvironmentSpec {
 						"jw*",
 					},
 				},
+				ConsumerAuthorization: config.ConsumerAuthorization{
+					Disabled: true,
+				},
 			},
 		},
 	}}
