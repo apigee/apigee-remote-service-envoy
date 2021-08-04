@@ -326,15 +326,25 @@ func TestEnvRequestCheck(t *testing.T) {
 			statusCode: int32(rpc.OK),
 			wantHeaders: []string{
 				":path",
-				"target",
-				"target",
 			},
 			wantValues: []string{
 				"/noauthz",
-				"add",
-				"append",
 			},
-			wantAppends: []bool{false, false, true},
+			wantAppends: []bool{false},
+			immediateAX: 0,
+		},
+		{
+			desc:       "no consumerauthorization required in operation level",
+			method:     http.MethodGet,
+			path:       "/v3/noauthz-op",
+			statusCode: int32(rpc.OK),
+			wantHeaders: []string{
+				":path",
+			},
+			wantValues: []string{
+				"/noauthz-op",
+			},
+			wantAppends: []bool{false},
 			immediateAX: 0,
 		},
 	}
@@ -1093,15 +1103,30 @@ func createAuthEnvSpec() config.EnvironmentSpec {
 			{
 				ID:       "api-without-authorization",
 				BasePath: "/v2",
-				HTTPRequestTransforms: config.HTTPRequestTransformations{
-					SetHeaders: map[string]string{
-						"target": "add",
+				ConsumerAuthorization: config.ConsumerAuthorization{
+					Disabled: true,
+				},
+			},
+			{
+				ID:       "op-without-authorization",
+				BasePath: "/v3",
+				ConsumerAuthorization: config.ConsumerAuthorization{
+					In: []config.APIOperationParameter{
+						{Match: config.Query("x-api-key")},
 					},
-					AppendHeaders: []config.KeyValue{
-						{Key: "target", Value: "append"},
-					},
-					RemoveHeaders: []string{
-						"jw*",
+				},
+				Operations: []config.APIOperation{
+					{
+						Name: "op",
+						HTTPMatches: []config.HTTPMatch{
+							{
+								PathTemplate: "/noauthz-op",
+								Method:       "",
+							},
+						},
+						ConsumerAuthorization: config.ConsumerAuthorization{
+							Disabled: true,
+						},
 					},
 				},
 			},

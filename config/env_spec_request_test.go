@@ -384,6 +384,32 @@ func TestIsAuthenticated(t *testing.T) {
 	}
 }
 
+func TestIsAuthorizationRequired(t *testing.T) {
+	envSpec := createGoodEnvSpec()
+	specExt, err := NewEnvironmentSpecExt(&envSpec)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	tests := []struct {
+		desc string
+		path string
+		want bool
+	}{
+		{"authz in api", "/v1/petstore", true},
+		{"authz disabled in operation", "/v1/noauthz", false},
+	}
+
+	for _, test := range tests {
+		envoyReq := testutil.NewEnvoyRequest(http.MethodGet, test.path, nil, nil)
+		req := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
+
+		if got := req.IsAuthorizationRequired(); got != test.want {
+			t.Errorf("req.IsAuthorizationRequired() = %v, want %v", got, test.want)
+		}
+	}
+}
+
 func TestAuthenticationRequirementDisabled(t *testing.T) {
 	tests := []struct {
 		desc string

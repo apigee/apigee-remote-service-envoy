@@ -1031,6 +1031,18 @@ func createGoodEnvSpec() EnvironmentSpec {
 							},
 						},
 					},
+					{
+						Name: "op-4",
+						HTTPMatches: []HTTPMatch{
+							{
+								PathTemplate: "/noauthz",
+								Method:       "GET",
+							},
+						},
+						ConsumerAuthorization: ConsumerAuthorization{
+							Disabled: true,
+						},
+					},
 				},
 				HTTPRequestTransforms: HTTPRequestTransformations{
 					SetHeaders: map[string]string{
