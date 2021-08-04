@@ -10,13 +10,13 @@ replace github.com/hashicorp/hcl => ./hcl_shim
 
 require (
 	github.com/alecthomas/participle/v2 v2.0.0-alpha5
-	github.com/apigee/apigee-remote-service-golib/v2 v2.0.2-0.20210723182655-e8a50e70800f
+	github.com/apigee/apigee-remote-service-golib/v2 v2.0.2-0.20210804233345-8d8372dbd427
 	github.com/envoyproxy/go-control-plane v0.9.9-0.20210217033140-668b12f5399d
 	github.com/gogo/googleapis v1.4.1
 	github.com/golang/protobuf v1.5.2
 	github.com/google/go-cmp v0.5.5
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
-	github.com/lestrrat-go/jwx v1.2.0
+	github.com/lestrrat-go/jwx v1.2.5
 	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.10.0
