@@ -321,7 +321,7 @@ func (e *EnvironmentSpecRequest) getAuthenticationRequirement() (auth Authentica
 
 // IsAuthorizationRequired returns true if Authorization is required.
 func (e *EnvironmentSpecRequest) IsAuthorizationRequired() bool {
-	return !e.GetConsumerAuthorization().isEmpty() && !e.GetConsumerAuthorization().Disabled
+	return !e.GetConsumerAuthorization().Disabled && !e.GetConsumerAuthorization().isEmpty()
 }
 
 func (e *EnvironmentSpecRequest) GetHTTPRequestTransformations() (transforms HTTPRequestTransformations) {
