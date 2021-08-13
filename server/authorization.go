@@ -152,9 +152,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 		}
 
 		// strip the basepath off path
-		if a.handler.operationConfigType == product.ProxyOperationConfigType {
-			path = strings.SplitN(envRequest.GetOperationPath(), "?", 2)[0]
-		}
+		path = strings.SplitN(envRequest.GetOperationPath(), "?", 2)[0]
 
 		apiKey = envRequest.GetAPIKey()
 

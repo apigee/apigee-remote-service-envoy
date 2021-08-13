@@ -28,7 +28,6 @@ import (
 	"github.com/apigee/apigee-remote-service-envoy/v2/testutil"
 	"github.com/apigee/apigee-remote-service-golib/v2/analytics"
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
-	libAuth "github.com/apigee/apigee-remote-service-golib/v2/auth"
 	"github.com/apigee/apigee-remote-service-golib/v2/auth/jwt"
 	apigeeContext "github.com/apigee/apigee-remote-service-golib/v2/context"
 	"github.com/apigee/apigee-remote-service-golib/v2/product"
@@ -280,7 +279,7 @@ func TestEnvRequestCheck(t *testing.T) {
 			headers: map[string]string{
 				"jwt": jwtString,
 			},
-			authErr:     libAuth.ErrBadAuth,
+			authErr:     auth.ErrBadAuth,
 			statusCode:  int32(rpc.PERMISSION_DENIED),
 			immediateAX: 1,
 		},
@@ -291,7 +290,7 @@ func TestEnvRequestCheck(t *testing.T) {
 			headers: map[string]string{
 				"jwt": jwtString,
 			},
-			authErr:     libAuth.ErrNetworkError,
+			authErr:     auth.ErrNetworkError,
 			statusCode:  int32(rpc.OK),
 			immediateAX: 0,
 		},
@@ -433,13 +432,13 @@ func TestBasePathStripping(t *testing.T) {
 			path:         "/petstore",
 		},
 		{
-			desc: "base path not stripped by default",
-			path: "/v1/petstore",
+			desc: "base path stripped by default",
+			path: "/petstore",
 		},
 		{
-			desc:         "base path not stripped for remoteservice mode",
+			desc:         "base path stripped for remoteservice mode",
 			opConfigType: "remoteservice",
-			path:         "/v1/petstore",
+			path:         "/petstore",
 		},
 	}
 
@@ -556,7 +555,7 @@ func TestGlobalCheck(t *testing.T) {
 	headers[headerAPI] = "api"
 
 	// ErrNoAuth
-	testAuthMan.sendAuth(nil, libAuth.ErrNoAuth)
+	testAuthMan.sendAuth(nil, auth.ErrNoAuth)
 	if resp, err = server.Check(context.Background(), req); err != nil {
 		t.Errorf("should not get error. got: %s", err)
 	}
@@ -565,7 +564,7 @@ func TestGlobalCheck(t *testing.T) {
 	}
 
 	// ErrBadAuth
-	testAuthMan.sendAuth(nil, libAuth.ErrBadAuth)
+	testAuthMan.sendAuth(nil, auth.ErrBadAuth)
 	if resp, err = server.Check(context.Background(), req); err != nil {
 		t.Errorf("should not get error. got: %s", err)
 	}
@@ -574,7 +573,7 @@ func TestGlobalCheck(t *testing.T) {
 	}
 
 	// ErrInternalError
-	testAuthMan.sendAuth(nil, libAuth.ErrInternalError)
+	testAuthMan.sendAuth(nil, auth.ErrInternalError)
 	if resp, err = server.Check(context.Background(), req); err != nil {
 		t.Errorf("should not get error. got: %s", err)
 	}
