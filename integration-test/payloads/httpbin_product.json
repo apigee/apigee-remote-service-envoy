@@ -16,8 +16,10 @@
   "apiResources": [
     "/httpbin/headers",
     "/headers",
-    "/proxy1",
-    "/proxy2"
+    "/passthru",
+    "/get",
+    "/anything",
+    "/checkHeaders"
   ],
   "environments": [
     "test"
