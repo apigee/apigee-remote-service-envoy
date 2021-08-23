@@ -77,7 +77,7 @@ func TestTransform(t *testing.T) {
 			template:     "prefix-{foo}-{bar}",
 			substitution: "{foo}_{bar}",
 			input:        "prefix-{foo}",
-			want:         "",
+			want:         "_",
 		},
 		{
 			desc:         "must work without suffix",

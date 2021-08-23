@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"path"
 	"sort"
 	"strconv"
 	"strings"
@@ -102,17 +103,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 		}
 	}
 
-	path, queryString := func(path string) (base, qs string) {
-		pathSplits := strings.SplitN(req.Attributes.Request.Http.Path, "?", 2)
-		base = pathSplits[0]
-		if len(pathSplits) > 1 {
-			qs = pathSplits[1]
-		}
-		return
-	}(req.Attributes.Request.Http.Path)
-
-	var api string
-	var apiKey string
+	var api, apiKey, path string
 	var claims map[string]interface{}
 
 	// EnvSpec found, takes priority over global settings
@@ -151,12 +142,20 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 			return a.authOK(req, tracker, nil, api, envRequest), nil
 		}
 
-		// strip the basepath off path
-		path = strings.SplitN(envRequest.GetOperationPath(), "?", 2)[0]
-
+		path = envRequest.GetOperationPath()
 		apiKey = envRequest.GetAPIKey()
 
 	} else { // global authentication
+
+		var queryString string
+		path, queryString = func(path string) (base, qs string) {
+			pathSplits := strings.SplitN(req.Attributes.Request.Http.Path, "?", 2)
+			base = pathSplits[0]
+			if len(pathSplits) > 1 {
+				qs = pathSplits[1]
+			}
+			return
+		}(req.Attributes.Request.Http.Path)
 
 		if v, ok := req.Attributes.ContextExtensions[apiContextKey]; ok { // api specified in context metadata
 			api = v
@@ -334,7 +333,7 @@ func corsResponseHeaders(envRequest *config.EnvironmentSpecRequest) (headers []*
 	return
 }
 
-// includes any JWTAuthentication.ForwardPayloadHeader requests
+// includes :path and any JWTAuthentication.ForwardPayloadHeader requests
 func addRequestHeaderTransforms(req *authv3.CheckRequest, envRequest *config.EnvironmentSpecRequest,
 	okResponse *authv3.OkHttpResponse) {
 	if envRequest != nil {
@@ -354,24 +353,57 @@ func addRequestHeaderTransforms(req *authv3.CheckRequest, envRequest *config.Env
 				}
 			}
 
-			// strip proxy base path from request path
-			addRequestHeader(okResponse, envoyPathHeader, envRequest.GetOperationPath(), false)
-
-			// header transforms from env config
 			transforms := envRequest.GetHTTPRequestTransformations()
-			for _, rhpat := range transforms.RemoveHeaders {
-				rhpat = strings.ToLower(rhpat)
+
+			// http path transformation
+			pathTransform := transforms.PathTransform
+			var targetPath = envRequest.GetOperationPath()
+			if pathTransform != "" {
+				targetPath = envRequest.Reify(pathTransform)
+				targetPath = path.Clean(targetPath)
+			}
+
+			queryMap := envRequest.GetQueryParams()
+			for _, t := range transforms.QueryTransforms.Remove {
+				t = strings.ToLower(t) // TODO: move
+				delete(queryMap, t)
+			}
+			queryAppends := make(map[string][]string) // excess adds
+			for k, v := range queryMap {
+				queryAppends[k] = []string{v}
+			}
+			for _, t := range transforms.QueryTransforms.Add {
+				value := envRequest.Reify(t.Value)
+				if t.Append {
+					queryAppends[t.Name] = append(queryAppends[t.Name], value)
+				} else {
+					queryAppends[t.Name] = []string{value}
+				}
+			}
+			if len(queryAppends) > 0 {
+				queryParams := []string{}
+				for name, vals := range queryAppends {
+					for _, val := range vals {
+						queryParams = append(queryParams, fmt.Sprintf("%s=%s", url.QueryEscape(name), url.QueryEscape(val)))
+					}
+				}
+				targetPath = targetPath + "?" + strings.Join(queryParams, "&")
+			}
+
+			addRequestHeader(okResponse, envoyPathHeader, targetPath, false)
+
+			// header transforms
+			for _, t := range transforms.HeaderTransforms.Remove {
+				t = strings.ToLower(t) // TODO: move
 				for hdr := range req.Attributes.Request.Http.Headers {
-					if util.SimpleGlobMatch(rhpat, hdr) {
+					if util.SimpleGlobMatch(t, hdr) {
 						okResponse.HeadersToRemove = append(okResponse.HeadersToRemove, hdr)
 					}
 				}
 			}
-			for k, v := range transforms.SetHeaders {
-				addRequestHeader(okResponse, k, v, false)
-			}
-			for _, v := range transforms.AppendHeaders {
-				addRequestHeader(okResponse, v.Key, v.Value, true)
+			for _, t := range transforms.HeaderTransforms.Add {
+				value := envRequest.Reify(t.Value)
+				addRequestHeader(okResponse, t.Name, value, t.Append)
 			}
 		}
 	}

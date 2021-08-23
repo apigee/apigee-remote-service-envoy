@@ -197,7 +197,7 @@ type APISpec struct {
 	ConsumerAuthorization ConsumerAuthorization `yaml:"consumer_authorization,omitempty" mapstructure:"consumer_authorization,omitempty"`
 
 	// Transformation rules applied to HTTP requests.
-	HTTPRequestTransforms HTTPRequestTransformations `yaml:"http_request_transforms,omitempty" mapstructure:"http_request_transforms,omitempty"`
+	HTTPRequestTransforms HTTPRequestTransforms `yaml:"http_request_transforms,omitempty" mapstructure:"http_request_transforms,omitempty"`
 
 	// A list of API Operations, names of which must be unique within the API.
 	Operations []APIOperation `yaml:"operations" mapstructure:"operations"`
@@ -224,95 +224,41 @@ type APIOperation struct {
 	HTTPMatches []HTTPMatch `yaml:"http_match,omitempty" mapstructure:"http_match,omitempty"`
 
 	// Transformation rules applied to HTTP requests for this Operation. Overrides the rules set at the API level.
-	HTTPRequestTransforms HTTPRequestTransformations `yaml:"http_request_transforms,omitempty" mapstructure:"http_request_transforms,omitempty"`
+	HTTPRequestTransforms HTTPRequestTransforms `yaml:"http_request_transforms,omitempty" mapstructure:"http_request_transforms,omitempty"`
 
 	// JWTAuthentication.Name -> *JWTAuthentication
 	jwtAuthentications map[string]*JWTAuthentication `yaml:"-" mapstructure:"-"`
 }
 
-// HTTPRequestTransformations are rules for modifying HTTP requests.
-type HTTPRequestTransformations struct {
-	// Header values to append. If a specified header is already present in the request, an additional value is added.
-	AppendHeaders []KeyValue `yaml:"-,omitempty" mapstructure:"-,omitempty"`
+// HTTPRequestTransforms are rules for modifying HTTP requests.
+type HTTPRequestTransforms struct {
+	// Header transformations
+	HeaderTransforms NameValueTransforms `yaml:"headers,omitempty" mapstructure:"headers,omitempty"`
 
-	// Header values to set. If a specified header is already present, the value here will overwrite it.
-	SetHeaders map[string]string `yaml:"set_headers,omitempty" mapstructure:"set_headers,omitempty"`
+	// QueryParam transformations
+	QueryTransforms NameValueTransforms `yaml:"query,omitempty" mapstructure:"headers,omitempty"`
 
-	// Headers to remove. Supports single wildcard globbing e.g. `x-apigee-*`.
-	RemoveHeaders []string `yaml:"remove_headers,omitempty" mapstructure:"remove_headers,omitempty"`
-
-	// URLPathTransformations transform the URL path on authorized requests.
-	URLPathTransformations URLPathTransformations `yaml:"set_path,omitempty" mapstructure:"set_path,omitempty"`
+	// PathTransform will rewrite the request path per the provided specification including
+	// constant values and replacement variable names from the path_template, headers, or
+	// query parameters, surrounded by {}. For example:
+	// set_path: "/constant/{path.wildcard}/{header.name}/{query.name}"
+	// If a query string is included, it will replace any query parameters on the request.
+	// If a query string is not included, the query parameters on the request are retained.
+	PathTransform string `yaml:"path,omitempty" mapstructure:"path,omitempty"`
 }
 
-type httpRequestTransformationsWrapper struct {
-	AppendHeaders          map[string]interface{} `yaml:"append_headers,omitempty" mapstructure:"append_headers,omitempty"`
-	SetHeaders             map[string]string      `yaml:"set_headers,omitempty" mapstructure:"set_headers,omitempty"`
-	RemoveHeaders          []string               `yaml:"remove_headers,omitempty" mapstructure:"remove_headers,omitempty"`
-	URLPathTransformations URLPathTransformations `yaml:"set_path,omitempty" mapstructure:"set_path,omitempty"`
+type NameValueTransforms struct {
+	Add    []AddNameValue `yaml:"add,omitempty" mapstructure:"add,omitempty"`
+	Remove []string       `yaml:"remove,omitempty" mapstructure:"remove,omitempty"`
 }
 
-// UnmarshalYAML implements the yaml.Unmarshaler interface
-func (t *HTTPRequestTransformations) UnmarshalYAML(node *yaml.Node) error {
-	type Unmarsh HTTPRequestTransformations
-	if err := node.Decode((*Unmarsh)(t)); err != nil {
-		return err
-	}
-
-	w := &httpRequestTransformationsWrapper{}
-	if err := node.Decode(w); err != nil {
-		return err
-	}
-
-	for k, v := range w.AppendHeaders {
-		switch x := v.(type) {
-		case string:
-			t.AppendHeaders = append(t.AppendHeaders, KeyValue{Key: k, Value: x})
-		case []interface{}:
-			for _, s := range x {
-				t.AppendHeaders = append(t.AppendHeaders, KeyValue{Key: k, Value: s.(string)})
-			}
-		}
-	}
-
-	return nil
-}
-
-// MarshalYAML implements the yaml.Marshaler interface
-func (t HTTPRequestTransformations) MarshalYAML() (interface{}, error) {
-	w := &httpRequestTransformationsWrapper{
-		AppendHeaders:          make(map[string]interface{}),
-		SetHeaders:             t.SetHeaders,
-		RemoveHeaders:          t.RemoveHeaders,
-		URLPathTransformations: t.URLPathTransformations,
-	}
-
-	// When marshalling, map[string][]string is used exclusively.
-	for _, v := range t.AppendHeaders {
-		if _, ok := w.AppendHeaders[v.Key]; !ok {
-			w.AppendHeaders[v.Key] = []string{v.Value}
-		} else {
-			w.AppendHeaders[v.Key] = append(w.AppendHeaders[v.Key].([]string), v.Value)
-		}
-	}
-
-	return w, nil
-}
-
-// KeyValue contains a key/value pair.
-type KeyValue struct {
-	// Key is the key.
-	Key string
+type AddNameValue struct {
+	// Name is the name.
+	Name string
 	// Value is the value.
 	Value string
-}
-
-// URLPathTransformations configure how a request path will be transformed.
-type URLPathTransformations struct {
-	// AddPrefix is the prefix that will be added to the request path.
-	// Double slashes will be merged, e.g., AddPrefix = "/prefix/" with path = "/foo"
-	// will result in path = "/prefix/foo".
-	AddPrefix string `yaml:"add_prefix,omitempty" mapstructure:"add_prefix,omitempty"`
+	// Append is true to append a value to name, false to replace all values at name
+	Append bool
 }
 
 // AuthenticationRequirement defines the authentication requirement. It can be jwt, any or all.
@@ -498,7 +444,12 @@ type ConsumerAuthorization struct {
 // HTTPMatch is an HTTP request matching rule.
 type HTTPMatch struct {
 	// URL path template using to match incoming requests and optionally identify
-	// path variables.
+	// path variables. Wildcard ("*") and double wildcard ("**") path variables can
+	// be anywhere in the path (but not in partial segments). A single named wildcard
+	// is declared as either {name} alone or {name=*}, a double named wildcard is declared
+	// as {name=**}. For example:
+	// `path_template: /v1/{single-segment=*}/{multi-segment=**}`
+	// Once defined, these variables may be used to populate transformations.
 	PathTemplate string `yaml:"path_template" mapstructure:"path_template"`
 
 	// HTTP method
@@ -650,4 +601,52 @@ type CorsPolicy struct {
 // IsEmpty returns true if there is no valid CORS policy to apply.
 func (c CorsPolicy) IsEmpty() bool {
 	return len(c.AllowOrigins) == 0 && len(c.AllowOriginsRegexes) == 0
+}
+
+//
+//
+// All code below this line is for config generator compatibility - remove after generator is updated.
+//
+//
+
+type HTTPRequestTransformations struct {
+	AppendHeaders          []KeyValue             `yaml:"-,omitempty" mapstructure:"-,omitempty"`
+	SetHeaders             map[string]string      `yaml:"set_headers,omitempty" mapstructure:"set_headers,omitempty"`
+	RemoveHeaders          []string               `yaml:"remove_headers,omitempty" mapstructure:"remove_headers,omitempty"`
+	URLPathTransformations URLPathTransformations `yaml:"set_path,omitempty" mapstructure:"set_path,omitempty"`
+}
+type KeyValue struct {
+	Key   string
+	Value string
+}
+type URLPathTransformations struct {
+	AddPrefix string `yaml:"add_prefix,omitempty" mapstructure:"add_prefix,omitempty"`
+}
+
+type httpRequestTransformationsWrapper struct {
+	AppendHeaders          map[string]interface{} `yaml:"append_headers,omitempty" mapstructure:"append_headers,omitempty"`
+	SetHeaders             map[string]string      `yaml:"set_headers,omitempty" mapstructure:"set_headers,omitempty"`
+	RemoveHeaders          []string               `yaml:"remove_headers,omitempty" mapstructure:"remove_headers,omitempty"`
+	URLPathTransformations URLPathTransformations `yaml:"set_path,omitempty" mapstructure:"set_path,omitempty"`
+}
+
+// MarshalYAML implements the yaml.Marshaler interface
+func (t HTTPRequestTransformations) MarshalYAML() (interface{}, error) {
+	w := &httpRequestTransformationsWrapper{
+		AppendHeaders:          make(map[string]interface{}),
+		SetHeaders:             t.SetHeaders,
+		RemoveHeaders:          t.RemoveHeaders,
+		URLPathTransformations: t.URLPathTransformations,
+	}
+
+	// When marshalling, map[string][]string is used exclusively.
+	for _, v := range t.AppendHeaders {
+		if _, ok := w.AppendHeaders[v.Key]; !ok {
+			w.AppendHeaders[v.Key] = []string{v.Value}
+		} else {
+			w.AppendHeaders[v.Key] = append(w.AppendHeaders[v.Key].([]string), v.Value)
+		}
+	}
+
+	return w, nil
 }

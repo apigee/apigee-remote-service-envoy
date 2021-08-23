@@ -61,12 +61,25 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
 
 		ec.corsVary[api.ID] = mustVary || len(api.Cors.AllowOriginsRegexes) > 0 || len(api.Cors.AllowOrigins) > 1
 
+		for _, in := range api.ConsumerAuthorization.In {
+			err := ec.parseAPIOperationParameter(in.Transformation)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		_, err := ec.parseTemplate(api.HTTPRequestTransforms.PathTransform)
+		if err != nil {
+			return nil, err
+		}
+
 		for i := range api.Operations {
 			op := api.Operations[i]
 
 			if len(op.HTTPMatches) == 0 { // empty is wildcard
 				split = []string{api.ID, wildcard, wildcard}
-				ec.opPathTree.AddChild(split, 0, &op)
+				opMatch := OpTemplateMatch{&op, nil}
+				ec.opPathTree.AddChild(split, 0, &opMatch)
 			} else {
 				for _, m := range op.HTTPMatches {
 					split = strings.Split(m.PathTemplate, "/")
@@ -75,7 +88,15 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
 						method = wildcard
 					}
 					split = append([]string{api.ID, method}, split...)
-					ec.opPathTree.AddChild(split, 0, &op)
+
+					// parse path template
+					t, err := ec.parseTemplate(m.PathTemplate)
+					if err != nil {
+						return nil, err
+					}
+
+					opMatch := OpTemplateMatch{&op, t}
+					ec.opPathTree.AddChild(split, 0, &opMatch)
 				}
 			}
 
@@ -84,6 +105,11 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
 				if err != nil {
 					return nil, err
 				}
+			}
+
+			_, err := ec.parseTemplate(op.HTTPRequestTransforms.PathTransform)
+			if err != nil {
+				return nil, err
 			}
 		}
 	}
@@ -98,6 +124,11 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
 	}
 
 	return ec, nil
+}
+
+type OpTemplateMatch struct {
+	operation *APIOperation
+	template  *transform.Template
 }
 
 // EnvironmentSpecExt extends an EnvironmentSpec to hold cached values.
@@ -128,8 +159,14 @@ func (e EnvironmentSpecExt) JWTAuthentications() []*JWTAuthentication {
 	return auths
 }
 
-func (h HTTPRequestTransformations) isEmpty() bool {
-	return len(h.AppendHeaders) == 0 && len(h.RemoveHeaders) == 0 && len(h.SetHeaders) == 0
+func (h HTTPRequestTransforms) isEmpty() bool {
+	return h.HeaderTransforms.isEmpty() &&
+		h.QueryTransforms.isEmpty() &&
+		len(strings.TrimSpace(h.PathTransform)) == 0
+}
+
+func (u NameValueTransforms) isEmpty() bool {
+	return len(u.Add) == 0 && len(u.Remove) == 0
 }
 
 func (c ConsumerAuthorization) isEmpty() bool {
@@ -160,27 +197,30 @@ func isEmpty(auth AuthenticationRequirement) bool {
 	return true
 }
 
+// parses and caches, use only during creation
+func (e *EnvironmentSpecExt) parseTemplate(templateString string) (*transform.Template, error) {
+	if templateString == "" {
+		return nil, nil
+	}
+	template, err := transform.Parse(templateString)
+	e.compiledTemplates[templateString] = template
+	return template, err
+}
+
 // parses the StringTransformation and adds to cache
-func (e EnvironmentSpecExt) parseAPIOperationParameter(s StringTransformation) error {
+// use only during creation
+func (e *EnvironmentSpecExt) parseAPIOperationParameter(s StringTransformation) error {
 	if s.Template == "" && s.Substitution == "" {
 		return nil
 	}
-	template, err := transform.Parse(s.Template)
-	e.compiledTemplates[s.Template] = template
+	_, err := e.parseTemplate(s.Template)
 	if err != nil {
 		return err
 	}
-	template, _ = transform.Parse(s.Substitution)
-	e.compiledTemplates[s.Substitution] = template
+	_, err = e.parseTemplate(s.Substitution)
 	return err
 }
 
-// Transform uses StringTransformation syntax to transform the passed string.
-func (e EnvironmentSpecExt) transform(s StringTransformation, in string) string {
-	if s.Template == "" && s.Substitution == "" {
-		return in
-	}
-	template := e.compiledTemplates[s.Template]
-	substitution := e.compiledTemplates[s.Substitution]
-	return transform.Substitute(template, substitution, in)
+func (e *EnvironmentSpecExt) GetTemplate(templateString string) *transform.Template {
+	return e.compiledTemplates[templateString]
 }

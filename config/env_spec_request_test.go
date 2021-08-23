@@ -146,7 +146,7 @@ func TestGetOperation(t *testing.T) {
 		{"petstore wrong method", http.MethodPost, "/v1/petstore/", "/petstore/", nil},
 		{"petstore", http.MethodGet, "/v1/petstore", "/petstore", petstore},
 		{"petstore/", http.MethodGet, "/v1/petstore/", "/petstore/", petstore},
-		{"petstore with query", http.MethodGet, "/v1/petstore?foo=bar", "/petstore?foo=bar", petstore},
+		{"petstore with query", http.MethodGet, "/v1/petstore?foo=bar", "/petstore", petstore},
 		{"bookshop", http.MethodPost, "/v1/bookshop/", "/bookshop/", bookshop},
 		{"noop", http.MethodPost, "/v3/bookshop/", "/bookshop/", defaultOperation},
 		{"empty", http.MethodPost, "/v4/whatever/", "/whatever/", empty},
@@ -162,8 +162,10 @@ func TestGetOperation(t *testing.T) {
 				t.Errorf("diff (-want +got):\n%s", diff)
 			}
 
-			if test.opPath != specReq.operationPath {
-				t.Errorf("want %q, got %q", test.opPath, specReq.operationPath)
+			if gotOperation != nil {
+				if test.opPath != specReq.GetOperationPath() {
+					t.Errorf("want %q, got %q", test.opPath, specReq.GetOperationPath())
+				}
 			}
 		})
 	}
@@ -181,13 +183,13 @@ func TestGetParamValueQuery(t *testing.T) {
 		path string
 		want string
 	}{
-		{"no query", "/", ""},
-		{"no path", "?key=value", "value"},
-		{"no trailing /", "/something?key=value", "value"},
-		{"trailing /", "/something/?key=value", "value"},
-		{"no keys", "/something?keyvalue", ""},
-		{"dup keys", "/something?key=value&key=value1", "value"},
-		{"extra key", "/something?key2=value2&key=value", "value"},
+		{"no query", "/v1", ""},
+		{"no op path", "v1?key=value", "value"},
+		{"no trailing slash", "/v1/petstore?key=value", "value"},
+		{"trailing slash", "v1/petstore/?key=value", "value"},
+		{"incorrect querystring", "v1/petstore?keyvalue", ""},
+		{"dup queries", "v1/petstore?key=value&key=value1", "value,value1"},
+		{"other queries", "v1/petstore?key2=value2&key=value", "value"},
 	}
 
 	for _, test := range tests {
@@ -517,7 +519,7 @@ func TestGetAPIKey(t *testing.T) {
 			req = NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
 			got = req.GetAPIKey()
 
-			if "" != got {
+			if got != "" {
 				t.Errorf("want: %q, got: %q", "", got)
 			}
 		})

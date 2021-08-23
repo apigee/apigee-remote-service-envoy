@@ -41,8 +41,8 @@ func TestNewEnvironmentSpecExt(t *testing.T) {
 		t.Errorf("must not be nil")
 	}
 
-	if len(specExt.compiledTemplates) != 3 {
-		t.Errorf("expected %d transformations", 3)
+	if len(specExt.compiledTemplates) != 9 {
+		t.Errorf("expected %d templates, got %d: %#v", 3, len(specExt.compiledTemplates), specExt.compiledTemplates)
 	}
 }
 
