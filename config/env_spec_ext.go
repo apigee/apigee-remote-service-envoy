@@ -61,6 +61,28 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
 
 		ec.corsVary[api.ID] = mustVary || len(api.Cors.AllowOriginsRegexes) > 0 || len(api.Cors.AllowOrigins) > 1
 
+		parseHTTPRequestTransforms := func(t HTTPRequestTransforms) error {
+			_, err := ec.parseTemplate(t.PathTransform)
+			if err != nil {
+				return err
+			}
+
+			for _, a := range t.HeaderTransforms.Add {
+				_, err := ec.parseTemplate(a.Value)
+				if err != nil {
+					return err
+				}
+			}
+
+			for _, a := range t.QueryTransforms.Add {
+				_, err := ec.parseTemplate(a.Value)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+
 		for _, in := range api.ConsumerAuthorization.In {
 			err := ec.parseAPIOperationParameter(in.Transformation)
 			if err != nil {
@@ -68,7 +90,7 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
 			}
 		}
 
-		_, err := ec.parseTemplate(api.HTTPRequestTransforms.PathTransform)
+		err := parseHTTPRequestTransforms(api.HTTPRequestTransforms)
 		if err != nil {
 			return nil, err
 		}
@@ -107,7 +129,7 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
 				}
 			}
 
-			_, err := ec.parseTemplate(op.HTTPRequestTransforms.PathTransform)
+			err := parseHTTPRequestTransforms(op.HTTPRequestTransforms)
 			if err != nil {
 				return nil, err
 			}

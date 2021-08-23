@@ -81,7 +81,6 @@ type EnvironmentSpecRequest struct {
 	Request               *authv3.CheckRequest
 	authMan               auth.Manager
 	jwtResults            map[string]*jwtResult // JWTAuthentication.Name ->
-	verifier              jwt.Verifier
 	apiSpec               *APISpec
 	operation             *APIOperation
 	consumerAuthorization *ConsumerAuthorization
@@ -259,7 +258,7 @@ func (e *EnvironmentSpecRequest) GetOperation() *APIOperation {
 	return e.operation
 }
 
-// GetParamValue extracts a value from request using Match
+// GetParamValue extracts a potentially tranformed value from request using Match
 func (e *EnvironmentSpecRequest) GetParamValue(param APIOperationParameter) string {
 	if e == nil || param.Match == nil {
 		return ""

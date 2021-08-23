@@ -294,8 +294,6 @@ func TestGetParamValueJWTClaim(t *testing.T) {
 			envoyReq := testutil.NewEnvoyRequest(http.MethodGet, "/v1/petstore", headers, nil)
 			specReq := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
 
-			specReq.verifier = &testutil.MockJWTVerifier{}
-
 			got := specReq.GetParamValue(param)
 
 			if test.want != got {
@@ -553,6 +551,103 @@ func TestEnvSpecRequestJWTAuthentications(t *testing.T) {
 				t.Errorf("req.JWTAuthentications() = %d, want %d", l, test.jwtLen)
 			}
 		})
+	}
+}
+
+func TestVariables(t *testing.T) {
+	envSpec := &EnvironmentSpec{
+		ID: "good-env-config",
+		APIs: []APISpec{{
+			ID: "apispec1",
+			Operations: []APIOperation{{
+				Name: "op",
+				HTTPMatches: []HTTPMatch{{
+					PathTemplate: "/seg1/{pathsegment}",
+				}},
+			}},
+			HTTPRequestTransforms: HTTPRequestTransforms{
+				HeaderTransforms: NameValueTransforms{
+					Add: []AddNameValue{
+						{"setheader", "new-{headers.setheader}", false},
+					},
+					Remove: []string{"removeheader"},
+				},
+				QueryTransforms: NameValueTransforms{
+					Add: []AddNameValue{
+						{"setquery", "new-{query.setquery}", false},
+					},
+					Remove: []string{"removequery"},
+				},
+				PathTransform: "/trans/{path.pathsegment}",
+			},
+		}},
+	}
+
+	specExt, err := NewEnvironmentSpecExt(envSpec)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	reqHeaders := map[string]string{
+		"setheader":    "oldvalue",
+		"removeheader": "oldvalue",
+	}
+	reqPath := "/seg1/value"
+	reqQueryString := "setquery=oldvalue&removequery=oldvalue"
+	envoyReq := testutil.NewEnvoyRequest(http.MethodGet, fmt.Sprintf("%s?%s", reqPath, reqQueryString), reqHeaders, nil)
+	envRequest := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
+
+	transforms := envRequest.GetHTTPRequestTransformations()
+	t.Logf("%#v", transforms)
+
+	vars := envRequest.variables
+	t.Logf("%#v", envRequest.variables)
+
+	wantRequestVars := map[string]string{
+		RequestPath:        reqPath,
+		RequestQuerystring: reqQueryString,
+	}
+	if diff := cmp.Diff(wantRequestVars, vars.request); diff != "" {
+		t.Errorf("diff (-want +got):\n%s", diff)
+	}
+
+	if diff := cmp.Diff(reqHeaders, vars.headers); diff != "" {
+		t.Errorf("diff (-want +got):\n%s", diff)
+	}
+
+	wantQueryVars := map[string]string{
+		"setquery":    "oldvalue",
+		"removequery": "oldvalue",
+	}
+	if diff := cmp.Diff(wantQueryVars, envRequest.GetQueryParams()); diff != "" {
+		t.Errorf("diff (-want +got):\n%s", diff)
+	}
+
+	wantPathVars := map[string]string{
+		"pathsegment": "value",
+	}
+	if diff := cmp.Diff(wantPathVars, vars.path); diff != "" {
+		t.Errorf("diff (-want +got):\n%s", diff)
+	}
+
+	// path
+	want := "/trans/value"
+	got := envRequest.Reify("/trans/{path.pathsegment}")
+	if want != got {
+		t.Errorf("want: %s, got: %s", want, got)
+	}
+
+	// header
+	want = "new-oldvalue"
+	got = envRequest.Reify("new-{headers.setheader}")
+	if want != got {
+		t.Errorf("want: %s, got: %s", want, got)
+	}
+
+	// query
+	want = "new-oldvalue"
+	got = envRequest.Reify("new-{query.setquery}")
+	if want != got {
+		t.Errorf("want: %s, got: %s", want, got)
 	}
 }
 
