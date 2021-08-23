@@ -554,6 +554,61 @@ func TestEnvSpecRequestJWTAuthentications(t *testing.T) {
 	}
 }
 
+func TestGetHTTPRequestTransformations(t *testing.T) {
+	envSpec := &EnvironmentSpec{
+		ID: "good-env-config",
+		APIs: []APISpec{{
+			ID: "apispec1",
+			Operations: []APIOperation{{
+				Name: "op",
+				HTTPMatches: []HTTPMatch{{
+					PathTemplate: "/operation",
+				}},
+				HTTPRequestTransforms: HTTPRequestTransforms{
+					PathTransform: "operation",
+				},
+			}},
+			HTTPRequestTransforms: HTTPRequestTransforms{
+				PathTransform: "api",
+			},
+		}},
+	}
+
+	specExt, err := NewEnvironmentSpecExt(envSpec)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	envoyReq := testutil.NewEnvoyRequest(http.MethodGet, "/operation", nil, nil)
+	envRequest := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
+
+	// ensure operation transform is checked if operation is selected and operation transform exists
+	transforms := envRequest.GetHTTPRequestTransformations()
+	if transforms.PathTransform != "operation" {
+		t.Fatal("want operation transform")
+	}
+
+	// ensure api transform is checked if operation is not selected
+	envoyReq = testutil.NewEnvoyRequest(http.MethodGet, "/", nil, nil)
+	envRequest = NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
+	transforms = envRequest.GetHTTPRequestTransformations()
+	if transforms.PathTransform != "api" {
+		t.Fatal("want api transform")
+	}
+
+	// ensure api transform is checked if operation is selected, but operation transform doesn't exist
+	envSpec.APIs[0].Operations[0].HTTPRequestTransforms = HTTPRequestTransforms{}
+	specExt, err = NewEnvironmentSpecExt(envSpec)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	envoyReq = testutil.NewEnvoyRequest(http.MethodGet, "/operation", nil, nil)
+	envRequest = NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
+	transforms = envRequest.GetHTTPRequestTransformations()
+	if transforms.PathTransform != "api" {
+		t.Fatal("want api transform")
+	}
+}
+
 func TestVariables(t *testing.T) {
 	envSpec := &EnvironmentSpec{
 		ID: "good-env-config",
@@ -598,7 +653,6 @@ func TestVariables(t *testing.T) {
 
 	transforms := envRequest.GetHTTPRequestTransformations()
 	t.Logf("%#v", transforms)
-
 	vars := envRequest.variables
 	t.Logf("%#v", envRequest.variables)
 
