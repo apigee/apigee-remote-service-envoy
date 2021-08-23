@@ -66,7 +66,7 @@ func Parse(val string) (*Template, error) {
 // substitution Template.
 func Substitute(template, substitution *Template, in string) string {
 	replacementMap := template.Extract(in)
-	return substitution.Replace(replacementMap)
+	return substitution.Reify(mapDict{replacementMap})
 }
 
 // Extract uses the passed template Template to identify and extract
@@ -101,25 +101,18 @@ func (t *Template) Extract(in string) map[string]string {
 	return extracted
 }
 
-// Replaces variables in the template using the substitution values.
-func (t *Template) Replace(values map[string]string) string {
-	if t == nil {
-		return ""
-	}
-	var b strings.Builder
-	for _, p := range t.Parts {
-		if p.Static != nil {
-			b.WriteString(p.Static.Value)
-		} else {
-			b.WriteString(values[p.Variable.Name])
-		}
-	}
-	return b.String()
-}
-
 type VariableDictionary interface {
 	// LookupValue returns a string, false if not found
 	LookupValue(string) (string, bool)
+}
+
+type mapDict struct {
+	vals map[string]string
+}
+
+func (m mapDict) LookupValue(val string) (string, bool) {
+	v, ok := m.vals[val]
+	return v, ok
 }
 
 func (t Template) Reify(dict VariableDictionary) string {

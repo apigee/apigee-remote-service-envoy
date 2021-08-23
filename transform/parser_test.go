@@ -111,3 +111,11 @@ func TestTransform(t *testing.T) {
 		})
 	}
 }
+
+func TestExtractNilTemplate(t *testing.T) {
+	var template *Template
+	r := template.Extract("foo")
+	if len(r) != 0 {
+		t.Errorf("should be empty map")
+	}
+}
