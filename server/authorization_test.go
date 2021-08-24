@@ -20,6 +20,7 @@ import (
 	"crypto/rsa"
 	"errors"
 	"net/http"
+	"net/url"
 	"reflect"
 	"testing"
 	"time"
@@ -36,6 +37,7 @@ import (
 	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	"github.com/gogo/googleapis/google/rpc"
+	"github.com/google/go-cmp/cmp"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -57,18 +59,28 @@ func TestAddHeaderTransforms(t *testing.T) {
 	tests := []struct {
 		desc            string
 		requestHeaders  map[string]string
-		appendHeaders   []config.KeyValue
-		setHeaders      map[string]string // don't add > 1 element as log order can change
+		addHeaders      []config.AddNameValue
 		removeHeaders   []string
 		expectedAdds    int // +1 to include :path
 		expectedRemoves int
 		expectedLog     string
 	}{
 		{
-			desc:            "test1",
-			requestHeaders:  map[string]string{"remove1": "remove"},
-			appendHeaders:   []config.KeyValue{{Key: "append", Value: "append1"}},
-			setHeaders:      map[string]string{"set": "set1"},
+			desc:            "test0",
+			requestHeaders:  map[string]string{"existing": "value"},
+			addHeaders:      []config.AddNameValue{},
+			removeHeaders:   []string{},
+			expectedAdds:    1,
+			expectedRemoves: 0,
+			expectedLog:     "Request header mods:\n  = \":path\": \"/pets...\"\n",
+		},
+		{
+			desc:           "test1",
+			requestHeaders: map[string]string{"remove1": "remove"},
+			addHeaders: []config.AddNameValue{
+				{Name: "append", Value: "append1", Append: true},
+				{Name: "set", Value: "set1", Append: false},
+			},
 			removeHeaders:   []string{"remove1"},
 			expectedAdds:    3,
 			expectedRemoves: 1,
@@ -77,21 +89,20 @@ func TestAddHeaderTransforms(t *testing.T) {
 		{
 			desc:           "test2",
 			requestHeaders: map[string]string{"remove1": "remove", "skip": "don't remove"},
-			appendHeaders: []config.KeyValue{
-				{Key: "append", Value: "append1"},
-				{Key: "append2", Value: "append2"},
+			addHeaders: []config.AddNameValue{
+				{Name: "append", Value: "append1", Append: true},
+				{Name: "append", Value: "append2", Append: true},
+				{Name: "set", Value: "set1", Append: false},
 			},
-			setHeaders:      map[string]string{"set": "set1"},
 			removeHeaders:   []string{"Remove1", "missing"},
 			expectedAdds:    4,
 			expectedRemoves: 1,
-			expectedLog:     "Request header mods:\n  = \":path\": \"/pets...\"\n  + \"append\": \"appen...\"\n  + \"append2\": \"appen...\"\n  = \"set\": \"set1\"\n   - \"remove1\"\n",
+			expectedLog:     "Request header mods:\n  = \":path\": \"/pets...\"\n  + \"append\": \"appen...\"\n  + \"append\": \"appen...\"\n  = \"set\": \"set1\"\n   - \"remove1\"\n",
 		},
 		{
 			desc:            "test3",
 			requestHeaders:  map[string]string{"remove1": "remove", "remove2": "remove", "skip": "don't remove"},
-			appendHeaders:   []config.KeyValue{},
-			setHeaders:      map[string]string{},
+			addHeaders:      []config.AddNameValue{},
 			removeHeaders:   []string{"Remove*"},
 			expectedAdds:    1,
 			expectedRemoves: 2,
@@ -103,10 +114,11 @@ func TestAddHeaderTransforms(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			envSpec := createAuthEnvSpec()
 
-			envSpec.APIs[0].HTTPRequestTransforms = config.HTTPRequestTransformations{
-				AppendHeaders: test.appendHeaders,
-				SetHeaders:    test.setHeaders,
-				RemoveHeaders: test.removeHeaders,
+			envSpec.APIs[0].HTTPRequestTransforms = config.HTTPRequestTransforms{
+				HeaderTransforms: config.NameValueTransforms{
+					Add:    test.addHeaders,
+					Remove: test.removeHeaders,
+				},
 			}
 			specExt, err := config.NewEnvironmentSpecExt(&envSpec)
 			if err != nil {
@@ -125,14 +137,9 @@ func TestAddHeaderTransforms(t *testing.T) {
 				t.Errorf("expected %d header removes got: %d", test.expectedRemoves, len(okResponse.HeadersToRemove))
 			}
 
-			for _, v := range test.appendHeaders {
-				if !hasHeaderAdd(okResponse.Headers, v.Key, v.Value, true) {
-					t.Errorf("expected header append: %q: %q", v.Key, v.Value)
-				}
-			}
-			for k, v := range test.setHeaders {
-				if !hasHeaderAdd(okResponse.Headers, k, v, false) {
-					t.Errorf("expected header set: %q: %q", k, v)
+			for _, kv := range test.addHeaders {
+				if !hasHeaderAdd(okResponse.Headers, kv.Name, kv.Value, kv.Append) {
+					t.Errorf("expected header mod: %q: %q (%t)", kv.Name, kv.Value, kv.Append)
 				}
 			}
 			for _, k := range test.removeHeaders {
@@ -163,6 +170,15 @@ func hasHeaderAdd(headers []*corev3.HeaderValueOption, key, value string, append
 	return false
 }
 
+func getHeaderValueOption(headers []*corev3.HeaderValueOption, key string) *corev3.HeaderValueOption {
+	for _, h := range headers {
+		if key == h.Header.Key {
+			return h
+		}
+	}
+	return nil
+}
+
 func hasHeaderRemove(okr *authv3.OkHttpResponse, key string) bool {
 	for _, h := range okr.HeadersToRemove {
 		if h == key {
@@ -170,6 +186,103 @@ func hasHeaderRemove(okr *authv3.OkHttpResponse, key string) bool {
 		}
 	}
 	return false
+}
+
+func TestPathTransforms(t *testing.T) {
+	tests := []struct {
+		desc          string
+		path          string
+		pathTransform string
+		addQueries    []config.AddNameValue
+		removeQueries []string
+		targetPath    string
+	}{
+		{
+			desc:          "test0",
+			path:          "/v1/petstore?query=value",
+			pathTransform: "",
+			addQueries:    []config.AddNameValue{},
+			removeQueries: []string{},
+			targetPath:    "/petstore?query=value",
+		},
+		{
+			desc:          "test1",
+			path:          "/v1/petstore",
+			pathTransform: "/v2/{request.path}",
+			addQueries: []config.AddNameValue{
+				{Name: "append", Value: "append1", Append: true},
+				{Name: "set", Value: "set1", Append: false},
+			},
+			removeQueries: []string{"remove1"},
+			targetPath:    "/v2/petstore?append=append1&set=set1",
+		},
+		{
+			desc:          "test2",
+			path:          "/v1/petstore",
+			pathTransform: "/v2/{request.path}",
+			addQueries: []config.AddNameValue{
+				{Name: "append", Value: "append1", Append: true},
+				{Name: "append", Value: "append2", Append: true},
+				{Name: "set", Value: "set1", Append: false},
+			},
+			removeQueries: []string{"Remove1", "missing"},
+			targetPath:    "/v2/petstore?append=append1&append=append2&set=set1",
+		},
+		{
+			desc:          "test3",
+			path:          "/v1/petstore",
+			pathTransform: "/v2/{request.path}",
+			addQueries:    []config.AddNameValue{},
+			removeQueries: []string{"Remove*"},
+			targetPath:    "/v2/petstore",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			envSpec := createAuthEnvSpec()
+
+			envSpec.APIs[0].HTTPRequestTransforms = config.HTTPRequestTransforms{
+				PathTransform: test.pathTransform,
+				QueryTransforms: config.NameValueTransforms{
+					Add:    test.addQueries,
+					Remove: test.removeQueries,
+				},
+			}
+			specExt, err := config.NewEnvironmentSpecExt(&envSpec)
+			if err != nil {
+				t.Fatalf("%v", err)
+			}
+			envoyReq := testutil.NewEnvoyRequest("GET", test.path, nil, nil)
+			specReq := config.NewEnvironmentSpecRequest(nil, specExt, envoyReq)
+			okResponse := &authv3.OkHttpResponse{}
+
+			addRequestHeaderTransforms(envoyReq, specReq, okResponse)
+
+			// path
+			pathSet := getHeaderValueOption(okResponse.Headers, envoyPathHeader)
+			if pathSet == nil {
+				t.Errorf("expected :path header mod")
+			} else if pathSet.Append.Value {
+				t.Errorf("expected :path set, got append")
+			} else if pathSet.Header.Value != test.targetPath {
+				want, err := url.Parse(test.targetPath)
+				if err != nil {
+					t.Fatalf("%v", err)
+				}
+				got, err := url.Parse(pathSet.Header.Value)
+				if err != nil {
+					t.Fatalf("%v", err)
+				}
+				if want.Path != got.Path {
+					t.Errorf("expected path: %q, got: %q", want.Path, got.Path)
+				}
+				if diff := cmp.Diff(want.Query(), got.Query()); diff != "" {
+					t.Errorf("query diff (-want +got):\n%s", diff)
+				}
+			}
+		})
+	}
 }
 
 func TestEnvRequestCheck(t *testing.T) {
@@ -1079,15 +1192,13 @@ func createAuthEnvSpec() config.EnvironmentSpec {
 						},
 					},
 				},
-				HTTPRequestTransforms: config.HTTPRequestTransformations{
-					SetHeaders: map[string]string{
-						"target": "add",
-					},
-					AppendHeaders: []config.KeyValue{
-						{Key: "target", Value: "append"},
-					},
-					RemoveHeaders: []string{
-						"jw*",
+				HTTPRequestTransforms: config.HTTPRequestTransforms{
+					HeaderTransforms: config.NameValueTransforms{
+						Add: []config.AddNameValue{
+							{Name: "target", Value: "add"},
+							{Name: "target", Value: "append", Append: true},
+						},
+						Remove: []string{"jw*"},
 					},
 				},
 				Cors: config.CorsPolicy{

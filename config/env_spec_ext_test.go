@@ -41,8 +41,8 @@ func TestNewEnvironmentSpecExt(t *testing.T) {
 		t.Errorf("must not be nil")
 	}
 
-	if len(specExt.compiledTemplates) != 3 {
-		t.Errorf("expected %d transformations", 3)
+	if len(specExt.compiledTemplates) != 10 {
+		t.Errorf("want %d templates, got %d: %#v", 10, len(specExt.compiledTemplates), specExt.compiledTemplates)
 	}
 }
 
@@ -103,5 +103,53 @@ func TestAuthorizationRequirementIsEmpty(t *testing.T) {
 				t.Errorf("expected empty == %t", test.empty)
 			}
 		})
+	}
+}
+
+func TestHTTPRequestTransformsIsEmpty(t *testing.T) {
+	transforms := HTTPRequestTransforms{}
+	if !transforms.isEmpty() {
+		t.Errorf("expected empty")
+	}
+	transforms.PathTransform = ""
+	transforms.HeaderTransforms = NameValueTransforms{}
+	transforms.QueryTransforms = NameValueTransforms{}
+	if !transforms.isEmpty() {
+		t.Errorf("expected empty")
+	}
+	transforms.HeaderTransforms = NameValueTransforms{
+		Add:    []AddNameValue{},
+		Remove: []string{},
+	}
+	transforms.QueryTransforms = NameValueTransforms{
+		Add:    []AddNameValue{},
+		Remove: []string{},
+	}
+	if !transforms.isEmpty() {
+		t.Errorf("expected empty")
+	}
+	transforms.PathTransform = "x"
+	if transforms.isEmpty() {
+		t.Errorf("expected not empty")
+	}
+	transforms.PathTransform = ""
+	transforms.HeaderTransforms.Add = []AddNameValue{{"x", "x", false}}
+	if transforms.isEmpty() {
+		t.Errorf("expected not empty")
+	}
+	transforms.HeaderTransforms.Add = []AddNameValue{}
+	transforms.QueryTransforms.Add = []AddNameValue{{"x", "x", false}}
+	if transforms.isEmpty() {
+		t.Errorf("expected not empty")
+	}
+	transforms.QueryTransforms.Add = []AddNameValue{}
+	transforms.HeaderTransforms.Remove = []string{"x"}
+	if transforms.isEmpty() {
+		t.Errorf("expected not empty")
+	}
+	transforms.HeaderTransforms.Remove = []string{}
+	transforms.QueryTransforms.Remove = []string{"x"}
+	if transforms.isEmpty() {
+		t.Errorf("expected not empty")
 	}
 }

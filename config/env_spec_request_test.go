@@ -146,7 +146,7 @@ func TestGetOperation(t *testing.T) {
 		{"petstore wrong method", http.MethodPost, "/v1/petstore/", "/petstore/", nil},
 		{"petstore", http.MethodGet, "/v1/petstore", "/petstore", petstore},
 		{"petstore/", http.MethodGet, "/v1/petstore/", "/petstore/", petstore},
-		{"petstore with query", http.MethodGet, "/v1/petstore?foo=bar", "/petstore?foo=bar", petstore},
+		{"petstore with query", http.MethodGet, "/v1/petstore?foo=bar", "/petstore", petstore},
 		{"bookshop", http.MethodPost, "/v1/bookshop/", "/bookshop/", bookshop},
 		{"noop", http.MethodPost, "/v3/bookshop/", "/bookshop/", defaultOperation},
 		{"empty", http.MethodPost, "/v4/whatever/", "/whatever/", empty},
@@ -162,8 +162,10 @@ func TestGetOperation(t *testing.T) {
 				t.Errorf("diff (-want +got):\n%s", diff)
 			}
 
-			if test.opPath != specReq.operationPath {
-				t.Errorf("want %q, got %q", test.opPath, specReq.operationPath)
+			if gotOperation != nil {
+				if test.opPath != specReq.GetOperationPath() {
+					t.Errorf("want %q, got %q", test.opPath, specReq.GetOperationPath())
+				}
 			}
 		})
 	}
@@ -181,13 +183,13 @@ func TestGetParamValueQuery(t *testing.T) {
 		path string
 		want string
 	}{
-		{"no query", "/", ""},
-		{"no path", "?key=value", "value"},
-		{"no trailing /", "/something?key=value", "value"},
-		{"trailing /", "/something/?key=value", "value"},
-		{"no keys", "/something?keyvalue", ""},
-		{"dup keys", "/something?key=value&key=value1", "value"},
-		{"extra key", "/something?key2=value2&key=value", "value"},
+		{"no query", "/v1", ""},
+		{"no op path", "v1?key=value", "value"},
+		{"no trailing slash", "/v1/petstore?key=value", "value"},
+		{"trailing slash", "v1/petstore/?key=value", "value"},
+		{"incorrect querystring", "v1/petstore?keyvalue", ""},
+		{"dup queries", "v1/petstore?key=value&key=value1", "value,value1"},
+		{"other queries", "v1/petstore?key2=value2&key=value", "value"},
 	}
 
 	for _, test := range tests {
@@ -291,8 +293,6 @@ func TestGetParamValueJWTClaim(t *testing.T) {
 
 			envoyReq := testutil.NewEnvoyRequest(http.MethodGet, "/v1/petstore", headers, nil)
 			specReq := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
-
-			specReq.verifier = &testutil.MockJWTVerifier{}
 
 			got := specReq.GetParamValue(param)
 
@@ -517,7 +517,7 @@ func TestGetAPIKey(t *testing.T) {
 			req = NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
 			got = req.GetAPIKey()
 
-			if "" != got {
+			if got != "" {
 				t.Errorf("want: %q, got: %q", "", got)
 			}
 		})
@@ -551,6 +551,157 @@ func TestEnvSpecRequestJWTAuthentications(t *testing.T) {
 				t.Errorf("req.JWTAuthentications() = %d, want %d", l, test.jwtLen)
 			}
 		})
+	}
+}
+
+func TestGetHTTPRequestTransforms(t *testing.T) {
+	envSpec := &EnvironmentSpec{
+		ID: "good-env-config",
+		APIs: []APISpec{{
+			ID: "apispec1",
+			Operations: []APIOperation{{
+				Name: "op",
+				HTTPMatches: []HTTPMatch{{
+					PathTemplate: "/operation",
+				}},
+				HTTPRequestTransforms: HTTPRequestTransforms{
+					PathTransform: "operation",
+				},
+			}},
+			HTTPRequestTransforms: HTTPRequestTransforms{
+				PathTransform: "api",
+			},
+		}},
+	}
+
+	specExt, err := NewEnvironmentSpecExt(envSpec)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	envoyReq := testutil.NewEnvoyRequest(http.MethodGet, "/operation", nil, nil)
+	envRequest := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
+
+	// ensure operation transform is checked if operation is selected and operation transform exists
+	transforms := envRequest.GetHTTPRequestTransforms()
+	if transforms.PathTransform != "operation" {
+		t.Fatal("want operation transform")
+	}
+
+	// ensure api transform is checked if operation is not selected
+	envoyReq = testutil.NewEnvoyRequest(http.MethodGet, "/", nil, nil)
+	envRequest = NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
+	transforms = envRequest.GetHTTPRequestTransforms()
+	if transforms.PathTransform != "api" {
+		t.Fatal("want api transform")
+	}
+
+	// ensure api transform is checked if operation is selected, but operation transform doesn't exist
+	envSpec.APIs[0].Operations[0].HTTPRequestTransforms = HTTPRequestTransforms{}
+	specExt, err = NewEnvironmentSpecExt(envSpec)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	envoyReq = testutil.NewEnvoyRequest(http.MethodGet, "/operation", nil, nil)
+	envRequest = NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
+	transforms = envRequest.GetHTTPRequestTransforms()
+	if transforms.PathTransform != "api" {
+		t.Fatal("want api transform")
+	}
+}
+
+func TestVariables(t *testing.T) {
+	envSpec := &EnvironmentSpec{
+		ID: "good-env-config",
+		APIs: []APISpec{{
+			ID: "apispec1",
+			Operations: []APIOperation{{
+				Name: "op",
+				HTTPMatches: []HTTPMatch{{
+					PathTemplate: "/seg1/{pathsegment}",
+				}},
+			}},
+			HTTPRequestTransforms: HTTPRequestTransforms{
+				HeaderTransforms: NameValueTransforms{
+					Add: []AddNameValue{
+						{"setheader", "new-{headers.setheader}", false},
+					},
+					Remove: []string{"removeheader"},
+				},
+				QueryTransforms: NameValueTransforms{
+					Add: []AddNameValue{
+						{"setquery", "new-{query.setquery}", false},
+					},
+					Remove: []string{"removequery"},
+				},
+				PathTransform: "/trans/{path.pathsegment}",
+			},
+		}},
+	}
+
+	specExt, err := NewEnvironmentSpecExt(envSpec)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	reqHeaders := map[string]string{
+		"setheader":    "oldvalue",
+		"removeheader": "oldvalue",
+	}
+	reqPath := "/seg1/value"
+	reqQueryString := "setquery=oldvalue&removequery=oldvalue"
+	envoyReq := testutil.NewEnvoyRequest(http.MethodGet, fmt.Sprintf("%s?%s", reqPath, reqQueryString), reqHeaders, nil)
+	envRequest := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
+
+	transforms := envRequest.GetHTTPRequestTransforms()
+	t.Logf("%#v", transforms)
+	vars := envRequest.variables
+	t.Logf("%#v", envRequest.variables)
+
+	wantRequestVars := map[string]string{
+		RequestPath:        reqPath,
+		RequestQuerystring: reqQueryString,
+	}
+	if diff := cmp.Diff(wantRequestVars, vars.request); diff != "" {
+		t.Errorf("diff (-want +got):\n%s", diff)
+	}
+
+	if diff := cmp.Diff(reqHeaders, vars.headers); diff != "" {
+		t.Errorf("diff (-want +got):\n%s", diff)
+	}
+
+	wantQueryVars := map[string]string{
+		"setquery":    "oldvalue",
+		"removequery": "oldvalue",
+	}
+	if diff := cmp.Diff(wantQueryVars, envRequest.GetQueryParams()); diff != "" {
+		t.Errorf("diff (-want +got):\n%s", diff)
+	}
+
+	wantPathVars := map[string]string{
+		"pathsegment": "value",
+	}
+	if diff := cmp.Diff(wantPathVars, vars.path); diff != "" {
+		t.Errorf("diff (-want +got):\n%s", diff)
+	}
+
+	// path
+	want := "/trans/value"
+	got := envRequest.Reify("/trans/{path.pathsegment}")
+	if want != got {
+		t.Errorf("want: %s, got: %s", want, got)
+	}
+
+	// header
+	want = "new-oldvalue"
+	got = envRequest.Reify("new-{headers.setheader}")
+	if want != got {
+		t.Errorf("want: %s, got: %s", want, got)
+	}
+
+	// query
+	want = "new-oldvalue"
+	got = envRequest.Reify("new-{query.setquery}")
+	if want != got {
+		t.Errorf("want: %s, got: %s", want, got)
 	}
 }
 

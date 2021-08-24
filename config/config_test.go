@@ -704,9 +704,11 @@ func TestLoadEnvironmentSpecs(t *testing.T) {
 								},
 							},
 						},
-						HTTPRequestTransforms: HTTPRequestTransformations{
-							SetHeaders: map[string]string{
-								"x-apigee-route": "route",
+						HTTPRequestTransforms: HTTPRequestTransforms{
+							HeaderTransforms: NameValueTransforms{
+								Add: []AddNameValue{
+									{Name: "x-apigee-route", Value: "route"},
+								},
 							},
 						},
 					},

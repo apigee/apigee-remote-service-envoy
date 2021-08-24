@@ -22,6 +22,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/apigee/apigee-remote-service-envoy/v2/transform"
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
 	"github.com/apigee/apigee-remote-service-golib/v2/auth/jwt"
 	"github.com/apigee/apigee-remote-service-golib/v2/log"
@@ -46,6 +47,14 @@ const (
 	CORSMaxAge                = "access-control-max-age"
 	CORSAllowCredentials      = "access-control-allow-credentials"
 	CORSAllowCredentialsValue = "true"
+
+	VariableNamespaceSeparator = "."
+	RequestNamespace           = "request"
+	QueryNamespace             = "query"
+	PathNamespace              = "path"
+	HeaderNamespace            = "headers"
+	RequestPath                = "path"
+	RequestQuerystring         = "querystring"
 )
 
 // a "match all" operation for apis without operations
@@ -61,6 +70,7 @@ func NewEnvironmentSpecRequest(authMan auth.Manager, e *EnvironmentSpecExt, req 
 		Request:            req,
 		jwtResults:         make(map[string]*jwtResult),
 	}
+	esr.parseRequest()
 	return esr
 }
 
@@ -71,12 +81,57 @@ type EnvironmentSpecRequest struct {
 	Request               *authv3.CheckRequest
 	authMan               auth.Manager
 	jwtResults            map[string]*jwtResult // JWTAuthentication.Name ->
-	verifier              jwt.Verifier
 	apiSpec               *APISpec
 	operation             *APIOperation
-	queryValues           url.Values
-	operationPath         string
 	consumerAuthorization *ConsumerAuthorization
+	variables             *requestVariables // for template reification
+}
+
+func (e *EnvironmentSpecRequest) parseRequest() {
+
+	path, queryString := func() (string, string) {
+		pathSplits := strings.SplitN(e.Request.Attributes.Request.Http.Path, "?", 2)
+		path := pathSplits[0]
+		var queryString string
+		if len(pathSplits) > 1 {
+			queryString = pathSplits[1]
+		}
+		return path, queryString
+	}()
+
+	// find API
+	pathSegments := strings.Split(path, "/")
+	pathSegments = append([]string{"/"}, pathSegments...)
+	if result := e.apiPathTree.Find(pathSegments, 0); result != nil {
+		e.apiSpec = result.(*APISpec)
+	} else {
+		return
+	}
+
+	// trim api base path
+	opPath := strings.TrimPrefix(path, e.apiSpec.BasePath)
+
+	var pathTemplate *transform.Template
+
+	if len(e.apiSpec.Operations) == 0 { // if no operations, match any for api
+		e.operation = defaultOperation
+	} else {
+		// find operation
+		pathSplits := strings.Split(opPath, "/")
+		// prepend method for search
+		method := e.Request.Attributes.Request.Http.Method
+		if e.IsCORSPreflight() {
+			method = e.Request.Attributes.Request.Http.Headers[CORSRequestMethod]
+		}
+		pathSplits = append([]string{e.apiSpec.ID, method}, pathSplits...)
+		if result := e.opPathTree.Find(pathSplits, 0); result != nil {
+			match := result.(*OpTemplateMatch)
+			e.operation = match.operation
+			pathTemplate = match.template
+		}
+	}
+
+	e.variables = e.parseRequestVariables(pathTemplate, opPath, queryString)
 }
 
 type jwtClaims map[string]interface{}
@@ -84,6 +139,88 @@ type jwtClaims map[string]interface{}
 type jwtResult struct {
 	claims jwtClaims
 	err    error
+}
+
+func (e *EnvironmentSpecRequest) parseRequestVariables(pathTemplate *transform.Template, opPath, queryString string) *requestVariables {
+
+	vars := &requestVariables{
+		path:    pathTemplate.Extract(opPath),
+		headers: e.Request.Attributes.Request.Http.Headers,
+		request: map[string]string{},
+		query:   map[string]string{},
+	}
+
+	vars.request[RequestPath] = opPath
+	vars.request[RequestQuerystring] = queryString
+
+	if queryString != "" {
+		vars.query = map[string]string{}
+		vals, err := url.ParseQuery(queryString)
+		if err != nil {
+			log.Warnf("error parsing querystring: %q, error: %v", queryString, err)
+		}
+		for k, vs := range vals {
+			vars.query[k] = strings.Join(vs, ",") // eliminate duplicated query names
+		}
+	}
+
+	return vars
+}
+
+type requestVariables struct {
+	headers map[string]string
+	request map[string]string
+	query   map[string]string
+	path    map[string]string
+}
+
+func (rv requestVariables) LookupValue(name string) (string, bool) {
+	splits := strings.SplitN(name, VariableNamespaceSeparator, 2)
+
+	var mapping map[string]string
+	if len(splits) > 1 {
+		switch splits[0] {
+		case RequestNamespace:
+			mapping = rv.request
+		case QueryNamespace:
+			mapping = rv.query
+		case PathNamespace:
+			mapping = rv.path
+		case HeaderNamespace:
+			mapping = rv.headers
+		}
+	}
+
+	if mapping == nil {
+		return "", false
+	}
+
+	val, ok := mapping[splits[1]]
+	return val, ok
+}
+
+// GetQueryParams returns a safe copy of the QueryParams map
+func (e *EnvironmentSpecRequest) GetQueryParams() map[string]string {
+	copy := make(map[string]string)
+	if e != nil {
+		for k, v := range e.variables.query {
+			copy[k] = v
+		}
+	}
+	return copy
+}
+
+// Reify will return a string with known {variables} replaced.
+// If the template is unknown, the unmodified template will be returned.
+// If a {variable} is unknown, it will be replaced by an empty string.
+func (e *EnvironmentSpecRequest) Reify(template string) string {
+	if e != nil {
+		ct := e.compiledTemplates[template]
+		if ct != nil {
+			return ct.Reify(e.variables)
+		}
+	}
+	return template
 }
 
 // GetJWTResult returns the claims and error if a JWTAuthentication of the passed name was
@@ -101,20 +238,15 @@ func (e *EnvironmentSpecRequest) GetAPISpec() *APISpec {
 	if e == nil {
 		return nil
 	}
-	if e.apiSpec == nil {
-		path := strings.Split(strings.SplitN(e.Request.Attributes.Request.Http.Path, "?", 2)[0], "/") // strip querystring and split
-		path = append([]string{"/"}, path...)
-		if result := e.apiPathTree.Find(path, 0); result != nil {
-			e.apiSpec = result.(*APISpec)
-		}
-	}
 	return e.apiSpec
 }
 
-// GetOperationPath returns path of Operation - no basepath, includes query string
+// GetOperationPath returns path of Operation, no basepath or querystring
 func (e *EnvironmentSpecRequest) GetOperationPath() string {
-	e.GetOperation() // ensures operationPath is populated
-	return e.operationPath
+	if e.GetOperation() == nil {
+		return ""
+	}
+	return e.variables.request[RequestPath]
 }
 
 // GetOperation uses HttpMatch to return an APIOperation
@@ -123,29 +255,10 @@ func (e *EnvironmentSpecRequest) GetOperation() *APIOperation {
 	if e == nil {
 		return nil
 	}
-	if e.operation == nil {
-		if api := e.GetAPISpec(); api != nil {
-			e.operationPath = strings.TrimPrefix(e.Request.Attributes.Request.Http.Path, api.BasePath)
-			if len(api.Operations) == 0 { // if no operations, match any for api
-				e.operation = defaultOperation
-			} else {
-				pathSplits := strings.Split(strings.SplitN(e.operationPath, "?", 2)[0], "/") // strip querystring and split
-				// prepend method for search
-				method := e.Request.Attributes.Request.Http.Method
-				if e.IsCORSPreflight() {
-					method = e.Request.Attributes.Request.Http.Headers[CORSRequestMethod]
-				}
-				pathSplits = append([]string{e.apiSpec.ID, method}, pathSplits...)
-				if result := e.opPathTree.Find(pathSplits, 0); result != nil {
-					e.operation = result.(*APIOperation)
-				}
-			}
-		}
-	}
 	return e.operation
 }
 
-// GetParamValue extracts a value from request using Match
+// GetParamValue extracts a potentially tranformed value from request using Match
 func (e *EnvironmentSpecRequest) GetParamValue(param APIOperationParameter) string {
 	if e == nil || param.Match == nil {
 		return ""
@@ -162,21 +275,14 @@ func (e *EnvironmentSpecRequest) GetParamValue(param APIOperationParameter) stri
 		}
 		log.Debugf("param from header %q: %q", key, util.Truncate(value, TruncateDebugRequestValuesAt))
 	case Query:
-		if e.queryValues == nil {
-			q := strings.SplitN(e.Request.Attributes.Request.Http.Path, "?", 2)
-			if len(q) > 1 {
-				vals, _ := url.ParseQuery(q[1])
-				e.queryValues = vals
-			}
-			key := string(m)
-			value = e.queryValues.Get(key)
-			log.Debugf("param from query %q: %q", key, util.Truncate(value, TruncateDebugRequestValuesAt))
-		}
+		key := string(m)
+		value = e.variables.query[key]
+		log.Debugf("param from query %q: %q", key, util.Truncate(value, TruncateDebugRequestValuesAt))
 	case JWTClaim:
 		value = e.getClaimValue(m)
 		log.Debugf("param from claim %q: %q", m, util.Truncate(value, TruncateDebugRequestValuesAt))
 	}
-	return e.transform(param.Transformation, value)
+	return e.Transform(param.Transformation.Template, param.Transformation.Substitution, value)
 }
 
 func (e *EnvironmentSpecRequest) getClaimValue(claim JWTClaim) string {
@@ -324,7 +430,7 @@ func (e *EnvironmentSpecRequest) IsAuthorizationRequired() bool {
 	return !e.GetConsumerAuthorization().Disabled && !e.GetConsumerAuthorization().isEmpty()
 }
 
-func (e *EnvironmentSpecRequest) GetHTTPRequestTransformations() (transforms HTTPRequestTransformations) {
+func (e *EnvironmentSpecRequest) GetHTTPRequestTransforms() (transforms HTTPRequestTransforms) {
 	if e != nil {
 		op := e.GetOperation()
 		if op != nil && !op.HTTPRequestTransforms.isEmpty() {
@@ -372,12 +478,14 @@ func (e *EnvironmentSpecRequest) meetsAuthenticatationRequirements(auth Authenti
 // to retrieve the API Key. This does not check if the request is authenticated.
 // Returns "" if ConsumerAuthorization is disabled.
 func (e *EnvironmentSpecRequest) GetAPIKey() (key string) {
-	auth := e.GetConsumerAuthorization()
-	if !auth.Disabled {
-		for _, authorization := range auth.In {
-			if key = e.GetParamValue(authorization); key != "" {
-				// First match wins.
-				return key
+	if e != nil {
+		auth := e.GetConsumerAuthorization()
+		if !auth.Disabled {
+			for _, authorization := range auth.In {
+				if key = e.GetParamValue(authorization); key != "" {
+					// First match wins.
+					return key
+				}
 			}
 		}
 	}
@@ -455,4 +563,14 @@ func (e *EnvironmentSpecRequest) AllowedOrigin() (origin string, vary bool) {
 
 	origin = ""
 	return
+}
+
+// Transform uses StringTransformation syntax to transform the passed string.
+func (e EnvironmentSpecRequest) Transform(source, target, input string) string {
+	if source == "" && target == "" {
+		return input
+	}
+	template := e.compiledTemplates[source]
+	substitution := e.compiledTemplates[target]
+	return transform.Substitute(template, substitution, input)
 }

@@ -77,7 +77,7 @@ func TestTransform(t *testing.T) {
 			template:     "prefix-{foo}-{bar}",
 			substitution: "{foo}_{bar}",
 			input:        "prefix-{foo}",
-			want:         "",
+			want:         "_",
 		},
 		{
 			desc:         "must work without suffix",
@@ -109,5 +109,13 @@ func TestTransform(t *testing.T) {
 				t.Errorf("want: %q, got: %q", test.want, got)
 			}
 		})
+	}
+}
+
+func TestExtractNilTemplate(t *testing.T) {
+	var template *Template
+	r := template.Extract("foo")
+	if len(r) != 0 {
+		t.Errorf("should be empty map")
 	}
 }

@@ -65,18 +65,28 @@ func Parse(val string) (*Template, error) {
 // the Variables from the passed string and replace them using the
 // substitution Template.
 func Substitute(template, substitution *Template, in string) string {
-	replacementMap := make(map[string]string)
+	replacementMap := template.Extract(in)
+	return substitution.Reify(mapDict{replacementMap})
+}
+
+// Extract uses the passed template Template to identify and extract
+// the Variables from the passed string.
+func (t *Template) Extract(in string) map[string]string {
+	extracted := make(map[string]string)
+	if t == nil {
+		return extracted
+	}
 
 	var variable *Variable
 	var pos int
-	for _, part := range template.Parts {
+	for _, part := range t.Parts {
 		if part.Static != nil {
 			pos = strings.Index(in, part.Static.Value)
 			if pos < 0 { // must match
-				return ""
+				return extracted
 			}
 			if variable != nil { // capture variable
-				replacementMap[variable.Name] = in[:pos]
+				extracted[variable.Name] = in[:pos]
 				in = in[pos:]
 				variable = nil
 			}
@@ -86,15 +96,33 @@ func Substitute(template, substitution *Template, in string) string {
 		}
 	}
 	if variable != nil {
-		replacementMap[variable.Name] = in // capture final variable
+		extracted[variable.Name] = in // capture final variable
 	}
+	return extracted
+}
 
+type VariableDictionary interface {
+	// LookupValue returns a string, false if not found
+	LookupValue(string) (string, bool)
+}
+
+type mapDict struct {
+	vals map[string]string
+}
+
+func (m mapDict) LookupValue(val string) (string, bool) {
+	v, ok := m.vals[val]
+	return v, ok
+}
+
+func (t Template) Reify(dict VariableDictionary) string {
 	var b strings.Builder
-	for _, p := range substitution.Parts {
+	for _, p := range t.Parts {
 		if p.Static != nil {
 			b.WriteString(p.Static.Value)
 		} else {
-			b.WriteString(replacementMap[p.Variable.Name])
+			val, _ := dict.LookupValue(p.Variable.Name)
+			b.WriteString(val)
 		}
 	}
 	return b.String()

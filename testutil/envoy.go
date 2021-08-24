@@ -21,6 +21,9 @@ import (
 )
 
 func NewEnvoyRequest(method, path string, headers map[string]string, metadata map[string]*structpb.Struct) *authv3.CheckRequest {
+	if headers != nil {
+		headers[":path"] = path
+	}
 	return &authv3.CheckRequest{
 		Attributes: &authv3.AttributeContext{
 			Request: &authv3.AttributeContext_Request{
