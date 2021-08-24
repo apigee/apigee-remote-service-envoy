@@ -365,7 +365,7 @@ func addRequestHeaderTransforms(req *authv3.CheckRequest, envRequest *config.Env
 
 			queryMap := envRequest.GetQueryParams()
 			for _, t := range transforms.QueryTransforms.Remove {
-				t = strings.ToLower(t) // TODO: move
+				t = strings.ToLower(t)
 				delete(queryMap, t)
 			}
 			queryAppends := make(map[string][]string) // excess adds
@@ -394,7 +394,7 @@ func addRequestHeaderTransforms(req *authv3.CheckRequest, envRequest *config.Env
 
 			// header transforms
 			for _, t := range transforms.HeaderTransforms.Remove {
-				t = strings.ToLower(t) // TODO: move
+				t = strings.ToLower(t)
 				for hdr := range req.Attributes.Request.Http.Headers {
 					if util.SimpleGlobMatch(t, hdr) {
 						okResponse.HeadersToRemove = append(okResponse.HeadersToRemove, hdr)
