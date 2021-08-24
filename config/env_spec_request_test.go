@@ -554,7 +554,7 @@ func TestEnvSpecRequestJWTAuthentications(t *testing.T) {
 	}
 }
 
-func TestGetHTTPRequestTransformations(t *testing.T) {
+func TestGetHTTPRequestTransforms(t *testing.T) {
 	envSpec := &EnvironmentSpec{
 		ID: "good-env-config",
 		APIs: []APISpec{{
@@ -582,7 +582,7 @@ func TestGetHTTPRequestTransformations(t *testing.T) {
 	envRequest := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
 
 	// ensure operation transform is checked if operation is selected and operation transform exists
-	transforms := envRequest.GetHTTPRequestTransformations()
+	transforms := envRequest.GetHTTPRequestTransforms()
 	if transforms.PathTransform != "operation" {
 		t.Fatal("want operation transform")
 	}
@@ -590,7 +590,7 @@ func TestGetHTTPRequestTransformations(t *testing.T) {
 	// ensure api transform is checked if operation is not selected
 	envoyReq = testutil.NewEnvoyRequest(http.MethodGet, "/", nil, nil)
 	envRequest = NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
-	transforms = envRequest.GetHTTPRequestTransformations()
+	transforms = envRequest.GetHTTPRequestTransforms()
 	if transforms.PathTransform != "api" {
 		t.Fatal("want api transform")
 	}
@@ -603,7 +603,7 @@ func TestGetHTTPRequestTransformations(t *testing.T) {
 	}
 	envoyReq = testutil.NewEnvoyRequest(http.MethodGet, "/operation", nil, nil)
 	envRequest = NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
-	transforms = envRequest.GetHTTPRequestTransformations()
+	transforms = envRequest.GetHTTPRequestTransforms()
 	if transforms.PathTransform != "api" {
 		t.Fatal("want api transform")
 	}
@@ -651,7 +651,7 @@ func TestVariables(t *testing.T) {
 	envoyReq := testutil.NewEnvoyRequest(http.MethodGet, fmt.Sprintf("%s?%s", reqPath, reqQueryString), reqHeaders, nil)
 	envRequest := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
 
-	transforms := envRequest.GetHTTPRequestTransformations()
+	transforms := envRequest.GetHTTPRequestTransforms()
 	t.Logf("%#v", transforms)
 	vars := envRequest.variables
 	t.Logf("%#v", envRequest.variables)

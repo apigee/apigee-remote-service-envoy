@@ -353,7 +353,7 @@ func addRequestHeaderTransforms(req *authv3.CheckRequest, envRequest *config.Env
 				}
 			}
 
-			transforms := envRequest.GetHTTPRequestTransformations()
+			transforms := envRequest.GetHTTPRequestTransforms()
 
 			// http path transformation
 			pathTransform := transforms.PathTransform

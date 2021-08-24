@@ -430,7 +430,7 @@ func (e *EnvironmentSpecRequest) IsAuthorizationRequired() bool {
 	return !e.GetConsumerAuthorization().Disabled && !e.GetConsumerAuthorization().isEmpty()
 }
 
-func (e *EnvironmentSpecRequest) GetHTTPRequestTransformations() (transforms HTTPRequestTransforms) {
+func (e *EnvironmentSpecRequest) GetHTTPRequestTransforms() (transforms HTTPRequestTransforms) {
 	if e != nil {
 		op := e.GetOperation()
 		if op != nil && !op.HTTPRequestTransforms.isEmpty() {
