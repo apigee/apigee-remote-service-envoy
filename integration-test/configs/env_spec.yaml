@@ -32,8 +32,10 @@ apis:
       in:
       - query: x-api-key
   http_request_transforms:
-    set_headers:
-      x-apigee-route: target
+    headers:
+      add:
+      - name: x-apigee-route
+        value: target
 - id: proxy2
   base_path: /proxy2
   consumer_authorization:
@@ -60,9 +62,12 @@ apis:
     - path_template: /checkHeaders
       method: GET
     http_request_transforms:
-      set_headers:
-        x-apigee-route: target
-        x-integration-test: integration
+      headers:
+        add:
+        - name: x-apigee-route
+          value: target
+        - name: x-integration-test
+          value: integration
     authentication:
       jwt:
         name: foo
@@ -76,10 +81,14 @@ apis:
           url: {{jwks}}
           cache_duration: 1h
   http_request_transforms:
-    set_headers:
-      x-apigee-route: target
+    headers:
+      add:
+      - name: x-apigee-route
+        value: target
 - id: passthru-proxy
   base_path: /passthru
   http_request_transforms:
-    set_headers:
-      x-apigee-route: target
+    headers:
+      add:
+      - name: x-apigee-route
+        value: target
