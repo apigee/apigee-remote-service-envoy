@@ -139,7 +139,8 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 
 		if !envRequest.IsAuthorizationRequired() {
 			log.Debugf("no authorization requirements")
-			return a.authOK(req, tracker, nil, api, envRequest), nil
+			// Send the root context for limited dynamic metadata.
+			return a.authOK(req, tracker, &auth.Context{Context: rootContext}, api, envRequest), nil
 		}
 
 		path = envRequest.GetOperationPath()
@@ -577,7 +578,7 @@ func (a *AuthorizationServer) createEnvoyDenied(req *authv3.CheckRequest, envReq
 			RequestPath:                  requestPath,
 			RequestVerb:                  req.Attributes.Request.Http.Method,
 			UserAgent:                    req.Attributes.Request.Http.Headers["User-Agent"],
-			ResponseStatusCode:           int(rpcCode),
+			ResponseStatusCode:           int(statusCode),
 			GatewaySource:                gatewaySource,
 			ClientIP:                     req.Attributes.Request.Http.Headers["X-Forwarded-For"],
 		}
