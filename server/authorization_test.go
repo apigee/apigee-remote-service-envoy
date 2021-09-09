@@ -424,7 +424,7 @@ func TestImmediateAnalytics(t *testing.T) {
 		ClientIP:                     headers["X-Forwarded-For"],
 		UserAgent:                    headers["User-Agent"],
 		APIProxyRevision:             0,
-		ResponseStatusCode:           int(rpc.PERMISSION_DENIED),
+		ResponseStatusCode:           http.StatusForbidden,
 		DeveloperEmail:               ac.DeveloperEmail,
 		DeveloperApp:                 ac.Application,
 		AccessToken:                  ac.AccessToken,

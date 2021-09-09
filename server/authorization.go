@@ -270,7 +270,7 @@ func (a *AuthorizationServer) createDenyResponse(req *envoy_auth.CheckRequest, t
 				RequestPath:                  requestPath,
 				RequestVerb:                  req.Attributes.Request.Http.Method,
 				UserAgent:                    req.Attributes.Request.Http.Headers["User-Agent"],
-				ResponseStatusCode:           int(code),
+				ResponseStatusCode:           int(tracker.statusCode),
 				GatewaySource:                gatewaySource,
 				ClientIP:                     req.Attributes.Request.Http.Headers["X-Forwarded-For"],
 			}
