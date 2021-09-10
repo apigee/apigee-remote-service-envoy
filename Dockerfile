@@ -44,6 +44,9 @@ RUN CGO_ENABLED=$CGO_ENABLED go build -a \
 RUN groupadd -g 999 apigee && \
     useradd -r -u 999 -g apigee apigee
 
+# remove all write privileges from ca-certificates.crt
+RUN chmod 4444 /etc/ssl/certs/ca-certificates.crt
+
 #--- Build runtime container ---#
 FROM ${RUN_CONTAINER}
 
