@@ -613,7 +613,8 @@ func TestVariables(t *testing.T) {
 	envSpec := &EnvironmentSpec{
 		ID: "good-env-config",
 		APIs: []APISpec{{
-			ID: "apispec1",
+			BasePath: "/",
+			ID:       "apispec1",
 			Operations: []APIOperation{{
 				Name: "op",
 				HTTPMatches: []HTTPMatch{{
