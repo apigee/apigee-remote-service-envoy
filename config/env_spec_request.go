@@ -109,7 +109,10 @@ func (e *EnvironmentSpecRequest) parseRequest() {
 	}
 
 	// trim api base path
-	opPath := strings.TrimPrefix(path, e.apiSpec.BasePath)
+	opPath := path
+	if e.apiSpec.BasePath != "/" {
+		opPath = strings.TrimPrefix(path, e.apiSpec.BasePath)
+	}
 
 	var pathTemplate *transform.Template
 
