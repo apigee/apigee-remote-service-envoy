@@ -25,6 +25,7 @@ import (
 
 	"github.com/apigee/apigee-remote-service-golib/v2/analytics"
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
+	"github.com/apigee/apigee-remote-service-golib/v2/product"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -121,6 +122,7 @@ func TestHandleHTTPAccessLogs(t *testing.T) {
 			envName:      extAuthzFields[headerEnvironment].GetStringValue(),
 			analyticsMan: testAnalyticsMan,
 		},
+		gatewaySource: managedGatewaySource,
 	}
 	if err := server.handleHTTPLogs(msg); err != nil {
 		t.Fatal(err)
@@ -178,6 +180,9 @@ func TestHandleHTTPAccessLogs(t *testing.T) {
 	}
 	if rec.UserAgent != userAgent {
 		t.Errorf("got: %s, want: %s", rec.UserAgent, userAgent)
+	}
+	if rec.GatewaySource != managedGatewaySource {
+		t.Errorf("got: %s, want: %s", rec.GatewaySource, managedGatewaySource)
 	}
 
 	attrMap := make(map[string]interface{})
@@ -338,6 +343,7 @@ func (tals *testAccessLogService) startAccessLogServer(t *testing.T) *grpc.Serve
 		envName:               "test",
 		analyticsMan:          testAnalyticsMan,
 		appendMetadataHeaders: true,
+		operationConfigType:   product.ProxyOperationConfigType,
 	}
 	server := AccessLogServer{}
 
