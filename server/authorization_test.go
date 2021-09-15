@@ -922,7 +922,7 @@ func TestImmediateAnalytics(t *testing.T) {
 			appendMetadataHeaders: true,
 			ready:                 util.NewAtomicBool(true),
 		},
-		gatewaySource: "configurable",
+		gatewaySource: managedGatewaySource,
 	}
 
 	var resp *authv3.CheckResponse
@@ -962,7 +962,7 @@ func TestImmediateAnalytics(t *testing.T) {
 		APIProduct:                   ac.APIProducts[0],
 		Organization:                 server.handler.orgName,
 		Environment:                  server.handler.envName,
-		GatewaySource:                "configurable",
+		GatewaySource:                managedGatewaySource,
 		// the following fields vary, ignore them
 		ClientSentStartTimestamp: got.ClientSentStartTimestamp,
 		ClientSentEndTimestamp:   got.ClientSentEndTimestamp,

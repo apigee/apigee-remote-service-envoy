@@ -23,6 +23,7 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/v2/analytics"
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
 	"github.com/apigee/apigee-remote-service-golib/v2/log"
+	"github.com/apigee/apigee-remote-service-golib/v2/product"
 	als "github.com/envoyproxy/go-control-plane/envoy/service/accesslog/v3"
 	"github.com/golang/protobuf/ptypes/duration"
 	"github.com/golang/protobuf/ptypes/timestamp"
@@ -34,6 +35,7 @@ import (
 
 const (
 	defaultGatewaySource = "envoy"
+	managedGatewaySource = "configurable"
 	datacaptureNamespace = "envoy.filters.http.apigee.datacapture"
 )
 
@@ -52,8 +54,8 @@ func (a *AccessLogServer) Register(s *grpc.Server, handler *Handler, d time.Dura
 	a.streamTimeout = d
 	a.context = ctx
 	a.gatewaySource = defaultGatewaySource
-	if a.handler.operationConfigType == "PROXY" {
-		a.gatewaySource = "configurable"
+	if a.handler.operationConfigType == product.ProxyOperationConfigType {
+		a.gatewaySource = managedGatewaySource
 	}
 }
 

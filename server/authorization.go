@@ -66,8 +66,8 @@ func (a *AuthorizationServer) Register(s *grpc.Server, handler *Handler) {
 	authv3.RegisterAuthorizationServer(s, a)
 	a.handler = handler
 	a.gatewaySource = defaultGatewaySource
-	if a.handler.operationConfigType == "PROXY" {
-		a.gatewaySource = "configurable"
+	if a.handler.operationConfigType == product.ProxyOperationConfigType {
+		a.gatewaySource = managedGatewaySource
 	}
 }
 
