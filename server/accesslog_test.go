@@ -121,6 +121,7 @@ func TestHandleHTTPAccessLogs(t *testing.T) {
 			envName:      extAuthzFields[headerEnvironment].GetStringValue(),
 			analyticsMan: testAnalyticsMan,
 		},
+		gatewaySource: "configurable",
 	}
 	if err := server.handleHTTPLogs(msg); err != nil {
 		t.Fatal(err)
@@ -178,6 +179,9 @@ func TestHandleHTTPAccessLogs(t *testing.T) {
 	}
 	if rec.UserAgent != userAgent {
 		t.Errorf("got: %s, want: %s", rec.UserAgent, userAgent)
+	}
+	if rec.GatewaySource != "configurable" {
+		t.Errorf("got: %s, want: %s", rec.GatewaySource, "configurable")
 	}
 
 	attrMap := make(map[string]interface{})
@@ -338,6 +342,7 @@ func (tals *testAccessLogService) startAccessLogServer(t *testing.T) *grpc.Serve
 		envName:               "test",
 		analyticsMan:          testAnalyticsMan,
 		appendMetadataHeaders: true,
+		operationConfigType:   "PROXY",
 	}
 	server := AccessLogServer{}
 

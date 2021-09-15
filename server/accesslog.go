@@ -33,7 +33,7 @@ import (
 )
 
 const (
-	gatewaySource        = "envoy"
+	defaultGatewaySource = "envoy"
 	datacaptureNamespace = "envoy.filters.http.apigee.datacapture"
 )
 
@@ -42,6 +42,7 @@ type AccessLogServer struct {
 	handler       *Handler
 	streamTimeout time.Duration // the duration for a stream to live
 	context       context.Context
+	gatewaySource string
 }
 
 // Register registers
@@ -50,6 +51,10 @@ func (a *AccessLogServer) Register(s *grpc.Server, handler *Handler, d time.Dura
 	a.handler = handler
 	a.streamTimeout = d
 	a.context = ctx
+	a.gatewaySource = defaultGatewaySource
+	if a.handler.operationConfigType == "PROXY" {
+		a.gatewaySource = "configurable"
+	}
 }
 
 // StreamAccessLogs streams
@@ -179,7 +184,7 @@ func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLo
 			RequestVerb:                  req.RequestMethod.String(),
 			UserAgent:                    req.UserAgent,
 			ResponseStatusCode:           responseCode,
-			GatewaySource:                gatewaySource,
+			GatewaySource:                a.gatewaySource,
 			ClientIP:                     req.GetForwardedFor(),
 			Attributes:                   attributes,
 		}
