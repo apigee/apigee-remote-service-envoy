@@ -286,13 +286,21 @@ func (a *AuthorizationServer) createEnvoyForwarded(
 	// user request header transforms
 	addRequestHeaderTransforms(req, envRequest, okResponse)
 
-	// apigee metadata request headers
+	// apigee metadata response headers
 	if a.handler.appendMetadataHeaders {
 		okResponse.Headers = append(okResponse.Headers, metadataHeaders(api, authContext)...)
 	}
 
 	// cors response headers
 	okResponse.ResponseHeadersToAdd = append(okResponse.ResponseHeadersToAdd, corsResponseHeaders(envRequest)...)
+
+	// apigee dynamic data response headers
+	var basepath string
+	if envRequest != nil && envRequest.GetAPISpec() != nil {
+		basepath = envRequest.GetAPISpec().BasePath
+	}
+	dynamicDataHeaders := apigeeDynamicDataHeaders(a.handler.Organization(), a.handler.Environment(), api, basepath, false)
+	okResponse.ResponseHeadersToAdd = append(okResponse.ResponseHeadersToAdd, dynamicDataHeaders...)
 
 	if log.DebugEnabled() {
 		log.Debugf(printHeaderMods(okResponse))
@@ -543,6 +551,13 @@ func (a *AuthorizationServer) createEnvoyDenied(req *authv3.CheckRequest, envReq
 		tracker.statusCode = statusCode
 	}
 
+	// apigee dynamic data response headers
+	var basepath string
+	if envRequest != nil && envRequest.GetAPISpec() != nil {
+		basepath = envRequest.GetAPISpec().BasePath
+	}
+	dynamicDataHeaders := apigeeDynamicDataHeaders(a.handler.Organization(), a.handler.Environment(), api, basepath, true)
+
 	response := &authv3.CheckResponse{
 		Status: &status.Status{
 			Code: int32(rpcCode),
@@ -552,7 +567,7 @@ func (a *AuthorizationServer) createEnvoyDenied(req *authv3.CheckRequest, envReq
 				Status: &typev3.HttpStatus{
 					Code: statusCode,
 				},
-				Headers: corsResponseHeaders(envRequest),
+				Headers: append(corsResponseHeaders(envRequest), dynamicDataHeaders...),
 			},
 		},
 	}
