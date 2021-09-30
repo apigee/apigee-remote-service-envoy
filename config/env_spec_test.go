@@ -1045,7 +1045,7 @@ func createGoodEnvSpec() EnvironmentSpec {
 			},
 			{
 				ID:       "empty-operation",
-				BasePath: "/v4",
+				BasePath: "/v4/*",
 				Operations: []APIOperation{
 					{
 						Name:        "empty",

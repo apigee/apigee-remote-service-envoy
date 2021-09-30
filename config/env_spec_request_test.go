@@ -77,6 +77,14 @@ func TestGetAPISpec(t *testing.T) {
 				ID:       "bookshop",
 				BasePath: "/v1/bookshop",
 			},
+			{
+				ID:       "wildcard-bookshop",
+				BasePath: "/*/bookshop",
+			},
+			{
+				ID:       "cafe",
+				BasePath: "/v2/*/cafe",
+			},
 		},
 	}
 	specExt, err := NewEnvironmentSpecExt(&envSpec)
@@ -105,6 +113,8 @@ func TestGetAPISpec(t *testing.T) {
 		{"no trailing", http.MethodGet, "/v1/petstore", apis["petstore"]},
 		{"querystring", http.MethodGet, "/v1/petstore?foo=bar", apis["petstore"]},
 		{"bookshop", http.MethodGet, "/v1/bookshop?foo=bar", apis["bookshop"]},
+		{"wildcard bookshop", http.MethodGet, "/v3/bookshop?foo=bar", apis["wildcard-bookshop"]},
+		{"cafe", http.MethodGet, "/v2/blue/cafe", apis["cafe"]},
 	}
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
@@ -149,7 +159,8 @@ func TestGetOperation(t *testing.T) {
 		{"petstore with query", http.MethodGet, "/v1/petstore?foo=bar", "/petstore", petstore},
 		{"bookshop", http.MethodPost, "/v1/bookshop/", "/bookshop/", bookshop},
 		{"noop", http.MethodPost, "/v3/bookshop/", "/bookshop/", defaultOperation},
-		{"empty", http.MethodPost, "/v4/whatever/", "/whatever/", empty},
+		// The basepath for this one is "/v4/*" so expecting "/v4/do" to be trimmed.
+		{"empty", http.MethodPost, "/v4/do/whatever/", "/whatever/", empty},
 	}
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
