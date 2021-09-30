@@ -33,9 +33,10 @@ const (
 	headerRegion        = "x-apigee-region"
 	headerMessageID     = "x-apigee-message-id"
 
-	headerFaultCode   = "x-apigee-fault-code"
-	headerFaultFlag   = "x-apigee-fault-flag"
-	headerFaultSource = "x-apigee-fault-source"
+	headerFaultCode     = "x-apigee-fault-code"
+	headerFaultFlag     = "x-apigee-fault-flag"
+	headerFaultSource   = "x-apigee-fault-source"
+	headerFaultRevision = "x-apigee-fault-revision"
 )
 
 func metadataHeaders(api string, ac *auth.Context) (headers []*corev3.HeaderValueOption) {
@@ -103,6 +104,9 @@ func apigeeDynamicDataHeaders(org, env, api, basepath string, fault bool) (heade
 		headers = append(headers, createHeaderValueOption(headerFaultFlag, "true", false))
 		// A placeholder fault code value.
 		headers = append(headers, createHeaderValueOption(headerFaultCode, "fault", false))
+		// TODO: This will always be "1" for ARCHIVE deployment.
+		//       But it needs to be supplied once the PROXY mode is supported.
+		headers = append(headers, createHeaderValueOption(headerFaultRevision, "1", false))
 	}
 
 	return
