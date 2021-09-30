@@ -286,7 +286,7 @@ func (a *AuthorizationServer) createEnvoyForwarded(
 	// user request header transforms
 	addRequestHeaderTransforms(req, envRequest, okResponse)
 
-	// apigee metadata response headers
+	// apigee metadata request headers
 	if a.handler.appendMetadataHeaders {
 		okResponse.Headers = append(okResponse.Headers, metadataHeaders(api, authContext)...)
 	}
