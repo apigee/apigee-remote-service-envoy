@@ -100,19 +100,18 @@ func (e *EnvironmentSpecRequest) parseRequest() {
 	}()
 
 	// find API
-	// trim the leading "/" before splitting and append it to the segments afterwards.
-	pathSegments := strings.Split(strings.TrimPrefix(path, "/"), "/")
+	pathSegments := strings.Split(path, "/")
 	pathSegments = append([]string{"/"}, pathSegments...)
 	result, length := e.apiPathTree.FindPrefix(pathSegments, 0)
-	if result != nil {
-		e.apiSpec = result.(*APISpec)
-	} else {
+	if result == nil {
 		return
 	}
+	e.apiSpec = result.(*APISpec)
 
 	// trim api base path
-	// ignore the first "/" when joining the segments but add it back afterwards.
-	matchedBasePath := fmt.Sprintf("/%s", strings.Join(pathSegments[1:length], "/"))
+	// ignore the first two elements - "/" and "" - when joining the segments
+	// but add it back afterwards.
+	matchedBasePath := "/" + strings.Join(pathSegments[2:length], "/")
 	opPath := strings.TrimPrefix(path, matchedBasePath)
 	if !strings.HasPrefix(opPath, "/") {
 		opPath = "/" + opPath
