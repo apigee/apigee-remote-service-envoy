@@ -684,6 +684,7 @@ func TestLoadEnvironmentSpecs(t *testing.T) {
 						ConsumerAuthorization: ConsumerAuthorization{
 							In: []APIOperationParameter{{Match: Header("x-api-key")}},
 						},
+						ServiceAccountEmail: "foo@bar.gserviceaccount.com",
 						GoogleOAuth: GoogleOAuth{
 							RefreshInterval: time.Hour,
 							TokenInfo: AccessTokenInfo{

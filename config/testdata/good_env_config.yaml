@@ -2,6 +2,7 @@ id: good-env-config
 apis:
 - id: api-1
   base_path: /v1
+  service_account_email: foo@bar.gserviceaccount.com
   google_oauth:
     refresh_interval: 1h
     access_token:
