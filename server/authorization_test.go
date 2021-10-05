@@ -21,6 +21,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -483,13 +484,17 @@ func TestEnvRequestCheck(t *testing.T) {
 					t.Fatal("must be OkResponse")
 				}
 				for i, h := range test.wantHeaders {
-					if !hasHeaderAdd(okr.OkResponse.Headers, h, test.wantValues[i], test.wantAppends[i]) {
+					if !hasHeaderAdd(okr.OkResponse.GetHeaders(), h, test.wantValues[i], test.wantAppends[i]) {
 						if test.wantAppends[i] {
 							t.Errorf("%q not appended to header %q", test.wantValues[i], h)
 						} else {
 							t.Errorf("%q header should be: %q", h, test.wantValues[i])
 						}
 					}
+				}
+				// Test selected Apigee dynamic data response header
+				if !hasHeaderAdd(okr.OkResponse.GetResponseHeadersToAdd(), headerDPColor, os.Getenv("APIGEE_DPCOLOR"), false) {
+					t.Errorf("expected response header add: %q", headerDPColor)
 				}
 			}
 		})
@@ -936,6 +941,11 @@ func TestImmediateAnalytics(t *testing.T) {
 
 	if len(testAnalyticsMan.records) != 1 {
 		t.Fatalf("got: %d, want: %d", len(testAnalyticsMan.records), 1)
+	}
+
+	// Check selected Apigee dynamic data header
+	if !hasHeaderAdd(resp.GetDeniedResponse().GetHeaders(), headerFaultFlag, "true", false) {
+		t.Errorf("expected response header add: %q", headerFaultFlag)
 	}
 
 	got := testAnalyticsMan.records[0]
