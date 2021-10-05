@@ -205,6 +205,13 @@ type APISpec struct {
 	// CORS Policy
 	Cors CorsPolicy `yaml:"cors,omitempty" mapstructure:"cors,omitempty"`
 
+	// Service account that will be impersonated for backend access.
+	ServiceAccountEmail string `yaml:"service_account_email,omitempty" mapstructure:"service_account_email,omitempty"`
+
+	// GoogleOAuth configures how to authenticate the request to the backend.
+	// Can be overridden at the operation level.
+	GoogleOAuth GoogleOAuth `yaml:"google_oauth,omitempty" mapstructure:"google_oauth,omitempty"`
+
 	// JWTAuthentication.Name -> *JWTAuthentication
 	jwtAuthentications map[string]*JWTAuthentication `yaml:"-" mapstructure:"-"`
 }
@@ -225,6 +232,10 @@ type APIOperation struct {
 
 	// Transformation rules applied to HTTP requests for this Operation. Overrides the rules set at the API level.
 	HTTPRequestTransforms HTTPRequestTransforms `yaml:"http_request_transforms,omitempty" mapstructure:"http_request_transforms,omitempty"`
+
+	// GoogleOAuth configures how to authenticate the request to the backend.
+	// Overrides the API (proxy) level settings.
+	GoogleOAuth GoogleOAuth `yaml:"google_oauth,omitempty" mapstructure:"google_oauth,omitempty"`
 
 	// JWTAuthentication.Name -> *JWTAuthentication
 	jwtAuthentications map[string]*JWTAuthentication `yaml:"-" mapstructure:"-"`
@@ -602,3 +613,89 @@ type CorsPolicy struct {
 func (c CorsPolicy) IsEmpty() bool {
 	return len(c.AllowOrigins) == 0 && len(c.AllowOriginsRegexes) == 0
 }
+
+// GoogleOAuth configures how to authenticate the request to the backend.
+type GoogleOAuth struct {
+	// The time between two adjacent token refreshments.
+	RefreshInterval time.Duration `yaml:"refresh_interval,omitempty" mapstructure:"refresh_interval,omitempty"`
+
+	// TokenInfo contains information about the ID or access token.
+	TokenInfo TokenInfo `yaml:"-" mapstructure:"-"`
+}
+
+// UnmarshalYAML implements the yaml.Unmarshaler interface
+func (g *GoogleOAuth) UnmarshalYAML(node *yaml.Node) error {
+	type Unmarsh GoogleOAuth
+	if err := node.Decode((*Unmarsh)(g)); err != nil {
+		return err
+	}
+
+	w := &googleOAuthWrapper{}
+	if err := node.Decode(w); err != nil {
+		return err
+	}
+	ctr := 0
+	if w.AccessTokenInfo != nil {
+		ctr++
+		g.TokenInfo = *w.AccessTokenInfo
+	}
+	if w.IdentityTokenInfo != nil {
+		ctr++
+		g.TokenInfo = *w.IdentityTokenInfo
+	}
+	if ctr > 1 {
+		return fmt.Errorf("at most one of access_token or id_token can be present")
+	}
+
+	return nil
+}
+
+// MarshalYAML implements the yaml.Marshaler interface
+func (g GoogleOAuth) MarshalYAML() (interface{}, error) {
+	w := &googleOAuthWrapper{
+		RefreshInterval: g.RefreshInterval,
+	}
+
+	switch v := g.TokenInfo.(type) {
+	case AccessTokenInfo:
+		w.AccessTokenInfo = &v
+	case IdentityTokenInfo:
+		w.IdentityTokenInfo = &v
+	}
+
+	return w, nil
+}
+
+type googleOAuthWrapper struct {
+	RefreshInterval   time.Duration      `yaml:"refresh_interval,omitempty" mapstructure:"refresh_interval,omitempty"`
+	AccessTokenInfo   *AccessTokenInfo   `yaml:"access_token,omitempty" mapstructure:"access_token,omitempty"`
+	IdentityTokenInfo *IdentityTokenInfo `yaml:"id_token,omitempty" mapstructure:"id_token,omitempty"`
+}
+
+// TokenInfo contains information about the ID or access token.
+type TokenInfo interface {
+	tokenInfo()
+}
+
+// AccessTokenInfo contains information about the access token.
+type AccessTokenInfo struct {
+	// Code to identify the scopes to be included in the OAuth 2.0 access token.
+	// See https://developers.google.com/identity/protocols/googlescopes for more
+	// information.
+	Scopes []string `yaml:"scopes,omitempty"`
+}
+
+func (i AccessTokenInfo) tokenInfo() {}
+
+// IdentityTokenInfo contains information about the ID token.
+type IdentityTokenInfo struct {
+	// The audience for the token, such as the API or account that this token
+	// grants access to.
+	Audience string `yaml:"audience" mapstructure:"audience"`
+
+	// Include the service account email in the token. If set to `true`, the
+	// token will contain `email` and `email_verified` claims.
+	IncludeEmail bool `yaml:"include_email,omitempty" mapstructure:"include_email,omitempty"`
+}
+
+func (i IdentityTokenInfo) tokenInfo() {}

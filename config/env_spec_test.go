@@ -834,6 +834,94 @@ func TestCORSPolicy(t *testing.T) {
 	}
 }
 
+func TestMarshalAndUnmarshalGoogleOAuth(t *testing.T) {
+	tests := []struct {
+		desc string
+		want *GoogleOAuth
+	}{
+		{
+			desc: "valid access token info",
+			want: &GoogleOAuth{
+				RefreshInterval: time.Minute,
+				TokenInfo: AccessTokenInfo{
+					Scopes: []string{
+						"https://www.googleapis.com/auth/cloud-platform",
+					},
+				},
+			},
+		},
+		{
+			desc: "valid id token info",
+			want: &GoogleOAuth{
+				RefreshInterval: time.Hour,
+				TokenInfo: IdentityTokenInfo{
+					Audience:     "aud",
+					IncludeEmail: true,
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			out, err := yaml.Marshal(test.want)
+			if err != nil {
+				t.Fatalf("yaml.Marshal() returns unexpected: %v", err)
+			}
+			got := &GoogleOAuth{}
+			if err := yaml.Unmarshal(out, got); err != nil {
+				t.Errorf("yaml.Unmarshal() returns unexpected: %v", err)
+			}
+			if diff := cmp.Diff(test.want, got); diff != "" {
+				t.Errorf("Marshal and unmarshal results in unexpected GoogleOAuth diff (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestUnmarshalGoogleOAuthError(t *testing.T) {
+	tests := []struct {
+		desc    string
+		data    []byte
+		wantErr string
+	}{
+		{
+			desc: "refresh interval in bad format",
+			data: []byte(`
+refresh_interval: abc
+`),
+		},
+		{
+			desc: "access_token in bad format",
+			data: []byte(`
+access_token: bad
+`),
+		},
+		{
+			desc: "access and id token info coexist",
+			data: []byte(`
+access_token:
+  scope:
+  - scope1
+id_token:
+  audience: mock
+`),
+			wantErr: "at most one of access_token or id_token can be present",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			g := &GoogleOAuth{}
+			if err := yaml.Unmarshal(test.data, g); err == nil {
+				t.Errorf("yaml.Unmarshal() returns no error, should have got error")
+			} else if test.wantErr != "" && err.Error() != test.wantErr {
+				t.Errorf("yaml.Unmarshal() returns error %v, want %s", err, test.wantErr)
+			}
+		})
+	}
+}
+
 func TestParamMatchTypes(t *testing.T) {
 	h := Header("header")
 	h.paramMatch()
@@ -843,6 +931,14 @@ func TestParamMatchTypes(t *testing.T) {
 
 	j := JWTClaim{}
 	j.paramMatch()
+}
+
+func TestTokenInfoTypes(t *testing.T) {
+	a := AccessTokenInfo{}
+	a.tokenInfo()
+
+	i := IdentityTokenInfo{}
+	i.tokenInfo()
 }
 
 func createGoodEnvSpec() EnvironmentSpec {

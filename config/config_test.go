@@ -684,6 +684,12 @@ func TestLoadEnvironmentSpecs(t *testing.T) {
 						ConsumerAuthorization: ConsumerAuthorization{
 							In: []APIOperationParameter{{Match: Header("x-api-key")}},
 						},
+						GoogleOAuth: GoogleOAuth{
+							RefreshInterval: time.Hour,
+							TokenInfo: AccessTokenInfo{
+								Scopes: []string{"scope-1"},
+							},
+						},
 						Operations: []APIOperation{
 							{
 								Name: "op-1",
@@ -691,6 +697,13 @@ func TestLoadEnvironmentSpecs(t *testing.T) {
 									{
 										PathTemplate: "/petstore",
 										Method:       "GET",
+									},
+								},
+								GoogleOAuth: GoogleOAuth{
+									RefreshInterval: time.Minute,
+									TokenInfo: IdentityTokenInfo{
+										Audience:     "aud",
+										IncludeEmail: true,
 									},
 								},
 							},
