@@ -20,10 +20,10 @@
 
 # Use the following combination to build an image linked with Boring Crypto:
 # --build-arg CGO_ENABLED=1
-# --build-arg BUILD_CONTAINER=goboring/golang:1.16b7
+# --build-arg BUILD_CONTAINER=us-docker.pkg.dev/google.com/api-project-999119582588/go-boringcrypto/golang:1.17.2b7
 # --build-arg RUN_CONTAINER=gcr.io/distroless/base
 
-ARG BUILD_CONTAINER=golang:1.16
+ARG BUILD_CONTAINER=golang:1.17
 ARG RUN_CONTAINER=gcr.io/distroless/static
 
 #--- Build binary in Go container ---#
