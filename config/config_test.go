@@ -684,11 +684,13 @@ func TestLoadEnvironmentSpecs(t *testing.T) {
 						ConsumerAuthorization: ConsumerAuthorization{
 							In: []APIOperationParameter{{Match: Header("x-api-key")}},
 						},
-						ServiceAccountEmail: "foo@bar.gserviceaccount.com",
-						GoogleOAuth: GoogleOAuth{
+						TargetAuthentication: TargetAuthentication{
 							RefreshInterval: time.Hour,
-							TokenInfo: AccessTokenInfo{
-								Scopes: []string{"scope-1"},
+							GoogleOAuth: GoogleOAuth{
+								ServiceAccountEmail: "foo@bar.gserviceaccount.com",
+								TokenInfo: AccessTokenInfo{
+									Scopes: []string{"scope-1"},
+								},
 							},
 						},
 						Operations: []APIOperation{
@@ -700,11 +702,14 @@ func TestLoadEnvironmentSpecs(t *testing.T) {
 										Method:       "GET",
 									},
 								},
-								GoogleOAuth: GoogleOAuth{
+								TargetAuthentication: TargetAuthentication{
 									RefreshInterval: time.Minute,
-									TokenInfo: IdentityTokenInfo{
-										Audience:     "aud",
-										IncludeEmail: true,
+									GoogleOAuth: GoogleOAuth{
+										ServiceAccountEmail: "foo@bar.gserviceaccount.com",
+										TokenInfo: IdentityTokenInfo{
+											Audience:     "aud",
+											IncludeEmail: true,
+										},
 									},
 								},
 							},

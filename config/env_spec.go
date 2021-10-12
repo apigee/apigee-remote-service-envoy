@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"time"
 
+	"golang.org/x/oauth2"
 	"gopkg.in/yaml.v3"
 )
 
@@ -205,12 +206,9 @@ type APISpec struct {
 	// CORS Policy
 	Cors CorsPolicy `yaml:"cors,omitempty" mapstructure:"cors,omitempty"`
 
-	// Service account that will be impersonated for backend access.
-	ServiceAccountEmail string `yaml:"service_account_email,omitempty" mapstructure:"service_account_email,omitempty"`
-
-	// GoogleOAuth configures how to authenticate the request to the backend.
+	// TargetAuthentication configures how to authenticate the request to the backend.
 	// Can be overridden at the operation level.
-	GoogleOAuth GoogleOAuth `yaml:"google_oauth,omitempty" mapstructure:"google_oauth,omitempty"`
+	TargetAuthentication TargetAuthentication `yaml:"target_authentication,omitempty" mapstructure:"target_authentication,omitempty"`
 
 	// JWTAuthentication.Name -> *JWTAuthentication
 	jwtAuthentications map[string]*JWTAuthentication `yaml:"-" mapstructure:"-"`
@@ -233,9 +231,9 @@ type APIOperation struct {
 	// Transformation rules applied to HTTP requests for this Operation. Overrides the rules set at the API level.
 	HTTPRequestTransforms HTTPRequestTransforms `yaml:"http_request_transforms,omitempty" mapstructure:"http_request_transforms,omitempty"`
 
-	// GoogleOAuth configures how to authenticate the request to the backend.
+	// TargetAuthentication configures how to authenticate the request to the backend.
 	// Overrides the API (proxy) level settings.
-	GoogleOAuth GoogleOAuth `yaml:"google_oauth,omitempty" mapstructure:"google_oauth,omitempty"`
+	TargetAuthentication TargetAuthentication `yaml:"target_authentication,omitempty" mapstructure:"target_authentication,omitempty"`
 
 	// JWTAuthentication.Name -> *JWTAuthentication
 	jwtAuthentications map[string]*JWTAuthentication `yaml:"-" mapstructure:"-"`
@@ -614,10 +612,22 @@ func (c CorsPolicy) IsEmpty() bool {
 	return len(c.AllowOrigins) == 0 && len(c.AllowOriginsRegexes) == 0
 }
 
-// GoogleOAuth configures how to authenticate the request to the backend.
-type GoogleOAuth struct {
+// TargetAuthentication configures how to authenticate the request to the backend.
+type TargetAuthentication struct {
 	// The time between two adjacent token refreshments.
 	RefreshInterval time.Duration `yaml:"refresh_interval,omitempty" mapstructure:"refresh_interval,omitempty"`
+
+	// GoogleOAuth configures how to authenticate the request to the backend with Google OAuth tokens.
+	GoogleOAuth GoogleOAuth `yaml:"google_oauth,omitempty" mapstructure:"google_oauth,omitempty"`
+
+	// TokenSource is used to fetch OAuth token.
+	// This is not part of the yaml config and will be generated internally.
+	TokenSource oauth2.TokenSource `yaml:"-" mapstructure:"-"`
+}
+
+type GoogleOAuth struct {
+	// Service account that will be impersonated for backend access.
+	ServiceAccountEmail string `yaml:"service_account_email,omitempty" mapstructure:"service_account_email,omitempty"`
 
 	// TokenInfo contains information about the ID or access token.
 	TokenInfo TokenInfo `yaml:"-" mapstructure:"-"`
@@ -653,7 +663,7 @@ func (g *GoogleOAuth) UnmarshalYAML(node *yaml.Node) error {
 // MarshalYAML implements the yaml.Marshaler interface
 func (g GoogleOAuth) MarshalYAML() (interface{}, error) {
 	w := &googleOAuthWrapper{
-		RefreshInterval: g.RefreshInterval,
+		ServiceAccountEmail: g.ServiceAccountEmail,
 	}
 
 	switch v := g.TokenInfo.(type) {
@@ -667,9 +677,9 @@ func (g GoogleOAuth) MarshalYAML() (interface{}, error) {
 }
 
 type googleOAuthWrapper struct {
-	RefreshInterval   time.Duration      `yaml:"refresh_interval,omitempty" mapstructure:"refresh_interval,omitempty"`
-	AccessTokenInfo   *AccessTokenInfo   `yaml:"access_token,omitempty" mapstructure:"access_token,omitempty"`
-	IdentityTokenInfo *IdentityTokenInfo `yaml:"id_token,omitempty" mapstructure:"id_token,omitempty"`
+	ServiceAccountEmail string             `yaml:"service_account_email,omitempty"`
+	AccessTokenInfo     *AccessTokenInfo   `yaml:"access_token,omitempty"`
+	IdentityTokenInfo   *IdentityTokenInfo `yaml:"id_token,omitempty"`
 }
 
 // TokenInfo contains information about the ID or access token.

@@ -842,7 +842,7 @@ func TestMarshalAndUnmarshalGoogleOAuth(t *testing.T) {
 		{
 			desc: "valid access token info",
 			want: &GoogleOAuth{
-				RefreshInterval: time.Minute,
+				ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
 				TokenInfo: AccessTokenInfo{
 					Scopes: []string{
 						"https://www.googleapis.com/auth/cloud-platform",
@@ -853,7 +853,7 @@ func TestMarshalAndUnmarshalGoogleOAuth(t *testing.T) {
 		{
 			desc: "valid id token info",
 			want: &GoogleOAuth{
-				RefreshInterval: time.Hour,
+				ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
 				TokenInfo: IdentityTokenInfo{
 					Audience:     "aud",
 					IncludeEmail: true,
@@ -885,12 +885,6 @@ func TestUnmarshalGoogleOAuthError(t *testing.T) {
 		data    []byte
 		wantErr string
 	}{
-		{
-			desc: "refresh interval in bad format",
-			data: []byte(`
-refresh_interval: abc
-`),
-		},
 		{
 			desc: "access_token in bad format",
 			data: []byte(`

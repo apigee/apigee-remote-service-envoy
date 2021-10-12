@@ -2,12 +2,13 @@ id: good-env-config
 apis:
 - id: api-1
   base_path: /v1
-  service_account_email: foo@bar.gserviceaccount.com
-  google_oauth:
+  target_authentication:
     refresh_interval: 1h
-    access_token:
-      scopes:
-      - scope-1
+    google_oauth:
+      service_account_email: foo@bar.gserviceaccount.com
+      access_token:
+        scopes:
+        - scope-1
   authentication:
     jwt:
       name: foo
@@ -25,11 +26,13 @@ apis:
     http_match:
     - path_template: /petstore
       method: GET
-    google_oauth:
+    target_authentication:
       refresh_interval: 1m
-      id_token:
-        audience: aud
-        include_email: true
+      google_oauth:
+        service_account_email: foo@bar.gserviceaccount.com
+        id_token:
+          audience: aud
+          include_email: true
   - name: op-2
     http_match:
     - path_template: /bookshop
