@@ -686,7 +686,7 @@ func TestLoadEnvironmentSpecs(t *testing.T) {
 						},
 						TargetAuthentication: TargetAuthentication{
 							RefreshInterval: time.Hour,
-							GoogleOAuth: GoogleOAuth{
+							OAuthProvider: GoogleOAuth{
 								ServiceAccountEmail: "foo@bar.gserviceaccount.com",
 								TokenInfo: AccessTokenInfo{
 									Scopes: []string{"scope-1"},
@@ -704,7 +704,7 @@ func TestLoadEnvironmentSpecs(t *testing.T) {
 								},
 								TargetAuthentication: TargetAuthentication{
 									RefreshInterval: time.Minute,
-									GoogleOAuth: GoogleOAuth{
+									OAuthProvider: GoogleOAuth{
 										ServiceAccountEmail: "foo@bar.gserviceaccount.com",
 										TokenInfo: IdentityTokenInfo{
 											Audience:     "aud",

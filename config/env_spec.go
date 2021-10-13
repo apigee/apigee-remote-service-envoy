@@ -617,12 +617,55 @@ type TargetAuthentication struct {
 	// The time between two adjacent token refreshments.
 	RefreshInterval time.Duration `yaml:"refresh_interval,omitempty" mapstructure:"refresh_interval,omitempty"`
 
-	// GoogleOAuth configures how to authenticate the request to the backend with Google OAuth tokens.
-	GoogleOAuth GoogleOAuth `yaml:"google_oauth,omitempty" mapstructure:"google_oauth,omitempty"`
+	// OAuthProvider contains information for getting the OAuth tokens.
+	// Currently supports GoogleOAuth.
+	OAuthProvider OAuthProvider `yaml:"-" mapstructure:"-"`
 
 	// TokenSource is used to fetch OAuth token.
 	// This is not part of the yaml config and will be generated internally.
 	TokenSource oauth2.TokenSource `yaml:"-" mapstructure:"-"`
+}
+
+type targetAuthenticationWrapper struct {
+	// The time between two adjacent token refreshments.
+	RefreshInterval time.Duration `yaml:"refresh_interval,omitempty" mapstructure:"refresh_interval,omitempty"`
+
+	// GoogleOAuth configures how to authenticate the request to the backend with Google OAuth tokens.
+	GoogleOAuth *GoogleOAuth `yaml:"google_oauth,omitempty" mapstructure:"google_oauth,omitempty"`
+}
+
+func (t *TargetAuthentication) UnmarshalYAML(node *yaml.Node) error {
+	type Unmarsh TargetAuthentication
+	if err := node.Decode((*Unmarsh)(t)); err != nil {
+		return err
+	}
+
+	w := &targetAuthenticationWrapper{}
+	if err := node.Decode(w); err != nil {
+		return err
+	}
+	if w.GoogleOAuth != nil {
+		t.OAuthProvider = *w.GoogleOAuth
+	}
+
+	return nil
+}
+
+func (t TargetAuthentication) MarshalYAML() (interface{}, error) {
+	w := &targetAuthenticationWrapper{
+		RefreshInterval: t.RefreshInterval,
+	}
+
+	switch v := t.OAuthProvider.(type) {
+	case GoogleOAuth:
+		w.GoogleOAuth = &v
+	}
+
+	return w, nil
+}
+
+type OAuthProvider interface {
+	oauthProvder()
 }
 
 type GoogleOAuth struct {
@@ -632,6 +675,8 @@ type GoogleOAuth struct {
 	// TokenInfo contains information about the ID or access token.
 	TokenInfo TokenInfo `yaml:"-" mapstructure:"-"`
 }
+
+func (g GoogleOAuth) oauthProvder() {}
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface
 func (g *GoogleOAuth) UnmarshalYAML(node *yaml.Node) error {

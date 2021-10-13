@@ -834,6 +834,75 @@ func TestCORSPolicy(t *testing.T) {
 	}
 }
 
+func TestMarshalAndUnmarshalTargetAuthentication(t *testing.T) {
+	tests := []struct {
+		desc string
+		want *TargetAuthentication
+	}{
+		{
+			desc: "valid target authentication",
+			want: &TargetAuthentication{
+				RefreshInterval: time.Hour,
+				OAuthProvider: GoogleOAuth{
+					ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
+					TokenInfo: AccessTokenInfo{
+						Scopes: []string{
+							"https://www.googleapis.com/auth/cloud-platform",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			out, err := yaml.Marshal(test.want)
+			if err != nil {
+				t.Fatalf("yaml.Marshal() returns unexpected: %v", err)
+			}
+			got := &TargetAuthentication{}
+			if err := yaml.Unmarshal(out, got); err != nil {
+				t.Errorf("yaml.Unmarshal() returns unexpected: %v", err)
+			}
+			if diff := cmp.Diff(test.want, got); diff != "" {
+				t.Errorf("Marshal and unmarshal results in unexpected TargetAuthentication diff (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestUnmarshalTargetAuthenticationError(t *testing.T) {
+	tests := []struct {
+		desc    string
+		data    []byte
+		wantErr string
+	}{
+		{
+			desc: "refresh interval in bad format",
+			data: []byte(`
+refresh_interval: abc`),
+		},
+		{
+			desc: "oauth provider in bad format",
+			data: []byte(`
+google_oauth: bad
+`),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			g := &TargetAuthentication{}
+			if err := yaml.Unmarshal(test.data, g); err == nil {
+				t.Errorf("yaml.Unmarshal() returns no error, should have got error")
+			} else if test.wantErr != "" && err.Error() != test.wantErr {
+				t.Errorf("yaml.Unmarshal() returns error %v, want %s", err, test.wantErr)
+			}
+		})
+	}
+}
+
 func TestMarshalAndUnmarshalGoogleOAuth(t *testing.T) {
 	tests := []struct {
 		desc string
@@ -886,6 +955,13 @@ func TestUnmarshalGoogleOAuthError(t *testing.T) {
 		wantErr string
 	}{
 		{
+			desc: "service account in bad format",
+			data: []byte(`
+service_account_email:
+- foo
+- bar`),
+		},
+		{
 			desc: "access_token in bad format",
 			data: []byte(`
 access_token: bad
@@ -925,6 +1001,11 @@ func TestParamMatchTypes(t *testing.T) {
 
 	j := JWTClaim{}
 	j.paramMatch()
+}
+
+func TestOAuthProviderTypes(t *testing.T) {
+	g := GoogleOAuth{}
+	g.oauthProvder()
 }
 
 func TestTokenInfoTypes(t *testing.T) {
