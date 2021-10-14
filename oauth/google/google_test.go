@@ -15,7 +15,6 @@
 package google
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -25,27 +24,6 @@ import (
 	iam "google.golang.org/api/iamcredentials/v1"
 	"google.golang.org/api/option"
 )
-
-func TestNewIAMServiceError(t *testing.T) {
-	tests := []struct {
-		desc    string
-		saEmail string
-		opts    []option.ClientOption
-	}{
-		{
-			desc: "missing service account",
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.desc, func(t *testing.T) {
-			_, err := NewIAMService(context.Background(), test.saEmail, test.opts...)
-			if err == nil {
-				t.Errorf("NewIAMService(...) err = nil, wanted error")
-			}
-		})
-	}
-}
 
 func TestAccessTokenRefresh(t *testing.T) {
 	ctr := 0
@@ -78,27 +56,32 @@ func TestAccessTokenRefresh(t *testing.T) {
 		}
 	}))
 
-	ctxWithCancel, cancelFunc := context.WithCancel(context.Background())
-	defer cancelFunc()
 	opts := []option.ClientOption{
 		option.WithHTTPClient(http.DefaultClient),
 		option.WithEndpoint(srv.URL),
 	}
-	s, err := NewIAMService(ctxWithCancel, "foo@bar.iam.gserviceaccount.com", opts...)
+	s, err := NewIAMService(opts...)
 	if err != nil {
 		t.Fatalf("NewIAMService() err = %v, wanted no error", err)
 	}
+	defer s.Close()
 
-	if _, err := s.AccessTokenSource(nil, 0); err == nil {
+	if _, err := s.AccessTokenSource("", nil, 0); err == nil {
+		t.Errorf("AccessTokenSource() err = nil, wanted error for empty service account")
+	}
+
+	saEmail := "foo@bar.iam.gserviceaccount.com"
+
+	if _, err := s.AccessTokenSource(saEmail, nil, 0); err == nil {
 		t.Errorf("AccessTokenSource() err = nil, wanted error for empty scopes")
 	}
 
 	scope := "https://www.googleapis.com/auth/cloud-platform"
-	if _, err := s.AccessTokenSource([]string{scope}, 0); err != nil {
+	if _, err := s.AccessTokenSource(saEmail, []string{scope}, 0); err != nil {
 		t.Fatalf("AccessTokenSource() err = %v, wanted no error", err)
 	}
 
-	ts, err := s.AccessTokenSource([]string{scope}, 50*time.Millisecond)
+	ts, err := s.AccessTokenSource(saEmail, []string{scope}, 50*time.Millisecond)
 	if err != nil {
 		t.Fatalf("AccessTokenSource() err = %v, wanted no error", err)
 	}
@@ -157,26 +140,30 @@ func TestIdentityTokenRefresh(t *testing.T) {
 		}
 	}))
 
-	ctxWithCancel, cancelFunc := context.WithCancel(context.Background())
-	defer cancelFunc()
 	opts := []option.ClientOption{
 		option.WithHTTPClient(http.DefaultClient),
 		option.WithEndpoint(srv.URL),
 	}
-	s, err := NewIAMService(ctxWithCancel, "foo@bar.iam.gserviceaccount.com", opts...)
+	s, err := NewIAMService(opts...)
 	if err != nil {
 		t.Fatalf("NewIAMService() err = %v, wanted no error", err)
 	}
+	defer s.Close()
 
-	if _, err := s.IdentityTokenSource("", false, 0); err == nil {
+	if _, err := s.IdentityTokenSource("", "aud", false, 0); err == nil {
+		t.Errorf("IdentityTokenSource() err = nil, wanted error for empty service account")
+	}
+
+	saEmail := "foo@bar.iam.gserviceaccount.com"
+	if _, err := s.IdentityTokenSource(saEmail, "", false, 0); err == nil {
 		t.Errorf("IdentityTokenSource() err = nil, wanted error for empty audience")
 	}
 
-	if _, err := s.IdentityTokenSource("aud", true, 0); err != nil {
+	if _, err := s.IdentityTokenSource(saEmail, "aud", true, 0); err != nil {
 		t.Fatalf("IdentityTokenSource() err = %v, wanted no error", err)
 	}
 
-	ts, err := s.IdentityTokenSource("aud", true, 50*time.Millisecond)
+	ts, err := s.IdentityTokenSource(saEmail, "aud", true, 50*time.Millisecond)
 	if err != nil {
 		t.Fatalf("IdentityTokenSource() err = %v, wanted no error", err)
 	}

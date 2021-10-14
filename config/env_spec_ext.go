@@ -17,9 +17,11 @@
 package config
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 
+	iam "github.com/apigee/apigee-remote-service-envoy/v2/oauth/google"
 	"github.com/apigee/apigee-remote-service-envoy/v2/transform"
 	"github.com/apigee/apigee-remote-service-golib/v2/path"
 )
@@ -27,7 +29,7 @@ import (
 const wildcard = "*"
 
 // NewEnvironmentSpecExt creates an EnvironmentSpecExt
-func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
+func NewEnvironmentSpecExt(spec *EnvironmentSpec, iamsvc *iam.IAMService) (*EnvironmentSpecExt, error) {
 	ec := &EnvironmentSpecExt{
 		EnvironmentSpec:    spec,
 		apiPathTree:        path.NewTree(),
@@ -95,6 +97,27 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
 			return nil, err
 		}
 
+		switch v := api.TargetAuthentication.OAuthProvider.(type) {
+		case GoogleOAuth:
+			if iamsvc == nil {
+				return nil, fmt.Errorf("google oauth required iam service to be configured")
+			}
+			switch ti := v.TokenInfo.(type) {
+			case AccessTokenInfo:
+				ts, err := iamsvc.AccessTokenSource(v.ServiceAccountEmail, ti.Scopes, api.TargetAuthentication.RefreshInterval)
+				if err != nil {
+					return nil, err
+				}
+				api.TargetAuthentication.TokenSource = ts
+			case IdentityTokenInfo:
+				ts, err := iamsvc.IdentityTokenSource(v.ServiceAccountEmail, ti.Audience, ti.IncludeEmail, api.TargetAuthentication.RefreshInterval)
+				if err != nil {
+					return nil, err
+				}
+				api.TargetAuthentication.TokenSource = ts
+			}
+		}
+
 		for i := range api.Operations {
 			op := api.Operations[i]
 
@@ -132,6 +155,27 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
 			err := parseHTTPRequestTransforms(op.HTTPRequestTransforms)
 			if err != nil {
 				return nil, err
+			}
+
+			switch v := op.TargetAuthentication.OAuthProvider.(type) {
+			case GoogleOAuth:
+				if iamsvc == nil {
+					return nil, fmt.Errorf("google oauth requires the IAMService, got nil")
+				}
+				switch ti := v.TokenInfo.(type) {
+				case AccessTokenInfo:
+					ts, err := iamsvc.AccessTokenSource(v.ServiceAccountEmail, ti.Scopes, op.TargetAuthentication.RefreshInterval)
+					if err != nil {
+						return nil, err
+					}
+					api.Operations[i].TargetAuthentication.TokenSource = ts
+				case IdentityTokenInfo:
+					ts, err := iamsvc.IdentityTokenSource(v.ServiceAccountEmail, ti.Audience, ti.IncludeEmail, op.TargetAuthentication.RefreshInterval)
+					if err != nil {
+						return nil, err
+					}
+					api.Operations[i].TargetAuthentication.TokenSource = ts
+				}
 			}
 		}
 	}

@@ -121,7 +121,7 @@ func TestAddHeaderTransforms(t *testing.T) {
 					Remove: test.removeHeaders,
 				},
 			}
-			specExt, err := config.NewEnvironmentSpecExt(&envSpec)
+			specExt, err := config.NewEnvironmentSpecExt(&envSpec, nil)
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
@@ -250,7 +250,7 @@ func TestPathTransforms(t *testing.T) {
 					Remove: test.removeQueries,
 				},
 			}
-			specExt, err := config.NewEnvironmentSpecExt(&envSpec)
+			specExt, err := config.NewEnvironmentSpecExt(&envSpec, nil)
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
@@ -288,7 +288,7 @@ func TestPathTransforms(t *testing.T) {
 
 func TestEnvRequestCheck(t *testing.T) {
 	envSpec := createAuthEnvSpec()
-	specExt, err := config.NewEnvironmentSpecExt(&envSpec)
+	specExt, err := config.NewEnvironmentSpecExt(&envSpec, nil)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -503,7 +503,7 @@ func TestEnvRequestCheck(t *testing.T) {
 
 func TestBasePathStripping(t *testing.T) {
 	envSpec := createAuthEnvSpec()
-	specExt, err := config.NewEnvironmentSpecExt(&envSpec)
+	specExt, err := config.NewEnvironmentSpecExt(&envSpec, nil)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -1040,7 +1040,7 @@ func TestCORSResponseHeaders(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 
 			envSpec := createAuthEnvSpec()
-			specExt, err := config.NewEnvironmentSpecExt(&envSpec)
+			specExt, err := config.NewEnvironmentSpecExt(&envSpec, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

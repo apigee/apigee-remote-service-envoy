@@ -244,6 +244,16 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 		return a.quotaExceeded(req, envRequest, tracker, authContext, api), nil
 	}
 
+	if ts := envRequest.TokenSource(); ts != nil {
+		token, err := ts.Token()
+		if err != nil {
+			log.Errorf("failed to get oauth token for the backend: %v", err)
+		}
+		authHeader := fmt.Sprintf("%s %s", token.Type(), token.AccessToken)
+		// TODO: remove this line and add actual logic.
+		log.Debugf("token header: %q", authHeader)
+	}
+
 	return a.authOK(req, tracker, authContext, api, envRequest), nil
 }
 

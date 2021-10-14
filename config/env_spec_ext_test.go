@@ -24,7 +24,7 @@ import (
 func TestNewEnvironmentSpecExt(t *testing.T) {
 
 	envSpec := createGoodEnvSpec()
-	specExt, err := NewEnvironmentSpecExt(&envSpec)
+	specExt, err := NewEnvironmentSpecExt(&envSpec, nil)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}

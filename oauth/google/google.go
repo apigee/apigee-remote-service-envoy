@@ -34,9 +34,10 @@ const (
 
 // IAMService defines the IAM service for a particular service account.
 type IAMService struct {
-	ctx    context.Context
-	svc    *iam.Service
-	saName string
+	ctx        context.Context
+	cancelFunc context.CancelFunc
+	svc        *iam.Service
+	saName     string
 }
 
 // AccessTokenSource defines an access token source.
@@ -62,31 +63,36 @@ type IdentityTokenSource struct {
 	mu    sync.Mutex
 }
 
-// NewIAMService creates a new IAM service with given service account email
-// and a list of client options.
-func NewIAMService(ctx context.Context, saEmail string, opts ...option.ClientOption) (*IAMService, error) {
-	if saEmail == "" {
-		return nil, fmt.Errorf("service account is required to create IAM service")
-	}
-	iamsvc, err := iam.NewService(ctx, opts...)
+// NewIAMService creates a new IAM service with given list of client options.
+func NewIAMService(opts ...option.ClientOption) (*IAMService, error) {
+	ctxWithCancel, cancelFunc := context.WithCancel(context.Background())
+	iamsvc, err := iam.NewService(ctxWithCancel, opts...)
 	if err != nil {
+		cancelFunc()
 		return nil, fmt.Errorf("failed to create new IAM credentials service: %v", err)
 	}
 	return &IAMService{
-		ctx:    ctx,
-		svc:    iamsvc,
-		saName: fmt.Sprintf(serviceAccountNameFormat, saEmail),
+		ctx:        ctxWithCancel,
+		cancelFunc: cancelFunc,
+		svc:        iamsvc,
 	}, nil
 }
 
-// AccessTokenSource returns a new access token source. Scopes are required.
-func (s *IAMService) AccessTokenSource(scopes []string, refreshInterval time.Duration) (*AccessTokenSource, error) {
+func (s *IAMService) Close() {
+	s.cancelFunc()
+}
+
+// AccessTokenSource returns a new access token source. Service account email and scopes are required.
+func (s *IAMService) AccessTokenSource(saEmail string, scopes []string, refreshInterval time.Duration) (*AccessTokenSource, error) {
+	if saEmail == "" {
+		return nil, fmt.Errorf("service account is required to create access token source")
+	}
 	if len(scopes) == 0 {
 		return nil, fmt.Errorf("scopes are required to create access token source")
 	}
 	ats := &AccessTokenSource{
 		iamsvc: s.svc,
-		saName: s.saName,
+		saName: fmt.Sprintf(serviceAccountNameFormat, saEmail),
 		scopes: scopes,
 	}
 
@@ -114,10 +120,13 @@ func (s *IAMService) AccessTokenSource(scopes []string, refreshInterval time.Dur
 	return ats, nil
 }
 
-// IdentityTokenSource returns a new ID token source. Audience is required.
-func (s *IAMService) IdentityTokenSource(audience string, includeEmail bool, refreshInterval time.Duration) (*IdentityTokenSource, error) {
+// IdentityTokenSource returns a new ID token source. Service account email and audience are required.
+func (s *IAMService) IdentityTokenSource(saEmail, audience string, includeEmail bool, refreshInterval time.Duration) (*IdentityTokenSource, error) {
+	if saEmail == "" {
+		return nil, fmt.Errorf("service account is required to create id token source")
+	}
 	if audience == "" {
-		return nil, fmt.Errorf("audience is required to create identity token source")
+		return nil, fmt.Errorf("audience is required to create id token source")
 	}
 	its := &IdentityTokenSource{
 		iamsvc:       s.svc,

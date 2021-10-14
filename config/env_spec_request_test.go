@@ -87,7 +87,7 @@ func TestGetAPISpec(t *testing.T) {
 			},
 		},
 	}
-	specExt, err := NewEnvironmentSpecExt(&envSpec)
+	specExt, err := NewEnvironmentSpecExt(&envSpec, nil)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -132,7 +132,7 @@ func TestGetAPISpec(t *testing.T) {
 
 func TestGetOperation(t *testing.T) {
 	envSpec := createGoodEnvSpec()
-	specExt, err := NewEnvironmentSpecExt(&envSpec)
+	specExt, err := NewEnvironmentSpecExt(&envSpec, nil)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -184,7 +184,7 @@ func TestGetOperation(t *testing.T) {
 
 func TestGetParamValueQuery(t *testing.T) {
 	envSpec := createGoodEnvSpec()
-	specExt, err := NewEnvironmentSpecExt(&envSpec)
+	specExt, err := NewEnvironmentSpecExt(&envSpec, nil)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -223,7 +223,7 @@ func TestGetParamValueQuery(t *testing.T) {
 
 func TestGetParamValueHeader(t *testing.T) {
 	envSpec := createGoodEnvSpec()
-	specExt, err := NewEnvironmentSpecExt(&envSpec)
+	specExt, err := NewEnvironmentSpecExt(&envSpec, nil)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -262,7 +262,7 @@ func TestGetParamValueHeader(t *testing.T) {
 
 func TestGetParamValueJWTClaim(t *testing.T) {
 	envSpec := createGoodEnvSpec()
-	specExt, err := NewEnvironmentSpecExt(&envSpec)
+	specExt, err := NewEnvironmentSpecExt(&envSpec, nil)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -316,7 +316,7 @@ func TestGetParamValueJWTClaim(t *testing.T) {
 
 func TestIsAuthenticated(t *testing.T) {
 	envSpec := createGoodEnvSpec()
-	specExt, err := NewEnvironmentSpecExt(&envSpec)
+	specExt, err := NewEnvironmentSpecExt(&envSpec, nil)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -397,7 +397,7 @@ func TestIsAuthenticated(t *testing.T) {
 
 func TestIsAuthorizationRequired(t *testing.T) {
 	envSpec := createGoodEnvSpec()
-	specExt, err := NewEnvironmentSpecExt(&envSpec)
+	specExt, err := NewEnvironmentSpecExt(&envSpec, nil)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -436,7 +436,7 @@ func TestAuthenticationRequirementDisabled(t *testing.T) {
 
 			// not authenticated
 			envSpec := createGoodEnvSpec()
-			specExt, err := NewEnvironmentSpecExt(&envSpec)
+			specExt, err := NewEnvironmentSpecExt(&envSpec, nil)
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
@@ -452,7 +452,7 @@ func TestAuthenticationRequirementDisabled(t *testing.T) {
 			envSpec = createGoodEnvSpec()
 			envSpec.APIs[0].Authentication.Disabled = true
 			envSpec.APIs[1].Authentication.Disabled = true
-			specExt, err = NewEnvironmentSpecExt(&envSpec)
+			specExt, err = NewEnvironmentSpecExt(&envSpec, nil)
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
@@ -467,7 +467,7 @@ func TestAuthenticationRequirementDisabled(t *testing.T) {
 			envSpec = createGoodEnvSpec()
 			envSpec.APIs[0].Operations[0].Authentication.Disabled = true
 			envSpec.APIs[1].Operations[0].Authentication.Disabled = true
-			specExt, err = NewEnvironmentSpecExt(&envSpec)
+			specExt, err = NewEnvironmentSpecExt(&envSpec, nil)
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
@@ -507,7 +507,7 @@ func TestGetAPIKey(t *testing.T) {
 			// enabled
 			envSpec.APIs[0].ConsumerAuthorization.Disabled = false
 			envSpec.APIs[1].Operations[0].ConsumerAuthorization.Disabled = false
-			specExt, err := NewEnvironmentSpecExt(&envSpec)
+			specExt, err := NewEnvironmentSpecExt(&envSpec, nil)
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
@@ -521,7 +521,7 @@ func TestGetAPIKey(t *testing.T) {
 			// disabled
 			envSpec.APIs[0].ConsumerAuthorization.Disabled = true
 			envSpec.APIs[1].Operations[0].ConsumerAuthorization.Disabled = true
-			specExt, err = NewEnvironmentSpecExt(&envSpec)
+			specExt, err = NewEnvironmentSpecExt(&envSpec, nil)
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
@@ -550,7 +550,7 @@ func TestEnvSpecRequestJWTAuthentications(t *testing.T) {
 
 			// not authenticated
 			envSpec := createGoodEnvSpec()
-			specExt, err := NewEnvironmentSpecExt(&envSpec)
+			specExt, err := NewEnvironmentSpecExt(&envSpec, nil)
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
@@ -585,7 +585,7 @@ func TestGetHTTPRequestTransforms(t *testing.T) {
 		}},
 	}
 
-	specExt, err := NewEnvironmentSpecExt(envSpec)
+	specExt, err := NewEnvironmentSpecExt(envSpec, nil)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -608,7 +608,7 @@ func TestGetHTTPRequestTransforms(t *testing.T) {
 
 	// ensure api transform is checked if operation is selected, but operation transform doesn't exist
 	envSpec.APIs[0].Operations[0].HTTPRequestTransforms = HTTPRequestTransforms{}
-	specExt, err = NewEnvironmentSpecExt(envSpec)
+	specExt, err = NewEnvironmentSpecExt(envSpec, nil)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -650,7 +650,7 @@ func TestVariables(t *testing.T) {
 		}},
 	}
 
-	specExt, err := NewEnvironmentSpecExt(envSpec)
+	specExt, err := NewEnvironmentSpecExt(envSpec, nil)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -736,7 +736,7 @@ func TestIsCors(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 
 			envSpec := createGoodEnvSpec()
-			specExt, err := NewEnvironmentSpecExt(&envSpec)
+			specExt, err := NewEnvironmentSpecExt(&envSpec, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -812,7 +812,7 @@ func TestAllowedOrigin(t *testing.T) {
 			envSpec := createGoodEnvSpec()
 			envSpec.APIs[0].Cors.AllowOrigins = test.allowOrigins
 			envSpec.APIs[0].Cors.AllowOriginsRegexes = test.allowOriginsRegexes
-			specExt, err := NewEnvironmentSpecExt(&envSpec)
+			specExt, err := NewEnvironmentSpecExt(&envSpec, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
