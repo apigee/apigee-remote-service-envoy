@@ -62,6 +62,7 @@ func TestAddHeaderTransforms(t *testing.T) {
 		requestHeaders  map[string]string
 		addHeaders      []config.AddNameValue
 		removeHeaders   []string
+		targetAuth      string
 		expectedAdds    int // +1 to include :path
 		expectedRemoves int
 		expectedLog     string
@@ -129,7 +130,7 @@ func TestAddHeaderTransforms(t *testing.T) {
 			specReq := config.NewEnvironmentSpecRequest(nil, specExt, envoyReq)
 			okResponse := &authv3.OkHttpResponse{}
 
-			addRequestHeaderTransforms(envoyReq, specReq, okResponse, "TODO")
+			addRequestHeaderTransforms(envoyReq, specReq, okResponse, test.targetAuth)
 
 			if test.expectedAdds != len(okResponse.Headers) {
 				t.Errorf("expected %d header adds got: %d", test.expectedAdds, len(okResponse.Headers))
@@ -258,7 +259,7 @@ func TestPathTransforms(t *testing.T) {
 			specReq := config.NewEnvironmentSpecRequest(nil, specExt, envoyReq)
 			okResponse := &authv3.OkHttpResponse{}
 
-			addRequestHeaderTransforms(envoyReq, specReq, okResponse, "TODO")
+			addRequestHeaderTransforms(envoyReq, specReq, okResponse, "")
 
 			// path
 			pathSet := getHeaderValueOption(okResponse.Headers, envoyPathHeader)
@@ -495,6 +496,11 @@ func TestEnvRequestCheck(t *testing.T) {
 				// Test selected Apigee dynamic data response header
 				if !hasHeaderAdd(okr.OkResponse.GetResponseHeadersToAdd(), headerDPColor, os.Getenv("APIGEE_DPCOLOR"), false) {
 					t.Errorf("expected response header add: %q", headerDPColor)
+				}
+			} else {
+				// Check selected Apigee dynamic data header
+				if !hasHeaderAdd(resp.GetDeniedResponse().GetHeaders(), headerFaultFlag, "true", false) {
+					t.Errorf("expected response header add: %q", headerFaultFlag)
 				}
 			}
 		})
@@ -941,11 +947,6 @@ func TestImmediateAnalytics(t *testing.T) {
 
 	if len(testAnalyticsMan.records) != 1 {
 		t.Fatalf("got: %d, want: %d", len(testAnalyticsMan.records), 1)
-	}
-
-	// Check selected Apigee dynamic data header
-	if !hasHeaderAdd(resp.GetDeniedResponse().GetHeaders(), headerFaultFlag, "true", false) {
-		t.Errorf("expected response header add: %q", headerFaultFlag)
 	}
 
 	got := testAnalyticsMan.records[0]

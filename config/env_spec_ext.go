@@ -21,7 +21,7 @@ import (
 	"regexp"
 	"strings"
 
-	iam "github.com/apigee/apigee-remote-service-envoy/v2/oauth/google"
+	"github.com/apigee/apigee-remote-service-envoy/v2/oauth/iam"
 	"github.com/apigee/apigee-remote-service-envoy/v2/transform"
 	"github.com/apigee/apigee-remote-service-golib/v2/path"
 )

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package google
+package iam
 
 import (
 	"encoding/json"
@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	iam "google.golang.org/api/iamcredentials/v1"
+	iamv1 "google.golang.org/api/iamcredentials/v1"
 	"google.golang.org/api/option"
 )
 
@@ -33,19 +33,19 @@ func TestAccessTokenRefresh(t *testing.T) {
 			http.Error(w, "server not ready", http.StatusInternalServerError)
 			return
 		}
-		req := &iam.GenerateAccessTokenRequest{}
+		req := &iamv1.GenerateAccessTokenRequest{}
 		if err := json.NewDecoder(r.Body).Decode(req); err != nil {
 			http.Error(w, "bad request", http.StatusBadRequest)
 			return
 		}
-		var resp *iam.GenerateAccessTokenResponse
+		var resp *iamv1.GenerateAccessTokenResponse
 		if ctr == 0 {
-			resp = &iam.GenerateAccessTokenResponse{
+			resp = &iamv1.GenerateAccessTokenResponse{
 				AccessToken: "token-1",
 				ExpireTime:  time.Now().Add(time.Millisecond).Format(time.RFC3339),
 			}
 		} else {
-			resp = &iam.GenerateAccessTokenResponse{
+			resp = &iamv1.GenerateAccessTokenResponse{
 				AccessToken: "token-2",
 				ExpireTime:  time.Now().Add(time.Hour).Format(time.RFC3339),
 			}
@@ -55,6 +55,7 @@ func TestAccessTokenRefresh(t *testing.T) {
 			http.Error(w, "failed to marshal response", http.StatusInternalServerError)
 		}
 	}))
+	defer srv.Close()
 
 	opts := []option.ClientOption{
 		option.WithHTTPClient(http.DefaultClient),
@@ -119,18 +120,18 @@ func TestIdentityTokenRefresh(t *testing.T) {
 			http.Error(w, "server not ready", http.StatusInternalServerError)
 			return
 		}
-		req := &iam.GenerateIdTokenRequest{}
+		req := &iamv1.GenerateIdTokenRequest{}
 		if err := json.NewDecoder(r.Body).Decode(req); err != nil {
 			http.Error(w, "bad request", http.StatusBadRequest)
 			return
 		}
-		var resp *iam.GenerateIdTokenResponse
+		var resp *iamv1.GenerateIdTokenResponse
 		if ctr == 0 {
-			resp = &iam.GenerateIdTokenResponse{
+			resp = &iamv1.GenerateIdTokenResponse{
 				Token: "token-1",
 			}
 		} else {
-			resp = &iam.GenerateIdTokenResponse{
+			resp = &iamv1.GenerateIdTokenResponse{
 				Token: "token-2",
 			}
 		}
@@ -139,6 +140,7 @@ func TestIdentityTokenRefresh(t *testing.T) {
 			http.Error(w, "failed to marshal response", http.StatusInternalServerError)
 		}
 	}))
+	defer srv.Close()
 
 	opts := []option.ClientOption{
 		option.WithHTTPClient(http.DefaultClient),

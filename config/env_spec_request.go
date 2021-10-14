@@ -590,6 +590,9 @@ func (e *EnvironmentSpecRequest) TargetAuth() (string, error) {
 	if ts := e.GetOperation().TargetAuthentication.TokenSource; ts != nil {
 		tokenSource = ts
 	}
+	if tokenSource == nil {
+		return "", nil
+	}
 	token, err := tokenSource.Token()
 	if err != nil {
 		return "", err

@@ -26,7 +26,7 @@ import (
 	"sync"
 
 	"github.com/apigee/apigee-remote-service-envoy/v2/config"
-	iam "github.com/apigee/apigee-remote-service-envoy/v2/oauth/google"
+	"github.com/apigee/apigee-remote-service-envoy/v2/oauth/iam"
 	"github.com/apigee/apigee-remote-service-golib/v2/analytics"
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
 	"github.com/apigee/apigee-remote-service-golib/v2/auth/jwt"

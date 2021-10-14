@@ -131,8 +131,17 @@ func TestGetAPISpec(t *testing.T) {
 }
 
 func TestGetOperation(t *testing.T) {
+	srv := testIAMServer()
+	defer srv.Close()
+
+	iamsvc, err := testIAMService(srv)
+	if err != nil {
+		t.Fatalf("failed to create test IAMService: %v", err)
+	}
+	defer iamsvc.Close()
+
 	envSpec := createGoodEnvSpec()
-	specExt, err := NewEnvironmentSpecExt(&envSpec, nil)
+	specExt, err := NewEnvironmentSpecExt(&envSpec, iamsvc)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -169,7 +178,11 @@ func TestGetOperation(t *testing.T) {
 			specReq := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
 
 			gotOperation := specReq.GetOperation()
-			if diff := cmp.Diff(test.want, gotOperation, cmpopts.IgnoreUnexported(APIOperation{})); diff != "" {
+			opts := []cmp.Option{
+				cmpopts.IgnoreUnexported(APIOperation{}),
+				cmpopts.IgnoreFields(TargetAuthentication{}, "TokenSource"),
+			}
+			if diff := cmp.Diff(test.want, gotOperation, opts...); diff != "" {
 				t.Errorf("diff (-want +got):\n%s", diff)
 			}
 
@@ -183,8 +196,17 @@ func TestGetOperation(t *testing.T) {
 }
 
 func TestGetParamValueQuery(t *testing.T) {
+	srv := testIAMServer()
+	defer srv.Close()
+
+	iamsvc, err := testIAMService(srv)
+	if err != nil {
+		t.Fatalf("failed to create test IAMService: %v", err)
+	}
+	defer iamsvc.Close()
+
 	envSpec := createGoodEnvSpec()
-	specExt, err := NewEnvironmentSpecExt(&envSpec, nil)
+	specExt, err := NewEnvironmentSpecExt(&envSpec, iamsvc)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -222,8 +244,17 @@ func TestGetParamValueQuery(t *testing.T) {
 }
 
 func TestGetParamValueHeader(t *testing.T) {
+	srv := testIAMServer()
+	defer srv.Close()
+
+	iamsvc, err := testIAMService(srv)
+	if err != nil {
+		t.Fatalf("failed to create test IAMService: %v", err)
+	}
+	defer iamsvc.Close()
+
 	envSpec := createGoodEnvSpec()
-	specExt, err := NewEnvironmentSpecExt(&envSpec, nil)
+	specExt, err := NewEnvironmentSpecExt(&envSpec, iamsvc)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -261,8 +292,17 @@ func TestGetParamValueHeader(t *testing.T) {
 }
 
 func TestGetParamValueJWTClaim(t *testing.T) {
+	srv := testIAMServer()
+	defer srv.Close()
+
+	iamsvc, err := testIAMService(srv)
+	if err != nil {
+		t.Fatalf("failed to create test IAMService: %v", err)
+	}
+	defer iamsvc.Close()
+
 	envSpec := createGoodEnvSpec()
-	specExt, err := NewEnvironmentSpecExt(&envSpec, nil)
+	specExt, err := NewEnvironmentSpecExt(&envSpec, iamsvc)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -315,8 +355,17 @@ func TestGetParamValueJWTClaim(t *testing.T) {
 }
 
 func TestIsAuthenticated(t *testing.T) {
+	srv := testIAMServer()
+	defer srv.Close()
+
+	iamsvc, err := testIAMService(srv)
+	if err != nil {
+		t.Fatalf("failed to create test IAMService: %v", err)
+	}
+	defer iamsvc.Close()
+
 	envSpec := createGoodEnvSpec()
-	specExt, err := NewEnvironmentSpecExt(&envSpec, nil)
+	specExt, err := NewEnvironmentSpecExt(&envSpec, iamsvc)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -396,8 +445,17 @@ func TestIsAuthenticated(t *testing.T) {
 }
 
 func TestIsAuthorizationRequired(t *testing.T) {
+	srv := testIAMServer()
+	defer srv.Close()
+
+	iamsvc, err := testIAMService(srv)
+	if err != nil {
+		t.Fatalf("failed to create test IAMService: %v", err)
+	}
+	defer iamsvc.Close()
+
 	envSpec := createGoodEnvSpec()
-	specExt, err := NewEnvironmentSpecExt(&envSpec, nil)
+	specExt, err := NewEnvironmentSpecExt(&envSpec, iamsvc)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -422,6 +480,15 @@ func TestIsAuthorizationRequired(t *testing.T) {
 }
 
 func TestAuthenticationRequirementDisabled(t *testing.T) {
+	srv := testIAMServer()
+	defer srv.Close()
+
+	iamsvc, err := testIAMService(srv)
+	if err != nil {
+		t.Fatalf("failed to create test IAMService: %v", err)
+	}
+	defer iamsvc.Close()
+
 	tests := []struct {
 		desc string
 		path string
@@ -436,7 +503,7 @@ func TestAuthenticationRequirementDisabled(t *testing.T) {
 
 			// not authenticated
 			envSpec := createGoodEnvSpec()
-			specExt, err := NewEnvironmentSpecExt(&envSpec, nil)
+			specExt, err := NewEnvironmentSpecExt(&envSpec, iamsvc)
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
@@ -452,7 +519,7 @@ func TestAuthenticationRequirementDisabled(t *testing.T) {
 			envSpec = createGoodEnvSpec()
 			envSpec.APIs[0].Authentication.Disabled = true
 			envSpec.APIs[1].Authentication.Disabled = true
-			specExt, err = NewEnvironmentSpecExt(&envSpec, nil)
+			specExt, err = NewEnvironmentSpecExt(&envSpec, iamsvc)
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
@@ -467,7 +534,7 @@ func TestAuthenticationRequirementDisabled(t *testing.T) {
 			envSpec = createGoodEnvSpec()
 			envSpec.APIs[0].Operations[0].Authentication.Disabled = true
 			envSpec.APIs[1].Operations[0].Authentication.Disabled = true
-			specExt, err = NewEnvironmentSpecExt(&envSpec, nil)
+			specExt, err = NewEnvironmentSpecExt(&envSpec, iamsvc)
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
@@ -482,6 +549,15 @@ func TestAuthenticationRequirementDisabled(t *testing.T) {
 }
 
 func TestGetAPIKey(t *testing.T) {
+	srv := testIAMServer()
+	defer srv.Close()
+
+	iamsvc, err := testIAMService(srv)
+	if err != nil {
+		t.Fatalf("failed to create test IAMService: %v", err)
+	}
+	defer iamsvc.Close()
+
 	envSpec := createGoodEnvSpec()
 
 	apiKey := "myapikey"
@@ -507,7 +583,7 @@ func TestGetAPIKey(t *testing.T) {
 			// enabled
 			envSpec.APIs[0].ConsumerAuthorization.Disabled = false
 			envSpec.APIs[1].Operations[0].ConsumerAuthorization.Disabled = false
-			specExt, err := NewEnvironmentSpecExt(&envSpec, nil)
+			specExt, err := NewEnvironmentSpecExt(&envSpec, iamsvc)
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
@@ -521,7 +597,7 @@ func TestGetAPIKey(t *testing.T) {
 			// disabled
 			envSpec.APIs[0].ConsumerAuthorization.Disabled = true
 			envSpec.APIs[1].Operations[0].ConsumerAuthorization.Disabled = true
-			specExt, err = NewEnvironmentSpecExt(&envSpec, nil)
+			specExt, err = NewEnvironmentSpecExt(&envSpec, iamsvc)
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
@@ -536,6 +612,15 @@ func TestGetAPIKey(t *testing.T) {
 }
 
 func TestEnvSpecRequestJWTAuthentications(t *testing.T) {
+	srv := testIAMServer()
+	defer srv.Close()
+
+	iamsvc, err := testIAMService(srv)
+	if err != nil {
+		t.Fatalf("failed to create test IAMService: %v", err)
+	}
+	defer iamsvc.Close()
+
 	tests := []struct {
 		desc   string
 		path   string
@@ -550,7 +635,7 @@ func TestEnvSpecRequestJWTAuthentications(t *testing.T) {
 
 			// not authenticated
 			envSpec := createGoodEnvSpec()
-			specExt, err := NewEnvironmentSpecExt(&envSpec, nil)
+			specExt, err := NewEnvironmentSpecExt(&envSpec, iamsvc)
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
@@ -718,6 +803,15 @@ func TestVariables(t *testing.T) {
 }
 
 func TestIsCors(t *testing.T) {
+	srv := testIAMServer()
+	defer srv.Close()
+
+	iamsvc, err := testIAMService(srv)
+	if err != nil {
+		t.Fatalf("failed to create test IAMService: %v", err)
+	}
+	defer iamsvc.Close()
+
 	tests := []struct {
 		desc         string
 		method       string
@@ -736,7 +830,7 @@ func TestIsCors(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 
 			envSpec := createGoodEnvSpec()
-			specExt, err := NewEnvironmentSpecExt(&envSpec, nil)
+			specExt, err := NewEnvironmentSpecExt(&envSpec, iamsvc)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -756,6 +850,15 @@ func TestIsCors(t *testing.T) {
 }
 
 func TestAllowedOrigin(t *testing.T) {
+	srv := testIAMServer()
+	defer srv.Close()
+
+	iamsvc, err := testIAMService(srv)
+	if err != nil {
+		t.Fatalf("failed to create test IAMService: %v", err)
+	}
+	defer iamsvc.Close()
+
 	tests := []struct {
 		desc                string
 		allowOrigins        []string
@@ -812,7 +915,7 @@ func TestAllowedOrigin(t *testing.T) {
 			envSpec := createGoodEnvSpec()
 			envSpec.APIs[0].Cors.AllowOrigins = test.allowOrigins
 			envSpec.APIs[0].Cors.AllowOriginsRegexes = test.allowOriginsRegexes
-			specExt, err := NewEnvironmentSpecExt(&envSpec, nil)
+			specExt, err := NewEnvironmentSpecExt(&envSpec, iamsvc)
 			if err != nil {
 				t.Fatal(err)
 			}

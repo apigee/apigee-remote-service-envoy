@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package google
+package iam
 
 import (
 	"context"
@@ -22,7 +22,7 @@ import (
 
 	"github.com/apigee/apigee-remote-service-golib/v2/log"
 	"golang.org/x/oauth2"
-	iam "google.golang.org/api/iamcredentials/v1"
+	iamv1 "google.golang.org/api/iamcredentials/v1"
 	"google.golang.org/api/option"
 )
 
@@ -36,13 +36,13 @@ const (
 type IAMService struct {
 	ctx        context.Context
 	cancelFunc context.CancelFunc
-	svc        *iam.Service
+	svc        *iamv1.Service
 }
 
 // AccessTokenSource defines an access token source.
 // It supplies access tokens via Token() method.
 type AccessTokenSource struct {
-	iamsvc *iam.Service
+	iamsvc *iamv1.Service
 	saName string
 	scopes []string
 
@@ -53,7 +53,7 @@ type AccessTokenSource struct {
 // IdentityTokenSource defines an ID token source.
 // It supplies ID tokens via Token() method.
 type IdentityTokenSource struct {
-	iamsvc       *iam.Service
+	iamsvc       *iamv1.Service
 	saName       string
 	audience     string
 	includeEmail bool
@@ -65,7 +65,7 @@ type IdentityTokenSource struct {
 // NewIAMService creates a new IAM service with given list of client options.
 func NewIAMService(opts ...option.ClientOption) (*IAMService, error) {
 	ctxWithCancel, cancelFunc := context.WithCancel(context.Background())
-	iamsvc, err := iam.NewService(ctxWithCancel, opts...)
+	iamsvc, err := iamv1.NewService(ctxWithCancel, opts...)
 	if err != nil {
 		cancelFunc()
 		return nil, fmt.Errorf("failed to create new IAM credentials service: %v", err)
@@ -175,7 +175,7 @@ func (ats *AccessTokenSource) Token() (*oauth2.Token, error) {
 }
 
 func (ats *AccessTokenSource) refresh() error {
-	req := &iam.GenerateAccessTokenRequest{
+	req := &iamv1.GenerateAccessTokenRequest{
 		Scope: ats.scopes,
 	}
 	resp, err := ats.iamsvc.Projects.ServiceAccounts.GenerateAccessToken(ats.saName, req).Do()
@@ -212,7 +212,7 @@ func (its *IdentityTokenSource) Token() (*oauth2.Token, error) {
 }
 
 func (its *IdentityTokenSource) refresh() error {
-	req := &iam.GenerateIdTokenRequest{
+	req := &iamv1.GenerateIdTokenRequest{
 		Audience:     its.audience,
 		IncludeEmail: its.includeEmail,
 	}
