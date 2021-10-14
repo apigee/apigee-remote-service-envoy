@@ -129,7 +129,7 @@ func TestAddHeaderTransforms(t *testing.T) {
 			specReq := config.NewEnvironmentSpecRequest(nil, specExt, envoyReq)
 			okResponse := &authv3.OkHttpResponse{}
 
-			addRequestHeaderTransforms(envoyReq, specReq, okResponse)
+			addRequestHeaderTransforms(envoyReq, specReq, okResponse, "TODO")
 
 			if test.expectedAdds != len(okResponse.Headers) {
 				t.Errorf("expected %d header adds got: %d", test.expectedAdds, len(okResponse.Headers))
@@ -258,7 +258,7 @@ func TestPathTransforms(t *testing.T) {
 			specReq := config.NewEnvironmentSpecRequest(nil, specExt, envoyReq)
 			okResponse := &authv3.OkHttpResponse{}
 
-			addRequestHeaderTransforms(envoyReq, specReq, okResponse)
+			addRequestHeaderTransforms(envoyReq, specReq, okResponse, "TODO")
 
 			// path
 			pathSet := getHeaderValueOption(okResponse.Headers, envoyPathHeader)

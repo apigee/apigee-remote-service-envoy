@@ -35,7 +35,7 @@ const (
 	PEMKeyType  = "RSA PRIVATE KEY"
 	jwtIssuer   = "apigee-remote-service-envoy"
 	jwtAudience = "remote-service-client"
-	authHeader  = "Authorization"
+	authHeader  = "authorization"
 )
 
 // AuthManager maintains an authorization header value

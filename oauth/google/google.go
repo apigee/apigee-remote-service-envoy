@@ -37,7 +37,6 @@ type IAMService struct {
 	ctx        context.Context
 	cancelFunc context.CancelFunc
 	svc        *iam.Service
-	saName     string
 }
 
 // AccessTokenSource defines an access token source.
@@ -130,7 +129,7 @@ func (s *IAMService) IdentityTokenSource(saEmail, audience string, includeEmail 
 	}
 	its := &IdentityTokenSource{
 		iamsvc:       s.svc,
-		saName:       s.saName,
+		saName:       fmt.Sprintf(serviceAccountNameFormat, saEmail),
 		audience:     audience,
 		includeEmail: includeEmail,
 	}

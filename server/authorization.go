@@ -53,6 +53,8 @@ const (
 	apiContextKey        = "apigee_api"
 	envSpecContextKey    = "apigee_env_config"
 	envoyPathHeader      = ":path"
+
+	altAuthHeader = "x-forwarded-authorization"
 )
 
 // AuthorizationServer server
@@ -144,8 +146,13 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 
 		if !envRequest.IsAuthorizationRequired() {
 			log.Debugf("no authorization requirements")
+			targetAuth, err := envRequest.TargetAuth()
+			if err != nil {
+				log.Errorf("failed to generate target auth token: %v", err)
+				return a.denied(req, envRequest, tracker, &auth.Context{Context: rootContext}, api), nil
+			}
 			// Send the root context for limited dynamic metadata.
-			return a.authOK(req, tracker, &auth.Context{Context: rootContext}, api, envRequest), nil
+			return a.authOK(req, tracker, &auth.Context{Context: rootContext}, api, envRequest, targetAuth), nil
 		}
 
 		path = envRequest.GetOperationPath()
@@ -218,7 +225,12 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 	case auth.ErrNetworkError:
 		if envRequest != nil && envRequest.GetConsumerAuthorization().FailOpen {
 			log.Debugf("FailOpen on operation: %v", envRequest.GetOperation().Name)
-			return a.authOK(req, tracker, authContext, api, envRequest), nil
+			targetAuth, err := envRequest.TargetAuth()
+			if err != nil {
+				log.Errorf("failed to generate target auth token: %v", err)
+				return a.denied(req, envRequest, tracker, &auth.Context{Context: rootContext}, api), nil
+			}
+			return a.authOK(req, tracker, authContext, api, envRequest, targetAuth), nil
 		} else {
 			return a.internalError(req, envRequest, tracker, err), nil
 		}
@@ -244,17 +256,12 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 		return a.quotaExceeded(req, envRequest, tracker, authContext, api), nil
 	}
 
-	if ts := envRequest.TokenSource(); ts != nil {
-		token, err := ts.Token()
-		if err != nil {
-			log.Errorf("failed to get oauth token for the backend: %v", err)
-		}
-		authHeader := fmt.Sprintf("%s %s", token.Type(), token.AccessToken)
-		// TODO: remove this line and add actual logic.
-		log.Debugf("token header: %q", authHeader)
+	targetAuth, err := envRequest.TargetAuth()
+	if err != nil {
+		log.Errorf("failed to generate target auth token: %v", err)
+		return a.denied(req, envRequest, tracker, &auth.Context{Context: rootContext}, api), nil
 	}
-
-	return a.authOK(req, tracker, authContext, api, envRequest), nil
+	return a.authOK(req, tracker, authContext, api, envRequest, targetAuth), nil
 }
 
 // apply quotas to all matched operations
@@ -279,9 +286,9 @@ func (a *AuthorizationServer) applyQuotas(ops []product.AuthorizedOperation, aut
 func (a *AuthorizationServer) authOK(
 	req *authv3.CheckRequest, tracker *prometheusRequestMetricTracker,
 	authContext *auth.Context, api string,
-	envRequest *config.EnvironmentSpecRequest) *authv3.CheckResponse {
+	envRequest *config.EnvironmentSpecRequest, targetAuth string) *authv3.CheckResponse {
 
-	checkResponse := a.createEnvoyForwarded(req, tracker, authContext, api, envRequest)
+	checkResponse := a.createEnvoyForwarded(req, tracker, authContext, api, envRequest, targetAuth)
 	checkResponse.GetOkResponse().Headers = append(checkResponse.GetOkResponse().Headers, createHeaderValueOption(headerAuthorized, "true", false))
 	return checkResponse
 }
@@ -289,12 +296,12 @@ func (a *AuthorizationServer) authOK(
 // response sends request on to target
 func (a *AuthorizationServer) createEnvoyForwarded(
 	req *authv3.CheckRequest, tracker *prometheusRequestMetricTracker,
-	authContext *auth.Context, api string, envRequest *config.EnvironmentSpecRequest) *authv3.CheckResponse {
+	authContext *auth.Context, api string, envRequest *config.EnvironmentSpecRequest, targetAuth string) *authv3.CheckResponse {
 
 	okResponse := &authv3.OkHttpResponse{}
 
 	// user request header transforms
-	addRequestHeaderTransforms(req, envRequest, okResponse)
+	addRequestHeaderTransforms(req, envRequest, okResponse, targetAuth)
 
 	// apigee metadata request headers
 	if a.handler.appendMetadataHeaders {
@@ -306,10 +313,13 @@ func (a *AuthorizationServer) createEnvoyForwarded(
 
 	// apigee dynamic data response headers
 	var basepath string
-	if envRequest != nil && envRequest.GetAPISpec() != nil {
-		basepath = envRequest.GetAPISpec().BasePath
+	var dynamicDataHeaders []*corev3.HeaderValueOption
+	if envRequest != nil {
+		if envRequest.GetAPISpec() != nil {
+			basepath = envRequest.GetAPISpec().BasePath
+		}
+		dynamicDataHeaders = apigeeDynamicDataHeaders(a.handler.Organization(), a.handler.Environment(), api, basepath, false)
 	}
-	dynamicDataHeaders := apigeeDynamicDataHeaders(a.handler.Organization(), a.handler.Environment(), api, basepath, false)
 	okResponse.ResponseHeadersToAdd = append(okResponse.ResponseHeadersToAdd, dynamicDataHeaders...)
 
 	if log.DebugEnabled() {
@@ -359,75 +369,91 @@ func corsResponseHeaders(envRequest *config.EnvironmentSpecRequest) (headers []*
 
 // includes :path and any JWTAuthentication.ForwardPayloadHeader requests
 func addRequestHeaderTransforms(req *authv3.CheckRequest, envRequest *config.EnvironmentSpecRequest,
-	okResponse *authv3.OkHttpResponse) {
-	if envRequest != nil {
-		if apiOperation := envRequest.GetOperation(); apiOperation != nil {
+	okResponse *authv3.OkHttpResponse, targetAuth string) {
+	if envRequest == nil {
+		return
+	}
 
-			// add ForwardPayloadHeaders
-			for _, ja := range envRequest.JWTAuthentications() {
-				claims, _ := envRequest.GetJWTResult(ja.Name)
-				if claims != nil && ja.ForwardPayloadHeader != "" {
-					b, err := json.Marshal(claims)
-					if err != nil {
-						log.Errorf("unable to marshal ForwardPayloadHeader for %s", ja.Name)
-						continue
-					}
-					encodedClaims := base64.URLEncoding.EncodeToString(b)
-					addRequestHeader(okResponse, ja.ForwardPayloadHeader, encodedClaims, true)
+	var removeAuth bool
+	if apiOperation := envRequest.GetOperation(); apiOperation != nil {
+		// add ForwardPayloadHeaders
+		for _, ja := range envRequest.JWTAuthentications() {
+			claims, _ := envRequest.GetJWTResult(ja.Name)
+			if claims != nil && ja.ForwardPayloadHeader != "" {
+				b, err := json.Marshal(claims)
+				if err != nil {
+					log.Errorf("unable to marshal ForwardPayloadHeader for %s", ja.Name)
+					continue
+				}
+				encodedClaims := base64.URLEncoding.EncodeToString(b)
+				addRequestHeader(okResponse, ja.ForwardPayloadHeader, encodedClaims, true)
+			}
+		}
+
+		transforms := envRequest.GetHTTPRequestTransforms()
+
+		// http path transformation
+		pathTransform := transforms.PathTransform
+		var targetPath = envRequest.GetOperationPath()
+		if pathTransform != "" {
+			targetPath = envRequest.Reify(pathTransform)
+			targetPath = path.Clean(targetPath)
+		}
+
+		queryMap := envRequest.GetQueryParams()
+		for _, t := range transforms.QueryTransforms.Remove {
+			t = strings.ToLower(t)
+			delete(queryMap, t)
+		}
+		queryAppends := make(map[string][]string) // excess adds
+		for k, v := range queryMap {
+			queryAppends[k] = []string{v}
+		}
+		for _, t := range transforms.QueryTransforms.Add {
+			value := envRequest.Reify(t.Value)
+			if t.Append {
+				queryAppends[t.Name] = append(queryAppends[t.Name], value)
+			} else {
+				queryAppends[t.Name] = []string{value}
+			}
+		}
+		if len(queryAppends) > 0 {
+			queryParams := []string{}
+			for name, vals := range queryAppends {
+				for _, val := range vals {
+					queryParams = append(queryParams, fmt.Sprintf("%s=%s", url.QueryEscape(name), url.QueryEscape(val)))
 				}
 			}
+			targetPath = targetPath + "?" + strings.Join(queryParams, "&")
+		}
 
-			transforms := envRequest.GetHTTPRequestTransforms()
+		addRequestHeader(okResponse, envoyPathHeader, targetPath, false)
 
-			// http path transformation
-			pathTransform := transforms.PathTransform
-			var targetPath = envRequest.GetOperationPath()
-			if pathTransform != "" {
-				targetPath = envRequest.Reify(pathTransform)
-				targetPath = path.Clean(targetPath)
+		// header transforms
+		for _, t := range transforms.HeaderTransforms.Remove {
+			t = strings.ToLower(t)
+			if t == authHeader {
+				removeAuth = true
 			}
-
-			queryMap := envRequest.GetQueryParams()
-			for _, t := range transforms.QueryTransforms.Remove {
-				t = strings.ToLower(t)
-				delete(queryMap, t)
-			}
-			queryAppends := make(map[string][]string) // excess adds
-			for k, v := range queryMap {
-				queryAppends[k] = []string{v}
-			}
-			for _, t := range transforms.QueryTransforms.Add {
-				value := envRequest.Reify(t.Value)
-				if t.Append {
-					queryAppends[t.Name] = append(queryAppends[t.Name], value)
-				} else {
-					queryAppends[t.Name] = []string{value}
+			for hdr := range req.Attributes.Request.Http.Headers {
+				if util.SimpleGlobMatch(t, hdr) {
+					okResponse.HeadersToRemove = append(okResponse.HeadersToRemove, hdr)
 				}
 			}
-			if len(queryAppends) > 0 {
-				queryParams := []string{}
-				for name, vals := range queryAppends {
-					for _, val := range vals {
-						queryParams = append(queryParams, fmt.Sprintf("%s=%s", url.QueryEscape(name), url.QueryEscape(val)))
-					}
-				}
-				targetPath = targetPath + "?" + strings.Join(queryParams, "&")
-			}
+		}
+		for _, t := range transforms.HeaderTransforms.Add {
+			value := envRequest.Reify(t.Value)
+			addRequestHeader(okResponse, t.Name, value, t.Append)
+		}
+	}
 
-			addRequestHeader(okResponse, envoyPathHeader, targetPath, false)
-
-			// header transforms
-			for _, t := range transforms.HeaderTransforms.Remove {
-				t = strings.ToLower(t)
-				for hdr := range req.Attributes.Request.Http.Headers {
-					if util.SimpleGlobMatch(t, hdr) {
-						okResponse.HeadersToRemove = append(okResponse.HeadersToRemove, hdr)
-					}
-				}
-			}
-			for _, t := range transforms.HeaderTransforms.Add {
-				value := envRequest.Reify(t.Value)
-				addRequestHeader(okResponse, t.Name, value, t.Append)
+	// Add given value to the auth header
+	if targetAuth != "" {
+		addRequestHeader(okResponse, authHeader, targetAuth, false)
+		// Move the original value to a different header if it's not configured to be removed.
+		if !removeAuth {
+			if v := req.Attributes.Request.Http.Headers[authHeader]; v != "" {
+				addRequestHeader(okResponse, altAuthHeader, v, false)
 			}
 		}
 	}
@@ -543,7 +569,7 @@ func (a *AuthorizationServer) createConditionalEnvoyDenied(
 
 	if authContext != nil && a.handler.allowUnauthorized {
 		log.Debugf("sending ok (actual: %s)", code.String())
-		return a.createEnvoyForwarded(req, tracker, authContext, api, envRequest)
+		return a.createEnvoyForwarded(req, tracker, authContext, api, envRequest, "TODO")
 	}
 
 	return a.createEnvoyDenied(req, envRequest, tracker, authContext, api, code, statusCode)
@@ -563,10 +589,13 @@ func (a *AuthorizationServer) createEnvoyDenied(req *authv3.CheckRequest, envReq
 
 	// apigee dynamic data response headers
 	var basepath string
-	if envRequest != nil && envRequest.GetAPISpec() != nil {
-		basepath = envRequest.GetAPISpec().BasePath
+	var dynamicDataHeaders []*corev3.HeaderValueOption
+	if envRequest != nil {
+		if envRequest.GetAPISpec() != nil {
+			basepath = envRequest.GetAPISpec().BasePath
+		}
+		dynamicDataHeaders = apigeeDynamicDataHeaders(a.handler.Organization(), a.handler.Environment(), api, basepath, true)
 	}
-	dynamicDataHeaders := apigeeDynamicDataHeaders(a.handler.Organization(), a.handler.Environment(), api, basepath, true)
 
 	response := &authv3.CheckResponse{
 		Status: &status.Status{

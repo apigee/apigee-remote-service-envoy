@@ -41,11 +41,11 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec, iamsvc *iam.IAMService) (*Envi
 	}
 
 	for i := range spec.APIs {
-		api := spec.APIs[i]
+		api := &spec.APIs[i]
 
 		split := strings.Split(api.BasePath, "/")
 		split = append([]string{"/"}, split...)
-		ec.apiPathTree.AddChild(split, 0, &api)
+		ec.apiPathTree.AddChild(split, 0, api)
 
 		var mustVary = false
 		allowedOrigins := make(map[string]bool, len(api.Cors.AllowOrigins))
@@ -119,11 +119,11 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec, iamsvc *iam.IAMService) (*Envi
 		}
 
 		for i := range api.Operations {
-			op := api.Operations[i]
+			op := &api.Operations[i]
 
 			if len(op.HTTPMatches) == 0 { // empty is wildcard
 				split = []string{api.ID, wildcard, wildcard}
-				opMatch := OpTemplateMatch{&op, nil}
+				opMatch := OpTemplateMatch{op, nil}
 				ec.opPathTree.AddChild(split, 0, &opMatch)
 			} else {
 				for _, m := range op.HTTPMatches {
@@ -140,7 +140,7 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec, iamsvc *iam.IAMService) (*Envi
 						return nil, err
 					}
 
-					opMatch := OpTemplateMatch{&op, t}
+					opMatch := OpTemplateMatch{op, t}
 					ec.opPathTree.AddChild(split, 0, &opMatch)
 				}
 			}
@@ -168,13 +168,13 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec, iamsvc *iam.IAMService) (*Envi
 					if err != nil {
 						return nil, err
 					}
-					api.Operations[i].TargetAuthentication.TokenSource = ts
+					op.TargetAuthentication.TokenSource = ts
 				case IdentityTokenInfo:
 					ts, err := iamsvc.IdentityTokenSource(v.ServiceAccountEmail, ti.Audience, ti.IncludeEmail, op.TargetAuthentication.RefreshInterval)
 					if err != nil {
 						return nil, err
 					}
-					api.Operations[i].TargetAuthentication.TokenSource = ts
+					op.TargetAuthentication.TokenSource = ts
 				}
 			}
 		}

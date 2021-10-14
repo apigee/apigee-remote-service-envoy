@@ -28,7 +28,6 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/v2/log"
 	"github.com/apigee/apigee-remote-service-golib/v2/util"
 	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
-	"golang.org/x/oauth2"
 )
 
 const TruncateDebugRequestValuesAt = 5
@@ -582,14 +581,18 @@ func (e EnvironmentSpecRequest) Transform(source, target, input string) string {
 	return transform.Substitute(template, substitution, input)
 }
 
-// TokenSource returns the TokenSource for the specific request.
-func (e *EnvironmentSpecRequest) TokenSource() oauth2.TokenSource {
+// TargetAuth returns the auth header value from the token source.
+func (e *EnvironmentSpecRequest) TargetAuth() (string, error) {
 	if e == nil {
-		return nil
+		return "", nil
 	}
 	tokenSource := e.GetAPISpec().TargetAuthentication.TokenSource
 	if ts := e.GetOperation().TargetAuthentication.TokenSource; ts != nil {
 		tokenSource = ts
 	}
-	return tokenSource
+	token, err := tokenSource.Token()
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s %s", token.Type(), token.AccessToken), nil
 }
