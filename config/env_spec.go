@@ -36,6 +36,7 @@ var allMethods = map[string]interface{}{"GET": nil, "POST": nil, "PUT": nil,
 //   * API configs under the same environment config with the same ID,
 //   * JWT authentication requirement under the same API or operation with the same name
 // and report them as errors.
+//   * missing basepaths (unless GrpcService is set, in which case that is allowed)
 // jwtAuthentications of each API and Operation will be populated upon successful
 func ValidateEnvironmentSpecs(ess []EnvironmentSpec) error {
 	configIDSet := make(map[string]bool)
@@ -49,15 +50,28 @@ func ValidateEnvironmentSpecs(ess []EnvironmentSpec) error {
 		}
 		configIDSet[es.ID] = true
 		basePathsSet := make(map[string]bool)
+		gRPCServiceSet := make(map[string]bool)
 		for j := range es.APIs {
 			api := &es.APIs[j]
 			if api.ID == "" {
 				return fmt.Errorf("API spec IDs must be non-empty")
 			}
-			if basePathsSet[api.BasePath] {
-				return fmt.Errorf("API spec basepaths within each environment spec must be unique, got multiple %s", api.BasePath)
+			// if GrpcService is not set, then BasePath must be.
+			if api.GrpcService == "" && api.BasePath == "" {
+				return fmt.Errorf("API %q does not have a BasePath set. BasePath is required unless GrpcService is specified.", api.ID)
 			}
-			basePathsSet[api.BasePath] = true
+			if api.BasePath != "" {
+				if basePathsSet[api.BasePath] {
+					return fmt.Errorf("API spec basepaths within each environment spec must be unique, got multiple %s", api.BasePath)
+				}
+				basePathsSet[api.BasePath] = true
+			}
+			if api.GrpcService != "" {
+				if gRPCServiceSet[api.GrpcService] {
+					return fmt.Errorf("API spec grpc_service must be unique within each environment, found multiple APIs for %q", api.GrpcService)
+				}
+				gRPCServiceSet[api.GrpcService] = true
+			}
 			api.jwtAuthentications = make(map[string]*JWTAuthentication)
 			if err := validateJWTAuthenticationName(&api.Authentication, api.jwtAuthentications); err != nil {
 				return err
@@ -186,6 +200,9 @@ type EnvironmentSpec struct {
 type APISpec struct {
 	// ID of the API, used to match the api_source of API Product Operations.
 	ID string `yaml:"id" mapstructure:"id"`
+
+	// Name of the gRPC service provided by this API. Used to map native gRPC method calls.
+	GrpcService string `yaml:"grpc_service,omitempty" mapstructure:"grpc_service,omitempty"`
 
 	// Base path for this API.
 	BasePath string `yaml:"base_path,omitempty" mapstructure:"base_path,omitempty"`

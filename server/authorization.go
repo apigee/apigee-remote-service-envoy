@@ -371,7 +371,7 @@ func addRequestHeaderTransforms(req *authv3.CheckRequest, envRequest *config.Env
 
 			// http path transformation
 			pathTransform := transforms.PathTransform
-			var targetPath = envRequest.GetOperationPath()
+			var targetPath = envRequest.GetTargetRequestPath()
 			if pathTransform != "" {
 				targetPath = envRequest.Reify(pathTransform)
 				targetPath = path.Clean(targetPath)

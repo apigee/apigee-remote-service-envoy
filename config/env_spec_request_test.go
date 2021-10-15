@@ -85,6 +85,10 @@ func TestGetAPISpec(t *testing.T) {
 				ID:       "cafe",
 				BasePath: "/v2/*/cafe",
 			},
+			{
+				ID:          "grpc-petshop",
+				GrpcService: "com.example.PetshopService",
+			},
 		},
 	}
 	specExt, err := NewEnvironmentSpecExt(&envSpec)
@@ -115,6 +119,7 @@ func TestGetAPISpec(t *testing.T) {
 		{"bookshop", http.MethodGet, "/v1/bookshop?foo=bar", apis["bookshop"]},
 		{"wildcard bookshop", http.MethodGet, "/v3/bookshop?foo=bar", apis["wildcard-bookshop"]},
 		{"cafe", http.MethodGet, "/v2/blue/cafe", apis["cafe"]},
+		{"grpc native", http.MethodPost, "/com.example.PetshopService/ListPets", apis["grpc-petshop"]},
 	}
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
@@ -142,30 +147,34 @@ func TestGetOperation(t *testing.T) {
 	petstore := &envSpec.APIs[0].Operations[0]
 	bookshop := &envSpec.APIs[0].Operations[1]
 	empty := &envSpec.APIs[3].Operations[0]
+	grpcList := &envSpec.APIs[4].Operations[0]
 
 	tests := []struct {
-		desc   string
-		method string
-		path   string
-		opPath string
-		want   *APIOperation
+		desc       string
+		method     string
+		path       string
+		headers    map[string]string
+		opPath     string
+		targetPath string
+		want       *APIOperation
 	}{
-		{"root", http.MethodGet, "/", "", nil},
-		{"basepath", http.MethodGet, "/v1", "", nil},
-		{"base slash", http.MethodGet, "/v1/", "/", nil},
-		{"petstore wrong method", http.MethodPost, "/v1/petstore/", "/petstore/", nil},
-		{"petstore", http.MethodGet, "/v1/petstore", "/petstore", petstore},
-		{"petstore/", http.MethodGet, "/v1/petstore/", "/petstore/", petstore},
-		{"petstore with query", http.MethodGet, "/v1/petstore?foo=bar", "/petstore", petstore},
-		{"bookshop", http.MethodPost, "/v1/bookshop/", "/bookshop/", bookshop},
-		{"noop", http.MethodPost, "/v3/bookshop/", "/bookshop/", defaultOperation},
+		{"root", http.MethodGet, "/", nil, "", "", nil},
+		{"basepath", http.MethodGet, "/v1", nil, "", "", nil},
+		{"base slash", http.MethodGet, "/v1/", nil, "/", "", nil},
+		{"petstore wrong method", http.MethodPost, "/v1/petstore/", nil, "/petstore/", "", nil},
+		{"petstore", http.MethodGet, "/v1/petstore", nil, "/petstore", "/petstore", petstore},
+		{"petstore/", http.MethodGet, "/v1/petstore/", nil, "/petstore/", "/petstore/", petstore},
+		{"petstore with query", http.MethodGet, "/v1/petstore?foo=bar", nil, "/petstore", "/petstore", petstore},
+		{"bookshop", http.MethodPost, "/v1/bookshop/", nil, "/bookshop/", "/bookshop/", bookshop},
+		{"noop", http.MethodPost, "/v3/bookshop/", nil, "/bookshop/", "/bookshop/", defaultOperation},
 		// The basepath for this one is "/v4/*" so expecting "/v4/do" to be trimmed.
-		{"empty", http.MethodPost, "/v4/do/whatever/", "/whatever/", empty},
+		{"empty", http.MethodPost, "/v4/do/whatever/", nil, "/whatever/", "/whatever/", empty},
+		{"grpc with specified op", http.MethodPost, "/foo.petstore.PetstoreService/ListPets", map[string]string{"content-type": "application/grpc"}, "/ListPets", "/foo.petstore.PetstoreService/ListPets", grpcList},
+		{"grpc with unspecified op", http.MethodPost, "/foo.petstore.PetstoreService/GetPet", map[string]string{"content-type": "application/grpc"}, "/GetPet", "/foo.petstore.PetstoreService/GetPet", nil},
 	}
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-
-			envoyReq := testutil.NewEnvoyRequest(test.method, test.path, nil, nil)
+			envoyReq := testutil.NewEnvoyRequest(test.method, test.path, test.headers, nil)
 			specReq := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
 
 			gotOperation := specReq.GetOperation()
@@ -175,8 +184,12 @@ func TestGetOperation(t *testing.T) {
 
 			if gotOperation != nil {
 				if test.opPath != specReq.GetOperationPath() {
-					t.Errorf("want %q, got %q", test.opPath, specReq.GetOperationPath())
+					t.Errorf("unexpected operation path: got %q, want %q", specReq.GetOperationPath(), test.opPath)
 				}
+			}
+
+			if test.targetPath != specReq.GetTargetRequestPath() {
+				t.Errorf("unexpected target request path: got %q, want %q", specReq.GetTargetRequestPath(), test.targetPath)
 			}
 		})
 	}
@@ -569,7 +582,8 @@ func TestGetHTTPRequestTransforms(t *testing.T) {
 	envSpec := &EnvironmentSpec{
 		ID: "good-env-config",
 		APIs: []APISpec{{
-			ID: "apispec1",
+			ID:       "apispec1",
+			BasePath: "/",
 			Operations: []APIOperation{{
 				Name: "op",
 				HTTPMatches: []HTTPMatch{{
@@ -595,7 +609,7 @@ func TestGetHTTPRequestTransforms(t *testing.T) {
 	// ensure operation transform is checked if operation is selected and operation transform exists
 	transforms := envRequest.GetHTTPRequestTransforms()
 	if transforms.PathTransform != "operation" {
-		t.Fatal("want operation transform")
+		t.Fatalf("got %q, want operation transform", transforms.PathTransform)
 	}
 
 	// ensure api transform is checked if operation is not selected
@@ -624,7 +638,7 @@ func TestVariables(t *testing.T) {
 	envSpec := &EnvironmentSpec{
 		ID: "good-env-config",
 		APIs: []APISpec{{
-			BasePath: "/",
+			BasePath: "/good",
 			ID:       "apispec1",
 			Operations: []APIOperation{{
 				Name: "op",
@@ -658,7 +672,8 @@ func TestVariables(t *testing.T) {
 		"setheader":    "oldvalue",
 		"removeheader": "oldvalue",
 	}
-	reqPath := "/seg1/value"
+	opPath := "/seg1/value"
+	reqPath := fmt.Sprintf("%s%s", envSpec.APIs[0].BasePath, opPath)
 	reqQueryString := "setquery=oldvalue&removequery=oldvalue"
 	envoyReq := testutil.NewEnvoyRequest(http.MethodGet, fmt.Sprintf("%s?%s", reqPath, reqQueryString), reqHeaders, nil)
 	envRequest := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
@@ -669,7 +684,8 @@ func TestVariables(t *testing.T) {
 	t.Logf("%#v", envRequest.variables)
 
 	wantRequestVars := map[string]string{
-		RequestPath:        reqPath,
+		RequestPath:        opPath,
+		OriginalPath:       reqPath,
 		RequestQuerystring: reqQueryString,
 	}
 	if diff := cmp.Diff(wantRequestVars, vars.request); diff != "" {

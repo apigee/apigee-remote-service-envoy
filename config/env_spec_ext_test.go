@@ -19,6 +19,7 @@ package config
 
 import (
 	"testing"
+	"strings"
 )
 
 func TestNewEnvironmentSpecExt(t *testing.T) {
@@ -29,14 +30,26 @@ func TestNewEnvironmentSpecExt(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 
-	if l := len(specExt.JWTAuthentications()); l != 8 {
-		t.Errorf("should be 8 JWTAuthentications, got %d", l)
+	if l := len(specExt.JWTAuthentications()); l != 9 {
+		t.Errorf("should be 9 JWTAuthentications, got %d", l)
 	}
 
 	if specExt.apiPathTree == nil {
 		t.Errorf("must not be nil")
 	}
 
+	httpPrefix := strings.Split("/v1", "/")
+	httpPrefix = append([]string{"/"}, httpPrefix...)
+	if result, _ := specExt.apiPathTree.FindPrefix(httpPrefix, 0); result == nil {
+		t.Errorf("gRPC prefix for apispec1 not found in apiPathTree")
+	}
+
+	gRPCPrefix := strings.Split("/foo.petstore.PetstoreService", "/")
+	gRPCPrefix = append([]string{"/"}, gRPCPrefix...)
+	if result, _ := specExt.apiPathTree.FindPrefix(gRPCPrefix, 0); result == nil {
+		t.Errorf("gRPC prefix for grpcapispec not found in apiPathTree")
+	}
+	
 	if specExt.opPathTree == nil {
 		t.Errorf("must not be nil")
 	}

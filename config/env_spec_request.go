@@ -33,6 +33,9 @@ import (
 const TruncateDebugRequestValuesAt = 5
 
 const (
+	ContentTypeHeader = "content-type"
+	GRPCContentType   = "application/grpc"
+
 	CORSOriginHeader   = "origin"
 	CORSOriginWildcard = "*"
 	CORSRequestMethod  = "access-control-request-method"
@@ -54,6 +57,7 @@ const (
 	PathNamespace              = "path"
 	HeaderNamespace            = "headers"
 	RequestPath                = "path"
+	OriginalPath               = "original_path"
 	RequestQuerystring         = "querystring"
 )
 
@@ -118,7 +122,6 @@ func (e *EnvironmentSpecRequest) parseRequest() {
 	}
 
 	var pathTemplate *transform.Template
-
 	if len(e.apiSpec.Operations) == 0 { // if no operations, match any for api
 		e.operation = defaultOperation
 	} else {
@@ -136,8 +139,7 @@ func (e *EnvironmentSpecRequest) parseRequest() {
 			pathTemplate = match.template
 		}
 	}
-
-	e.variables = e.parseRequestVariables(pathTemplate, opPath, queryString)
+	e.variables = e.parseRequestVariables(pathTemplate, path, opPath, queryString)
 }
 
 type jwtClaims map[string]interface{}
@@ -147,7 +149,7 @@ type jwtResult struct {
 	err    error
 }
 
-func (e *EnvironmentSpecRequest) parseRequestVariables(pathTemplate *transform.Template, opPath, queryString string) *requestVariables {
+func (e *EnvironmentSpecRequest) parseRequestVariables(pathTemplate *transform.Template, originalPath, opPath, queryString string) *requestVariables {
 
 	vars := &requestVariables{
 		path:    pathTemplate.Extract(opPath),
@@ -157,6 +159,7 @@ func (e *EnvironmentSpecRequest) parseRequestVariables(pathTemplate *transform.T
 	}
 
 	vars.request[RequestPath] = opPath
+	vars.request[OriginalPath] = originalPath
 	vars.request[RequestQuerystring] = queryString
 
 	if queryString != "" {
@@ -245,6 +248,22 @@ func (e *EnvironmentSpecRequest) GetAPISpec() *APISpec {
 		return nil
 	}
 	return e.apiSpec
+}
+
+// isGRPCRequest returns true if this request looks like a gRPC request.
+func (e *EnvironmentSpecRequest) isGRPCRequest() bool {
+	return e.apiSpec != nil &&
+		e.apiSpec.GrpcService != "" &&
+		e.variables.headers[ContentTypeHeader] == GRPCContentType &&
+		e.Request.Attributes.Request.Http.Method == "POST"
+}
+
+// GetTargetRequestPath returns the path for the request that should be sent to the target.
+func (e *EnvironmentSpecRequest) GetTargetRequestPath() string {
+	if e.isGRPCRequest() {
+		return e.variables.request[OriginalPath]
+	}
+	return e.GetOperationPath()
 }
 
 // GetOperationPath returns path of Operation, no basepath or querystring
