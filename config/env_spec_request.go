@@ -583,12 +583,14 @@ func (e EnvironmentSpecRequest) Transform(source, target, input string) string {
 
 // TargetAuth returns the auth header value from the token source.
 func (e *EnvironmentSpecRequest) TargetAuth() (string, error) {
-	if e == nil {
+	if e == nil || e.GetAPISpec() == nil {
 		return "", nil
 	}
 	tokenSource := e.GetAPISpec().TargetAuthentication.TokenSource
-	if ts := e.GetOperation().TargetAuthentication.TokenSource; ts != nil {
-		tokenSource = ts
+	if op := e.GetOperation(); op != nil {
+		if ts := op.TargetAuthentication.TokenSource; ts != nil {
+			tokenSource = ts
+		}
 	}
 	if tokenSource == nil {
 		return "", nil

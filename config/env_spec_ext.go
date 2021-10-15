@@ -28,8 +28,16 @@ import (
 
 const wildcard = "*"
 
+type EnvironmentSpecExtOption func(e *EnvironmentSpecExt)
+
+func WithIAMService(iamsvc *iam.IAMService) EnvironmentSpecExtOption {
+	return func(e *EnvironmentSpecExt) {
+		e.iamsvc = iamsvc
+	}
+}
+
 // NewEnvironmentSpecExt creates an EnvironmentSpecExt
-func NewEnvironmentSpecExt(spec *EnvironmentSpec, iamsvc *iam.IAMService) (*EnvironmentSpecExt, error) {
+func NewEnvironmentSpecExt(spec *EnvironmentSpec, options ...EnvironmentSpecExtOption) (*EnvironmentSpecExt, error) {
 	ec := &EnvironmentSpecExt{
 		EnvironmentSpec:    spec,
 		apiPathTree:        path.NewTree(),
@@ -38,6 +46,11 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec, iamsvc *iam.IAMService) (*Envi
 		corsVary:           make(map[string]bool, len(spec.APIs)),
 		corsAllowedOrigins: make(map[string]map[string]bool, len(spec.APIs)),
 		compiledRegExps:    make(map[string]*regexp.Regexp),
+	}
+
+	// Apply options to mutate ec
+	for _, opt := range options {
+		opt(ec)
 	}
 
 	for i := range spec.APIs {
@@ -99,18 +112,18 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec, iamsvc *iam.IAMService) (*Envi
 
 		switch v := api.TargetAuthentication.OAuthProvider.(type) {
 		case GoogleOAuth:
-			if iamsvc == nil {
+			if ec.iamsvc == nil {
 				return nil, fmt.Errorf("google oauth required iam service to be configured")
 			}
 			switch ti := v.TokenInfo.(type) {
 			case AccessTokenInfo:
-				ts, err := iamsvc.AccessTokenSource(v.ServiceAccountEmail, ti.Scopes, api.TargetAuthentication.RefreshInterval)
+				ts, err := ec.iamsvc.AccessTokenSource(v.ServiceAccountEmail, ti.Scopes, api.TargetAuthentication.RefreshInterval)
 				if err != nil {
 					return nil, err
 				}
 				api.TargetAuthentication.TokenSource = ts
 			case IdentityTokenInfo:
-				ts, err := iamsvc.IdentityTokenSource(v.ServiceAccountEmail, ti.Audience, ti.IncludeEmail, api.TargetAuthentication.RefreshInterval)
+				ts, err := ec.iamsvc.IdentityTokenSource(v.ServiceAccountEmail, ti.Audience, ti.IncludeEmail, api.TargetAuthentication.RefreshInterval)
 				if err != nil {
 					return nil, err
 				}
@@ -118,8 +131,8 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec, iamsvc *iam.IAMService) (*Envi
 			}
 		}
 
-		for i := range api.Operations {
-			op := &api.Operations[i]
+		for j := range api.Operations {
+			op := &api.Operations[j]
 
 			if len(op.HTTPMatches) == 0 { // empty is wildcard
 				split = []string{api.ID, wildcard, wildcard}
@@ -159,18 +172,18 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec, iamsvc *iam.IAMService) (*Envi
 
 			switch v := op.TargetAuthentication.OAuthProvider.(type) {
 			case GoogleOAuth:
-				if iamsvc == nil {
+				if ec.iamsvc == nil {
 					return nil, fmt.Errorf("google oauth requires the IAMService, got nil")
 				}
 				switch ti := v.TokenInfo.(type) {
 				case AccessTokenInfo:
-					ts, err := iamsvc.AccessTokenSource(v.ServiceAccountEmail, ti.Scopes, op.TargetAuthentication.RefreshInterval)
+					ts, err := ec.iamsvc.AccessTokenSource(v.ServiceAccountEmail, ti.Scopes, op.TargetAuthentication.RefreshInterval)
 					if err != nil {
 						return nil, err
 					}
 					op.TargetAuthentication.TokenSource = ts
 				case IdentityTokenInfo:
-					ts, err := iamsvc.IdentityTokenSource(v.ServiceAccountEmail, ti.Audience, ti.IncludeEmail, op.TargetAuthentication.RefreshInterval)
+					ts, err := ec.iamsvc.IdentityTokenSource(v.ServiceAccountEmail, ti.Audience, ti.IncludeEmail, op.TargetAuthentication.RefreshInterval)
 					if err != nil {
 						return nil, err
 					}
@@ -207,6 +220,7 @@ type EnvironmentSpecExt struct {
 	corsVary           map[string]bool                // api ID -> true if vary header should be true
 	corsAllowedOrigins map[string]map[string]bool     // api ID -> statically allowed origin -> true
 	compiledRegExps    map[string]*regexp.Regexp      // uncompiled -> compiled
+	iamsvc             *iam.IAMService
 }
 
 // JWTAuthentications returns a list of all JWTAuthentications for the Spec

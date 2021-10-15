@@ -31,17 +31,8 @@ import (
 )
 
 func TestNewEnvironmentSpecExt(t *testing.T) {
-	srv := testIAMServer()
-	defer srv.Close()
-
-	iamsvc, err := testIAMService(srv)
-	if err != nil {
-		t.Fatalf("failed to create test IAMService: %v", err)
-	}
-	defer iamsvc.Close()
-
 	envSpec := createGoodEnvSpec()
-	specExt, err := NewEnvironmentSpecExt(&envSpec, iamsvc)
+	specExt, err := NewEnvironmentSpecExt(&envSpec)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -60,6 +51,143 @@ func TestNewEnvironmentSpecExt(t *testing.T) {
 
 	if len(specExt.compiledTemplates) != 10 {
 		t.Errorf("want %d templates, got %d: %#v", 10, len(specExt.compiledTemplates), specExt.compiledTemplates)
+	}
+}
+
+func TestNewEnvironmentSpecExtError(t *testing.T) {
+	srv := testIAMServer()
+	defer srv.Close()
+
+	iamsvc, err := testIAMService(srv)
+	if err != nil {
+		t.Fatalf("failed to create test IAMService: %v", err)
+	}
+	defer iamsvc.Close()
+
+	tests := []struct {
+		desc string
+		spec *EnvironmentSpec
+		opts []EnvironmentSpecExtOption
+	}{
+		{
+			desc: "missing iam service at the API level",
+			spec: &EnvironmentSpec{
+				APIs: []APISpec{{
+					TargetAuthentication: TargetAuthentication{
+						OAuthProvider: GoogleOAuth{},
+					},
+				}},
+			},
+		},
+		{
+			desc: "missing service account at the API level",
+			spec: &EnvironmentSpec{
+				APIs: []APISpec{{
+					TargetAuthentication: TargetAuthentication{
+						OAuthProvider: GoogleOAuth{
+							TokenInfo: AccessTokenInfo{},
+						},
+					},
+				}},
+			},
+			opts: []EnvironmentSpecExtOption{WithIAMService(iamsvc)},
+		},
+		{
+			desc: "access token info missing scopes at the API level",
+			spec: &EnvironmentSpec{
+				APIs: []APISpec{{
+					TargetAuthentication: TargetAuthentication{
+						OAuthProvider: GoogleOAuth{
+							ServiceAccountEmail: "foo@bar.com",
+							TokenInfo:           AccessTokenInfo{},
+						},
+					},
+				}},
+			},
+			opts: []EnvironmentSpecExtOption{WithIAMService(iamsvc)},
+		},
+		{
+			desc: "id token info missing audience at the API level",
+			spec: &EnvironmentSpec{
+				APIs: []APISpec{{
+					TargetAuthentication: TargetAuthentication{
+						OAuthProvider: GoogleOAuth{
+							ServiceAccountEmail: "foo@bar.com",
+							TokenInfo:           IdentityTokenInfo{},
+						},
+					},
+				}},
+			},
+			opts: []EnvironmentSpecExtOption{WithIAMService(iamsvc)},
+		},
+		{
+			desc: "missing iam service at the API level",
+			spec: &EnvironmentSpec{
+				APIs: []APISpec{{
+					Operations: []APIOperation{{
+						TargetAuthentication: TargetAuthentication{
+							OAuthProvider: GoogleOAuth{},
+						},
+					}},
+				}},
+			},
+		},
+		{
+			desc: "missing service account at the operation level",
+			spec: &EnvironmentSpec{
+				APIs: []APISpec{{
+					Operations: []APIOperation{{
+						TargetAuthentication: TargetAuthentication{
+							OAuthProvider: GoogleOAuth{
+								TokenInfo: AccessTokenInfo{},
+							},
+						},
+					}},
+				}},
+			},
+			opts: []EnvironmentSpecExtOption{WithIAMService(iamsvc)},
+		},
+		{
+			desc: "access token info missing scopes at the operation level",
+			spec: &EnvironmentSpec{
+				APIs: []APISpec{{
+					Operations: []APIOperation{{
+						TargetAuthentication: TargetAuthentication{
+							OAuthProvider: GoogleOAuth{
+								ServiceAccountEmail: "foo@bar.com",
+								TokenInfo:           AccessTokenInfo{},
+							},
+						},
+					}},
+				}},
+			},
+			opts: []EnvironmentSpecExtOption{WithIAMService(iamsvc)},
+		},
+		{
+			desc: "id token info missing audience at the operation level",
+			spec: &EnvironmentSpec{
+				APIs: []APISpec{{
+					Operations: []APIOperation{{
+						TargetAuthentication: TargetAuthentication{
+							OAuthProvider: GoogleOAuth{
+								ServiceAccountEmail: "foo@bar.com",
+								TokenInfo:           IdentityTokenInfo{},
+							},
+						},
+					}},
+				}},
+			},
+			opts: []EnvironmentSpecExtOption{WithIAMService(iamsvc)},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			_, err := NewEnvironmentSpecExt(test.spec, test.opts...)
+			if err == nil {
+				t.Errorf("NewEnvironmentSpecExt(...) err == nil, wanted error")
+			}
+		})
 	}
 }
 

@@ -1105,15 +1105,6 @@ func createGoodEnvSpec() EnvironmentSpec {
 						ConsumerAuthorization: ConsumerAuthorization{
 							Disabled: true,
 						},
-						TargetAuthentication: TargetAuthentication{
-							RefreshInterval: time.Hour,
-							OAuthProvider: GoogleOAuth{
-								ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
-								TokenInfo: AccessTokenInfo{
-									Scopes: []string{ApigeeAPIScope},
-								},
-							},
-						},
 					},
 				},
 				HTTPRequestTransforms: HTTPRequestTransforms{
@@ -1222,16 +1213,6 @@ func createGoodEnvSpec() EnvironmentSpec {
 						{Match: Header("x-api-key")},
 					},
 				},
-				TargetAuthentication: TargetAuthentication{
-					RefreshInterval: time.Hour,
-					OAuthProvider: GoogleOAuth{
-						ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
-						TokenInfo: IdentityTokenInfo{
-							IncludeEmail: true,
-							Audience:     "foo",
-						},
-					},
-				},
 			},
 			{
 				ID:       "empty-operation",
@@ -1240,16 +1221,6 @@ func createGoodEnvSpec() EnvironmentSpec {
 					{
 						Name:        "empty",
 						HTTPMatches: []HTTPMatch{},
-						TargetAuthentication: TargetAuthentication{
-							RefreshInterval: time.Hour,
-							OAuthProvider: GoogleOAuth{
-								ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
-								TokenInfo: IdentityTokenInfo{
-									IncludeEmail: true,
-									Audience:     "foo",
-								},
-							},
-						},
 					},
 				},
 				Authentication: AuthenticationRequirement{
@@ -1264,15 +1235,6 @@ func createGoodEnvSpec() EnvironmentSpec {
 					In: []APIOperationParameter{
 						{Match: Query("x-api-key")},
 						{Match: Header("x-api-key")},
-					},
-				},
-				TargetAuthentication: TargetAuthentication{
-					RefreshInterval: time.Hour,
-					OAuthProvider: GoogleOAuth{
-						ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
-						TokenInfo: AccessTokenInfo{
-							Scopes: []string{ApigeeAPIScope},
-						},
 					},
 				},
 			}},

@@ -184,7 +184,7 @@ func NewHandler(cfg *config.Config) (*Handler, error) {
 	for i := range cfg.EnvironmentSpecs.Inline {
 		// make EnvironmentSpecExt lookup table
 		spec := cfg.EnvironmentSpecs.Inline[i]
-		envSpec, err := config.NewEnvironmentSpecExt(&spec, iamsvc)
+		envSpec, err := config.NewEnvironmentSpecExt(&spec, config.WithIAMService(iamsvc))
 		if err != nil {
 			return nil, err
 		}
