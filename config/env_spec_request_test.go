@@ -952,6 +952,11 @@ func TestTargetAuth(t *testing.T) {
 			path:           "/v3",
 			wantTargetAuth: "",
 		},
+		{
+			desc:           "nomatch",
+			path:           "/v4",
+			wantTargetAuth: "",
+		},
 	}
 
 	for _, test := range tests {
