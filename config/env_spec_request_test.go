@@ -838,10 +838,10 @@ func TestAllowedOrigin(t *testing.T) {
 }
 
 func TestTargetAuth(t *testing.T) {
-	srv := testIAMServer()
+	srv := testutil.IAMServer()
 	defer srv.Close()
 
-	iamsvc, err := testIAMService(srv)
+	iamsvc, err := testutil.IAMService(srv)
 	if err != nil {
 		t.Fatalf("failed to create test IAMService: %v", err)
 	}

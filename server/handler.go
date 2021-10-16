@@ -284,6 +284,7 @@ func NewHandler(cfg *config.Config) (*Handler, error) {
 		envSpecsByID:          environmentSpecsByID,
 		operationConfigType:   cfg.Tenant.OperationConfigType,
 		ready:                 util.NewAtomicBool(false),
+		iamService:            iamsvc,
 	}
 	h.setReadyWhenReady()
 

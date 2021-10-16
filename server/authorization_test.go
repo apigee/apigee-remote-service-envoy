@@ -20,6 +20,7 @@ import (
 	"crypto/rsa"
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"reflect"
@@ -480,12 +481,12 @@ func TestEnvRequestCheck(t *testing.T) {
 			}
 			testAnalyticsMan.records = []analytics.Record{}
 			if test.statusCode == int32(rpc.OK) {
-				okr, ok := resp.HttpResponse.(*authv3.CheckResponse_OkResponse)
-				if !ok {
-					t.Fatal("must be OkResponse")
+				okr := resp.GetOkResponse()
+				if okr == nil {
+					t.Fatal("OkResponse is nil")
 				}
 				for i, h := range test.wantHeaders {
-					if !hasHeaderAdd(okr.OkResponse.GetHeaders(), h, test.wantValues[i], test.wantAppends[i]) {
+					if !hasHeaderAdd(okr.GetHeaders(), h, test.wantValues[i], test.wantAppends[i]) {
 						if test.wantAppends[i] {
 							t.Errorf("%q not appended to header %q", test.wantValues[i], h)
 						} else {
@@ -494,7 +495,7 @@ func TestEnvRequestCheck(t *testing.T) {
 					}
 				}
 				// Test selected Apigee dynamic data response header
-				if !hasHeaderAdd(okr.OkResponse.GetResponseHeadersToAdd(), headerDPColor, os.Getenv("APIGEE_DPCOLOR"), false) {
+				if !hasHeaderAdd(okr.GetResponseHeadersToAdd(), headerDPColor, os.Getenv("APIGEE_DPCOLOR"), false) {
 					t.Errorf("expected response header add: %q", headerDPColor)
 				}
 			} else {
@@ -1066,6 +1067,212 @@ func TestCORSResponseHeaders(t *testing.T) {
 			logged := printHeaderMods(okResponse)
 			if test.expectedLog != logged {
 				t.Errorf("want: %q\n, got: %q\n", test.expectedLog, logged)
+			}
+		})
+	}
+}
+
+func TestTargetAuth(t *testing.T) {
+	srv := testutil.IAMServer()
+	defer srv.Close()
+
+	badSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "server not ready", http.StatusInternalServerError)
+	}))
+
+	iamsvc, err := testutil.IAMService(srv)
+	if err != nil {
+		t.Fatalf("failed to create test IAMService: %v", err)
+	}
+	defer iamsvc.Close()
+
+	iamsvc2, err := testutil.IAMService(badSrv)
+	if err != nil {
+		t.Fatalf("failed to create test IAMService: %v", err)
+	}
+	defer iamsvc2.Close()
+
+	goodEnvSpec := &config.EnvironmentSpec{
+		ID: "good-iam",
+		APIs: []config.APISpec{
+			{
+				BasePath: "/v1",
+				TargetAuthentication: config.TargetAuthentication{
+					OAuthProvider: config.GoogleOAuth{
+						ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
+						TokenInfo: config.AccessTokenInfo{
+							Scopes: []string{config.ApigeeAPIScope},
+						},
+					},
+				},
+				Operations: []config.APIOperation{
+					{
+						HTTPMatches: []config.HTTPMatch{{
+							PathTemplate: "/op-1",
+						}},
+					},
+					{
+						HTTPMatches: []config.HTTPMatch{{
+							PathTemplate: "/op-2",
+						}},
+						TargetAuthentication: config.TargetAuthentication{
+							OAuthProvider: config.GoogleOAuth{
+								ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
+								TokenInfo: config.IdentityTokenInfo{
+									Audience: "aud",
+								},
+							},
+						},
+					},
+					{
+						HTTPMatches: []config.HTTPMatch{{
+							PathTemplate: "/op-3",
+						}},
+						// Remove original auth header
+						HTTPRequestTransforms: config.HTTPRequestTransforms{
+							HeaderTransforms: config.NameValueTransforms{
+								Remove: []string{"authorization"},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	badEnvSpec := &config.EnvironmentSpec{
+		ID: "bad-iam",
+		APIs: []config.APISpec{
+			{
+				BasePath: "/v1",
+				TargetAuthentication: config.TargetAuthentication{
+					OAuthProvider: config.GoogleOAuth{
+						ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
+						TokenInfo: config.AccessTokenInfo{
+							Scopes: []string{config.ApigeeAPIScope},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	specExt, err := config.NewEnvironmentSpecExt(goodEnvSpec, config.WithIAMService(iamsvc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	badSpecExt, err := config.NewEnvironmentSpecExt(badEnvSpec, config.WithIAMService(iamsvc2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	environmentSpecsByID := map[string]*config.EnvironmentSpecExt{
+		goodEnvSpec.ID: specExt,
+		badSpecExt.ID:  badSpecExt,
+	}
+
+	testAuthMan := &testAuthMan{}
+	testProductMan := &testProductMan{
+		api:     "api",
+		resolve: true,
+		products: product.ProductsNameMap{
+			"product1": &product.APIProduct{
+				DisplayName: "product1",
+			},
+		},
+	}
+	testQuotaMan := &testQuotaMan{}
+	testAnalyticsMan := &testAnalyticsMan{}
+	server := AuthorizationServer{
+		handler: &Handler{
+			authMan:               testAuthMan,
+			productMan:            testProductMan,
+			quotaMan:              testQuotaMan,
+			jwtProviderKey:        "apigee",
+			appendMetadataHeaders: true,
+			analyticsMan:          testAnalyticsMan,
+			envSpecsByID:          environmentSpecsByID,
+			ready:                 util.NewAtomicBool(true),
+		},
+	}
+
+	tests := []struct {
+		desc        string
+		path        string
+		headers     map[string]string
+		wantHeaders map[string]string // header -> value
+		specExtID   string
+		statusCode  int32
+	}{
+		{
+			desc:      "access token at api level",
+			path:      "/v1/op-1",
+			specExtID: goodEnvSpec.ID,
+			wantHeaders: map[string]string{
+				"authorization": "Bearer access-token",
+			},
+		},
+		{
+			desc:      "id token at api level",
+			path:      "/v1/op-2",
+			specExtID: goodEnvSpec.ID,
+			wantHeaders: map[string]string{
+				"authorization": "Bearer id-token",
+			},
+		},
+		{
+			desc:      "original auth forwarded",
+			path:      "/v1/op-1",
+			specExtID: goodEnvSpec.ID,
+			headers: map[string]string{
+				"authorization": "original",
+			},
+			wantHeaders: map[string]string{
+				"authorization":             "Bearer access-token",
+				"x-forwarded-authorization": "original",
+			},
+		},
+		{
+			desc:      "original auth not forwarded because it's configured to be removed",
+			path:      "/v1/op-3",
+			specExtID: goodEnvSpec.ID,
+			headers: map[string]string{
+				"authorization": "original",
+			},
+			wantHeaders: map[string]string{
+				"authorization": "Bearer access-token",
+			},
+		},
+		{
+			desc:       "denied response from access token fetching error",
+			path:       "/v1/op-1",
+			specExtID:  badEnvSpec.ID,
+			statusCode: int32(rpc.PERMISSION_DENIED),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			req := testutil.NewEnvoyRequest(http.MethodGet, test.path, test.headers, nil)
+			req.Attributes.ContextExtensions = map[string]string{
+				envSpecContextKey: test.specExtID,
+			}
+			resp, err := server.Check(context.Background(), req)
+			if err != nil {
+				t.Fatalf("Check(...) err = %v, wanted no error", err)
+			}
+			if code := resp.GetStatus().GetCode(); code != test.statusCode {
+				t.Fatalf("Check(...) status = %d, wanted %d", code, test.statusCode)
+			}
+			if resp.GetStatus().GetCode() == int32(rpc.OK) {
+				okr := resp.GetOkResponse()
+				if okr == nil {
+					t.Fatal("OkResponse is nil")
+				}
+				for h, v := range test.wantHeaders {
+					if !hasHeaderAdd(okr.GetHeaders(), h, v, false) {
+						t.Errorf("%q header should be: %q", h, v)
+					}
+				}
 			}
 		})
 	}

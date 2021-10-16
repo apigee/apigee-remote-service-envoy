@@ -18,16 +18,9 @@
 package config
 
 import (
-	"encoding/json"
-	"net/http"
-	"net/http/httptest"
-	"strings"
 	"testing"
-	"time"
 
-	"github.com/apigee/apigee-remote-service-envoy/v2/oauth/iam"
-	iamv1 "google.golang.org/api/iamcredentials/v1"
-	"google.golang.org/api/option"
+	"github.com/apigee/apigee-remote-service-envoy/v2/testutil"
 )
 
 func TestNewEnvironmentSpecExt(t *testing.T) {
@@ -55,10 +48,10 @@ func TestNewEnvironmentSpecExt(t *testing.T) {
 }
 
 func TestNewEnvironmentSpecExtError(t *testing.T) {
-	srv := testIAMServer()
+	srv := testutil.IAMServer()
 	defer srv.Close()
 
-	iamsvc, err := testIAMService(srv)
+	iamsvc, err := testutil.IAMService(srv)
 	if err != nil {
 		t.Fatalf("failed to create test IAMService: %v", err)
 	}
@@ -297,38 +290,4 @@ func TestHTTPRequestTransformsIsEmpty(t *testing.T) {
 	if transforms.isEmpty() {
 		t.Errorf("expected not empty")
 	}
-}
-
-func testIAMServer() *httptest.Server {
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.Contains(r.URL.Path, "generateAccessToken") {
-			if err := json.NewEncoder(w).Encode(&iamv1.GenerateAccessTokenResponse{
-				AccessToken: "access-token",
-				ExpireTime:  time.Now().Add(time.Hour).Format(time.RFC3339),
-			}); err != nil {
-				http.Error(w, "failed to marshal response", http.StatusInternalServerError)
-			}
-		} else if strings.Contains(r.URL.Path, "generateIdToken") {
-			if err := json.NewEncoder(w).Encode(&iamv1.GenerateIdTokenResponse{
-				Token: "id-token",
-			}); err != nil {
-				http.Error(w, "failed to marshal response", http.StatusInternalServerError)
-			}
-		} else {
-			http.Error(w, "bad request", http.StatusBadRequest)
-		}
-	}))
-}
-
-func testIAMService(srv *httptest.Server) (*iam.IAMService, error) {
-	opts := []option.ClientOption{
-		option.WithHTTPClient(http.DefaultClient),
-		option.WithEndpoint(srv.URL),
-	}
-
-	s, err := iam.NewIAMService(opts...)
-	if err != nil {
-		return nil, err
-	}
-	return s, nil
 }
