@@ -586,9 +586,9 @@ func (e *EnvironmentSpecRequest) TargetAuth() (string, error) {
 	if e == nil || e.GetAPISpec() == nil {
 		return "", nil
 	}
-	tokenSource := e.GetAPISpec().TargetAuthentication.TokenSource
+	tokenSource := e.apiTokenSources[e.GetAPISpec().ID]
 	if op := e.GetOperation(); op != nil {
-		if ts := op.TargetAuthentication.TokenSource; ts != nil {
+		if ts := e.opTokenSources[e.GetAPISpec().ID][op.Name]; ts != nil {
 			tokenSource = ts
 		}
 	}

@@ -1096,6 +1096,7 @@ func TestTargetAuth(t *testing.T) {
 		ID: "good-iam",
 		APIs: []config.APISpec{
 			{
+				ID:       "petstore",
 				BasePath: "/v1",
 				TargetAuthentication: config.TargetAuthentication{
 					OAuthProvider: config.GoogleOAuth{
@@ -1107,11 +1108,13 @@ func TestTargetAuth(t *testing.T) {
 				},
 				Operations: []config.APIOperation{
 					{
+						Name: "op1",
 						HTTPMatches: []config.HTTPMatch{{
 							PathTemplate: "/op-1",
 						}},
 					},
 					{
+						Name: "op2",
 						HTTPMatches: []config.HTTPMatch{{
 							PathTemplate: "/op-2",
 						}},
@@ -1125,6 +1128,7 @@ func TestTargetAuth(t *testing.T) {
 						},
 					},
 					{
+						Name: "op3",
 						HTTPMatches: []config.HTTPMatch{{
 							PathTemplate: "/op-3",
 						}},

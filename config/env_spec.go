@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"time"
 
-	"golang.org/x/oauth2"
 	"gopkg.in/yaml.v3"
 )
 
@@ -620,10 +619,6 @@ type TargetAuthentication struct {
 	// OAuthProvider contains information for getting the OAuth tokens.
 	// Currently supports GoogleOAuth.
 	OAuthProvider OAuthProvider `yaml:"-" mapstructure:"-"`
-
-	// TokenSource is used to fetch OAuth token.
-	// This is not part of the yaml config and will be generated internally.
-	TokenSource oauth2.TokenSource `yaml:"-" mapstructure:"-"`
 }
 
 type targetAuthenticationWrapper struct {

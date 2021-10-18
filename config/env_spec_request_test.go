@@ -171,7 +171,6 @@ func TestGetOperation(t *testing.T) {
 			gotOperation := specReq.GetOperation()
 			opts := []cmp.Option{
 				cmpopts.IgnoreUnexported(APIOperation{}),
-				cmpopts.IgnoreFields(TargetAuthentication{}, "TokenSource"),
 			}
 			if diff := cmp.Diff(test.want, gotOperation, opts...); diff != "" {
 				t.Errorf("diff (-want +got):\n%s", diff)
@@ -850,6 +849,7 @@ func TestTargetAuth(t *testing.T) {
 	envSpec := &EnvironmentSpec{
 		APIs: []APISpec{
 			{
+				ID:       "petstore", // required for the test to work
 				BasePath: "/v1",
 				TargetAuthentication: TargetAuthentication{
 					OAuthProvider: GoogleOAuth{
@@ -861,11 +861,13 @@ func TestTargetAuth(t *testing.T) {
 				},
 				Operations: []APIOperation{
 					{
+						Name: "op1",
 						HTTPMatches: []HTTPMatch{{
 							PathTemplate: "/op-1",
 						}},
 					},
 					{
+						Name: "op2",
 						HTTPMatches: []HTTPMatch{{
 							PathTemplate: "/op-2",
 						}},
@@ -881,6 +883,7 @@ func TestTargetAuth(t *testing.T) {
 				},
 			},
 			{
+				ID:       "bookstore",
 				BasePath: "/v2",
 				TargetAuthentication: TargetAuthentication{
 					OAuthProvider: GoogleOAuth{
@@ -892,13 +895,15 @@ func TestTargetAuth(t *testing.T) {
 				},
 				Operations: []APIOperation{
 					{
+						Name: "op1",
 						HTTPMatches: []HTTPMatch{{
-							PathTemplate: "/op-3",
+							PathTemplate: "/op-1",
 						}},
 					},
 					{
+						Name: "op2",
 						HTTPMatches: []HTTPMatch{{
-							PathTemplate: "/op-4",
+							PathTemplate: "/op-2",
 						}},
 						TargetAuthentication: TargetAuthentication{
 							OAuthProvider: GoogleOAuth{
@@ -939,12 +944,12 @@ func TestTargetAuth(t *testing.T) {
 		},
 		{
 			desc:           "id token at api level",
-			path:           "/v2/op-3",
+			path:           "/v2/op-1",
 			wantTargetAuth: "Bearer id-token",
 		},
 		{
 			desc:           "access token at op level",
-			path:           "/v2/op-4",
+			path:           "/v2/op-2",
 			wantTargetAuth: "Bearer access-token",
 		},
 		{

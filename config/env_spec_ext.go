@@ -24,6 +24,7 @@ import (
 	"github.com/apigee/apigee-remote-service-envoy/v2/oauth/iam"
 	"github.com/apigee/apigee-remote-service-envoy/v2/transform"
 	"github.com/apigee/apigee-remote-service-golib/v2/path"
+	"golang.org/x/oauth2"
 )
 
 const wildcard = "*"
@@ -46,6 +47,8 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec, options ...EnvironmentSpecExtO
 		corsVary:           make(map[string]bool, len(spec.APIs)),
 		corsAllowedOrigins: make(map[string]map[string]bool, len(spec.APIs)),
 		compiledRegExps:    make(map[string]*regexp.Regexp),
+		apiTokenSources:    make(map[string]oauth2.TokenSource),
+		opTokenSources:     make(map[string]map[string]oauth2.TokenSource),
 	}
 
 	// Apply options to mutate ec
@@ -110,6 +113,7 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec, options ...EnvironmentSpecExtO
 			return nil, err
 		}
 
+		ec.opTokenSources[api.ID] = make(map[string]oauth2.TokenSource)
 		switch v := api.TargetAuthentication.OAuthProvider.(type) {
 		case GoogleOAuth:
 			if ec.iamsvc == nil {
@@ -121,13 +125,13 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec, options ...EnvironmentSpecExtO
 				if err != nil {
 					return nil, err
 				}
-				api.TargetAuthentication.TokenSource = ts
+				ec.apiTokenSources[api.ID] = ts
 			case IdentityTokenInfo:
 				ts, err := ec.iamsvc.IdentityTokenSource(v.ServiceAccountEmail, ti.Audience, ti.IncludeEmail, api.TargetAuthentication.RefreshInterval)
 				if err != nil {
 					return nil, err
 				}
-				api.TargetAuthentication.TokenSource = ts
+				ec.apiTokenSources[api.ID] = ts
 			}
 		}
 
@@ -181,13 +185,13 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec, options ...EnvironmentSpecExtO
 					if err != nil {
 						return nil, err
 					}
-					op.TargetAuthentication.TokenSource = ts
+					ec.opTokenSources[api.ID][op.Name] = ts
 				case IdentityTokenInfo:
 					ts, err := ec.iamsvc.IdentityTokenSource(v.ServiceAccountEmail, ti.Audience, ti.IncludeEmail, op.TargetAuthentication.RefreshInterval)
 					if err != nil {
 						return nil, err
 					}
-					op.TargetAuthentication.TokenSource = ts
+					ec.opTokenSources[api.ID][op.Name] = ts
 				}
 			}
 		}
@@ -221,6 +225,8 @@ type EnvironmentSpecExt struct {
 	corsAllowedOrigins map[string]map[string]bool     // api ID -> statically allowed origin -> true
 	compiledRegExps    map[string]*regexp.Regexp      // uncompiled -> compiled
 	iamsvc             *iam.IAMService
+	apiTokenSources    map[string]oauth2.TokenSource            // api ID -> token source
+	opTokenSources     map[string]map[string]oauth2.TokenSource // api ID -> op Name -> token source
 }
 
 // JWTAuthentications returns a list of all JWTAuthentications for the Spec
