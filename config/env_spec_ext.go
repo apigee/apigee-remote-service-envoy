@@ -116,7 +116,7 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
 			// child of the API.
 
 			if isGRPC {
-				split := []string{api.ID, "POST", "", op.Name}
+				split := []string{api.ID, "POST", op.Name}
 				opMatch := OpTemplateMatch{&op, nil}
 				ec.opPathTree.AddChild(split, 0, &opMatch)
 			}

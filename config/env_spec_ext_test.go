@@ -18,8 +18,8 @@
 package config
 
 import (
-	"testing"
 	"strings"
+	"testing"
 )
 
 func TestNewEnvironmentSpecExt(t *testing.T) {
@@ -49,9 +49,19 @@ func TestNewEnvironmentSpecExt(t *testing.T) {
 	if result, _ := specExt.apiPathTree.FindPrefix(gRPCPrefix, 0); result == nil {
 		t.Errorf("gRPC prefix for grpcapispec not found in apiPathTree")
 	}
-	
+
 	if specExt.opPathTree == nil {
 		t.Errorf("must not be nil")
+	}
+
+	httpSplit := strings.Split("/petstore", "/")
+	if result, _ := specExt.opPathTree.FindPrefix(append([]string{"apispec1", "GET"}, httpSplit...), 0); result == nil {
+		t.Errorf("HTTP op for op-1 not found in opPathTree")
+	}
+
+	grpcSplit := strings.Split("/ListPets", "/")
+	if result, _ := specExt.opPathTree.FindPrefix(append([]string{"grpcapispec", "POST"}, grpcSplit...), 0); result == nil {
+		t.Errorf("gRPC op for ListPets not found in opPathTree")
 	}
 
 	if len(specExt.compiledTemplates) != 10 {
