@@ -56,8 +56,8 @@ const (
 	QueryNamespace             = "query"
 	PathNamespace              = "path"
 	HeaderNamespace            = "headers"
-	RequestPath                = "path"
-	OriginalPath               = "original_path"
+	OperationPath              = "operation_path"
+	FullRequestPath            = "full_request_path"
 	RequestQuerystring         = "querystring"
 )
 
@@ -158,8 +158,8 @@ func (e *EnvironmentSpecRequest) parseRequestVariables(pathTemplate *transform.T
 		query:   map[string]string{},
 	}
 
-	vars.request[RequestPath] = opPath
-	vars.request[OriginalPath] = originalPath
+	vars.request[OperationPath] = opPath
+	vars.request[FullRequestPath] = originalPath
 	vars.request[RequestQuerystring] = queryString
 
 	if queryString != "" {
@@ -261,7 +261,7 @@ func (e *EnvironmentSpecRequest) isGRPCRequest() bool {
 // GetTargetRequestPath returns the path for the request that should be sent to the target.
 func (e *EnvironmentSpecRequest) GetTargetRequestPath() string {
 	if e.isGRPCRequest() {
-		return e.variables.request[OriginalPath]
+		return e.variables.request[FullRequestPath]
 	}
 	return e.GetOperationPath()
 }
@@ -271,7 +271,7 @@ func (e *EnvironmentSpecRequest) GetOperationPath() string {
 	if e.GetOperation() == nil {
 		return ""
 	}
-	return e.variables.request[RequestPath]
+	return e.variables.request[OperationPath]
 }
 
 // GetOperation uses HttpMatch to return an APIOperation
