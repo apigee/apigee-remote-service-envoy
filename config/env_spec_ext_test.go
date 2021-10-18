@@ -18,6 +18,7 @@
 package config
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/apigee/apigee-remote-service-envoy/v2/testutil"
@@ -30,16 +31,38 @@ func TestNewEnvironmentSpecExt(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 
-	if l := len(specExt.JWTAuthentications()); l != 8 {
-		t.Errorf("should be 8 JWTAuthentications, got %d", l)
+	if l := len(specExt.JWTAuthentications()); l != 9 {
+		t.Errorf("should be 9 JWTAuthentications, got %d", l)
 	}
 
 	if specExt.apiPathTree == nil {
 		t.Errorf("must not be nil")
 	}
 
+	httpPrefix := strings.Split("/v1", "/")
+	httpPrefix = append([]string{"/"}, httpPrefix...)
+	if result, _ := specExt.apiPathTree.FindPrefix(httpPrefix, 0); result == nil {
+		t.Errorf("gRPC prefix for apispec1 not found in apiPathTree")
+	}
+
+	gRPCPrefix := strings.Split("/foo.petstore.PetstoreService", "/")
+	gRPCPrefix = append([]string{"/"}, gRPCPrefix...)
+	if result, _ := specExt.apiPathTree.FindPrefix(gRPCPrefix, 0); result == nil {
+		t.Errorf("gRPC prefix for grpcapispec not found in apiPathTree")
+	}
+
 	if specExt.opPathTree == nil {
 		t.Errorf("must not be nil")
+	}
+
+	httpSplit := strings.Split("/petstore", "/")
+	if result, _ := specExt.opPathTree.FindPrefix(append([]string{"apispec1", "GET"}, httpSplit...), 0); result == nil {
+		t.Errorf("HTTP op for op-1 not found in opPathTree")
+	}
+
+	grpcSplit := strings.Split("/ListPets", "/")
+	if result, _ := specExt.opPathTree.FindPrefix(append([]string{"grpcapispec", "POST"}, grpcSplit...), 0); result == nil {
+		t.Errorf("gRPC op for ListPets not found in opPathTree")
 	}
 
 	if len(specExt.compiledTemplates) != 10 {
