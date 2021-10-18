@@ -26,10 +26,10 @@ import (
 
 const wildcard = "*"
 
-func splitAndAddToPathTree(tree path.Tree, path string, api APISpec) {
+func splitAndAddToPathTree(tree path.Tree, path string, api *APISpec) {
 	split := strings.Split(path, "/")
 	split = append([]string{"/"}, split...)
-	tree.AddChild(split, 0, &api)
+	tree.AddChild(split, 0, api)
 }
 
 // NewEnvironmentSpecExt creates an EnvironmentSpecExt
@@ -49,13 +49,13 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
 
 		// Add basepath to apiPathTree.
 		if api.BasePath != "" || api.GrpcService == "" {
-			splitAndAddToPathTree(ec.apiPathTree, api.BasePath, api)
+			splitAndAddToPathTree(ec.apiPathTree, api.BasePath, &api)
 		}
 
 		// Add gRPC service to apiPathTree as well, so that a path that comes in
 		// with the gRPC service name as the first component will match the same API.
 		if api.GrpcService != "" {
-			splitAndAddToPathTree(ec.apiPathTree, api.GrpcService, api)
+			splitAndAddToPathTree(ec.apiPathTree, api.GrpcService, &api)
 		}
 
 		var mustVary = false
