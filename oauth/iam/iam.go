@@ -22,6 +22,7 @@ import (
 
 	"github.com/apigee/apigee-remote-service-golib/v2/log"
 	"golang.org/x/oauth2"
+	"golang.org/x/sync/singleflight"
 	iamv1 "google.golang.org/api/iamcredentials/v1"
 	"google.golang.org/api/option"
 )
@@ -46,8 +47,9 @@ type AccessTokenSource struct {
 	saName string
 	scopes []string
 
-	token *oauth2.Token
-	mu    sync.Mutex
+	token      *oauth2.Token
+	mu         sync.Mutex
+	herdBuster singleflight.Group
 }
 
 // IdentityTokenSource defines an ID token source.
@@ -58,8 +60,9 @@ type IdentityTokenSource struct {
 	audience     string
 	includeEmail bool
 
-	token *oauth2.Token
-	mu    sync.Mutex
+	token      *oauth2.Token
+	mu         sync.Mutex
+	herdBuster singleflight.Group
 }
 
 // NewIAMService creates a new IAM service with given list of client options.
@@ -103,7 +106,7 @@ func (s *IAMService) AccessTokenSource(saEmail string, scopes []string, refreshI
 		for {
 			select {
 			case <-tick.C:
-				if err := ats.refresh(); err != nil {
+				if err := ats.singleRefresh(); err != nil {
 					log.Errorf("%v", err)
 				}
 			case <-s.ctx.Done():
@@ -113,7 +116,7 @@ func (s *IAMService) AccessTokenSource(saEmail string, scopes []string, refreshI
 		}
 	}()
 
-	if err := ats.refresh(); err != nil {
+	if err := ats.singleRefresh(); err != nil {
 		log.Errorf("%v", err)
 	}
 	return ats, nil
@@ -142,7 +145,7 @@ func (s *IAMService) IdentityTokenSource(saEmail, audience string, includeEmail 
 		for {
 			select {
 			case <-tick.C:
-				if err := its.refresh(); err != nil {
+				if err := its.singleRefresh(); err != nil {
 					log.Errorf("%v", err)
 				}
 			case <-s.ctx.Done():
@@ -152,7 +155,7 @@ func (s *IAMService) IdentityTokenSource(saEmail, audience string, includeEmail 
 		}
 	}()
 
-	if err := its.refresh(); err != nil {
+	if err := its.singleRefresh(); err != nil {
 		log.Errorf("%v", err)
 	}
 	return its, nil
@@ -161,7 +164,7 @@ func (s *IAMService) IdentityTokenSource(saEmail, audience string, includeEmail 
 // Token returns the access token from the source.
 func (ats *AccessTokenSource) Token() (*oauth2.Token, error) {
 	if !ats.token.Valid() {
-		if err := ats.refresh(); err != nil {
+		if err := ats.singleRefresh(); err != nil {
 			return nil, err
 		}
 	}
@@ -174,31 +177,42 @@ func (ats *AccessTokenSource) Token() (*oauth2.Token, error) {
 	}, nil
 }
 
-func (ats *AccessTokenSource) refresh() error {
+func (ats *AccessTokenSource) singleRefresh() error {
+	// Empty key because there is only one token source per instance.
+	res, err, _ := ats.herdBuster.Do("", func() (interface{}, error) {
+		return ats.refresh()
+	})
+	if err != nil {
+		return err
+	}
+	ats.mu.Lock()
+	defer ats.mu.Unlock()
+	ats.token = res.(*oauth2.Token)
+	return nil
+}
+
+func (ats *AccessTokenSource) refresh() (*oauth2.Token, error) {
 	req := &iamv1.GenerateAccessTokenRequest{
 		Scope: ats.scopes,
 	}
 	resp, err := ats.iamsvc.Projects.ServiceAccounts.GenerateAccessToken(ats.saName, req).Do()
 	if err != nil {
-		return fmt.Errorf("failed to fetch access token for %q: %v", ats.saName, err)
+		return nil, fmt.Errorf("failed to fetch access token for %q: %v", ats.saName, err)
 	}
 	t, err := time.Parse(time.RFC3339, resp.ExpireTime)
 	if err != nil {
-		return fmt.Errorf("failed to parse access token expire time for %q: %v", ats.saName, err)
+		return nil, fmt.Errorf("failed to parse access token expire time for %q: %v", ats.saName, err)
 	}
-	ats.mu.Lock()
-	defer ats.mu.Unlock()
-	ats.token = &oauth2.Token{
+	return &oauth2.Token{
 		AccessToken: resp.AccessToken,
 		Expiry:      t,
-	}
-	return nil
+	}, nil
 }
 
 // Token returns the ID token from the source.
 func (its *IdentityTokenSource) Token() (*oauth2.Token, error) {
 	if !its.token.Valid() {
-		if err := its.refresh(); err != nil {
+		if err := its.singleRefresh(); err != nil {
 			return nil, err
 		}
 	}
@@ -211,21 +225,32 @@ func (its *IdentityTokenSource) Token() (*oauth2.Token, error) {
 	}, nil
 }
 
-func (its *IdentityTokenSource) refresh() error {
+func (its *IdentityTokenSource) singleRefresh() error {
+	// Empty key because there is only one token source per instance.
+	res, err, _ := its.herdBuster.Do("", func() (interface{}, error) {
+		return its.refresh()
+	})
+	if err != nil {
+		return err
+	}
+	its.mu.Lock()
+	defer its.mu.Unlock()
+	its.token = res.(*oauth2.Token)
+	return nil
+}
+
+func (its *IdentityTokenSource) refresh() (*oauth2.Token, error) {
 	req := &iamv1.GenerateIdTokenRequest{
 		Audience:     its.audience,
 		IncludeEmail: its.includeEmail,
 	}
 	resp, err := its.iamsvc.Projects.ServiceAccounts.GenerateIdToken(its.saName, req).Do()
 	if err != nil {
-		return fmt.Errorf("failed to fetch ID token for %q: %v", its.saName, err)
+		return nil, fmt.Errorf("failed to fetch ID token for %q: %v", its.saName, err)
 	}
-	its.mu.Lock()
-	defer its.mu.Unlock()
-	its.token = &oauth2.Token{
+	return &oauth2.Token{
 		AccessToken: resp.Token,
 		// ID token expires in one hour by default. Add 5 mins skew.
 		Expiry: time.Now().Add(55 * time.Minute),
-	}
-	return nil
+	}, nil
 }
