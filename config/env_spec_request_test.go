@@ -685,7 +685,6 @@ func TestVariables(t *testing.T) {
 
 	wantRequestVars := map[string]string{
 		RequestPath:        opPath,
-		OriginalPath:       reqPath,
 		RequestQuerystring: reqQueryString,
 	}
 	if diff := cmp.Diff(wantRequestVars, vars.request); diff != "" {

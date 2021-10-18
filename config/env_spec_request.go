@@ -57,7 +57,6 @@ const (
 	PathNamespace              = "path"
 	HeaderNamespace            = "headers"
 	RequestPath                = "path"
-	OriginalPath               = "original_path"
 	RequestQuerystring         = "querystring"
 )
 
@@ -83,6 +82,7 @@ func NewEnvironmentSpecRequest(authMan auth.Manager, e *EnvironmentSpecExt, req 
 type EnvironmentSpecRequest struct {
 	*EnvironmentSpecExt
 	Request               *authv3.CheckRequest
+	originalRequestPath   string
 	authMan               auth.Manager
 	jwtResults            map[string]*jwtResult // JWTAuthentication.Name ->
 	apiSpec               *APISpec
@@ -102,6 +102,8 @@ func (e *EnvironmentSpecRequest) parseRequest() {
 		}
 		return path, queryString
 	}()
+	// Save the original path, pre-basepath removal, in case we need it (e.g., for gRPC requests).
+	e.originalRequestPath = path
 
 	// find API
 	pathSegments := strings.Split(path, "/")
@@ -139,7 +141,7 @@ func (e *EnvironmentSpecRequest) parseRequest() {
 			pathTemplate = match.template
 		}
 	}
-	e.variables = e.parseRequestVariables(pathTemplate, path, opPath, queryString)
+	e.variables = e.parseRequestVariables(pathTemplate, opPath, queryString)
 }
 
 type jwtClaims map[string]interface{}
@@ -149,7 +151,7 @@ type jwtResult struct {
 	err    error
 }
 
-func (e *EnvironmentSpecRequest) parseRequestVariables(pathTemplate *transform.Template, originalPath, opPath, queryString string) *requestVariables {
+func (e *EnvironmentSpecRequest) parseRequestVariables(pathTemplate *transform.Template, opPath, queryString string) *requestVariables {
 
 	vars := &requestVariables{
 		path:    pathTemplate.Extract(opPath),
@@ -159,7 +161,6 @@ func (e *EnvironmentSpecRequest) parseRequestVariables(pathTemplate *transform.T
 	}
 
 	vars.request[RequestPath] = opPath
-	vars.request[OriginalPath] = originalPath
 	vars.request[RequestQuerystring] = queryString
 
 	if queryString != "" {
@@ -261,7 +262,7 @@ func (e *EnvironmentSpecRequest) isGRPCRequest() bool {
 // GetTargetRequestPath returns the path for the request that should be sent to the target.
 func (e *EnvironmentSpecRequest) GetTargetRequestPath() string {
 	if e.isGRPCRequest() {
-		return e.variables.request[OriginalPath]
+		return e.originalRequestPath
 	}
 	return e.GetOperationPath()
 }
