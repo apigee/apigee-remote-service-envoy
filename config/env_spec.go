@@ -660,7 +660,7 @@ func (t TargetAuthentication) MarshalYAML() (interface{}, error) {
 }
 
 type OAuthProvider interface {
-	oauthProvder()
+	oauthProvider()
 }
 
 type GoogleOAuth struct {
@@ -671,7 +671,7 @@ type GoogleOAuth struct {
 	TokenInfo TokenInfo `yaml:"-" mapstructure:"-"`
 }
 
-func (g GoogleOAuth) oauthProvder() {}
+func (g GoogleOAuth) oauthProvider() {}
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface
 func (g *GoogleOAuth) UnmarshalYAML(node *yaml.Node) error {

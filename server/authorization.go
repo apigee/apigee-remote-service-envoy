@@ -568,8 +568,13 @@ func (a *AuthorizationServer) createConditionalEnvoyDenied(
 	}
 
 	if authContext != nil && a.handler.allowUnauthorized {
+		targetAuth, err := envRequest.TargetAuth()
+		if err != nil {
+			log.Errorf("failed to generate target auth token: %v", err)
+			return a.createEnvoyDenied(req, envRequest, tracker, authContext, api, rpc.PERMISSION_DENIED, typev3.StatusCode_Forbidden)
+		}
 		log.Debugf("sending ok (actual: %s)", code.String())
-		return a.createEnvoyForwarded(req, tracker, authContext, api, envRequest, "TODO")
+		return a.createEnvoyForwarded(req, tracker, authContext, api, envRequest, targetAuth)
 	}
 
 	return a.createEnvoyDenied(req, envRequest, tracker, authContext, api, code, statusCode)

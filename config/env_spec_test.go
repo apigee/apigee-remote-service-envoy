@@ -1005,7 +1005,7 @@ func TestParamMatchTypes(t *testing.T) {
 
 func TestOAuthProviderTypes(t *testing.T) {
 	g := GoogleOAuth{}
-	g.oauthProvder()
+	g.oauthProvider()
 }
 
 func TestTokenInfoTypes(t *testing.T) {
