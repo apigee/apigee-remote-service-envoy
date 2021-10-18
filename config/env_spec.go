@@ -31,6 +31,22 @@ const anyMethod = ""
 var allMethods = map[string]interface{}{"GET": nil, "POST": nil, "PUT": nil,
 	"PATCH": nil, "DELETE": nil, "HEAD": nil, "OPTIONS": nil, "CONNECT": nil, "TRACE": nil}
 
+// Validate HTTP Request Transforms.
+//   * If GrpcService is specified on the API
+func validateHttpRequestTransforms(api *APISpec, t HTTPRequestTransforms) error {
+	if api.GrpcService == "" {
+		return nil
+	}
+
+	if len(t.QueryTransforms.Add) > 0 || len(t.QueryTransforms.Remove) > 0 {
+		return fmt.Errorf("cannot use HTTP Query transforms with GRPC services.")
+	}
+	if t.PathTransform != "" {
+		return fmt.Errorf("cannot use HTTP Path transform with GRPC services.")
+	}
+	return nil
+}
+
 // ValidateEnvironmentSpecs checks if there are
 //   * environment configs with the same ID,
 //   * API configs under the same environment config with the same ID,
@@ -72,6 +88,10 @@ func ValidateEnvironmentSpecs(ess []EnvironmentSpec) error {
 				}
 				gRPCServiceSet[api.GrpcService] = true
 			}
+			if err := validateHttpRequestTransforms(api, api.HTTPRequestTransforms); err != nil {
+				return fmt.Errorf("API %q: error validating HttpRequestTransforms: %w", api.ID, err)
+			}
+
 			api.jwtAuthentications = make(map[string]*JWTAuthentication)
 			if err := validateJWTAuthenticationName(&api.Authentication, api.jwtAuthentications); err != nil {
 				return err
@@ -95,6 +115,10 @@ func ValidateEnvironmentSpecs(ess []EnvironmentSpec) error {
 				if err := validateJWTAuthenticationName(&op.Authentication, op.jwtAuthentications); err != nil {
 					return err
 				}
+				if err := validateHttpRequestTransforms(api, op.HTTPRequestTransforms); err != nil {
+					return fmt.Errorf("API %q, Operation %q: error validating HttpRequestTransforms: %w", api.ID, op.Name, err)
+				}
+
 				for _, p := range op.ConsumerAuthorization.In {
 					if err := validateAPIOperationParameter(&p, op.jwtAuthentications, api.jwtAuthentications); err != nil {
 						return err

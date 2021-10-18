@@ -142,6 +142,87 @@ func TestValidateEnvironmentSpecs(t *testing.T) {
 			wantErr: `API spec grpc_service must be unique within each environment, found multiple APIs for "echo.EchoService"`,
 		},
 		{
+			desc: "gRPC services with path transforms (not allowed)",
+			configs: []EnvironmentSpec{
+				{
+					ID: "spec",
+					APIs: []APISpec{
+						{
+							ID:          "api-1",
+							GrpcService: "echo.EchoService",
+							HTTPRequestTransforms: HTTPRequestTransforms{
+								HeaderTransforms: NameValueTransforms{
+									Add: []AddNameValue{
+										{Name: "x-apigee-target", Value: "target"},
+									},
+								},
+								PathTransform: "/target_prefix/{path}",
+							},
+						},
+					},
+				},
+			},
+			hasErr:  true,
+			wantErr: `API "api-1": error validating HttpRequestTransforms: cannot use HTTP Path transform with GRPC services.`,
+		},
+		{
+			desc: "gRPC services with query transforms (not allowed)",
+			configs: []EnvironmentSpec{
+				{
+					ID: "spec",
+					APIs: []APISpec{
+						{
+							ID:          "api-1",
+							GrpcService: "echo.EchoService",
+							HTTPRequestTransforms: HTTPRequestTransforms{
+								QueryTransforms: NameValueTransforms{
+									Add: []AddNameValue{
+										{
+											Name:  "param_a",
+											Value: "value_a",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			hasErr:  true,
+			wantErr: `API "api-1": error validating HttpRequestTransforms: cannot use HTTP Query transforms with GRPC services.`,
+		},
+		{
+			desc: "gRPC service with invalid transform on Operation",
+			configs: []EnvironmentSpec{
+				{
+					ID: "spec",
+					APIs: []APISpec{
+						{
+							ID:          "api-1",
+							GrpcService: "echo.EchoService",
+							Operations: []APIOperation{
+								{
+									Name: "operation1",
+									HTTPRequestTransforms: HTTPRequestTransforms{
+										QueryTransforms: NameValueTransforms{
+											Add: []AddNameValue{
+												{
+													Name:  "param_a",
+													Value: "value_a",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			hasErr:  true,
+			wantErr: `API "api-1", Operation "operation1": error validating HttpRequestTransforms: cannot use HTTP Query transforms with GRPC services.`,
+		},
+		{
 			desc: "empty operation name",
 			configs: []EnvironmentSpec{
 				{
