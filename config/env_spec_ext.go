@@ -26,6 +26,12 @@ import (
 
 const wildcard = "*"
 
+func splitAndAddToPathTree(tree path.Tree, path string, api *APISpec) {
+	split := strings.Split(path, "/")
+	split = append([]string{"/"}, split...)
+	tree.AddChild(split, 0, api)
+}
+
 // NewEnvironmentSpecExt creates an EnvironmentSpecExt
 func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
 	ec := &EnvironmentSpecExt{
@@ -41,9 +47,16 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
 	for i := range spec.APIs {
 		api := spec.APIs[i]
 
-		split := strings.Split(api.BasePath, "/")
-		split = append([]string{"/"}, split...)
-		ec.apiPathTree.AddChild(split, 0, &api)
+		// Add basepath to apiPathTree.
+		if api.BasePath != "" || api.GrpcService == "" {
+			splitAndAddToPathTree(ec.apiPathTree, api.BasePath, &api)
+		}
+
+		// Add gRPC service to apiPathTree as well, so that a path that comes in
+		// with the gRPC service name as the first component will match the same API.
+		if api.GrpcService != "" {
+			splitAndAddToPathTree(ec.apiPathTree, api.GrpcService, &api)
+		}
 
 		var mustVary = false
 		allowedOrigins := make(map[string]bool, len(api.Cors.AllowOrigins))
@@ -96,15 +109,25 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
 		}
 
 		for i := range api.Operations {
+			isGRPC := api.GrpcService != ""
 			op := api.Operations[i]
 
-			if len(op.HTTPMatches) == 0 { // empty is wildcard
-				split = []string{api.ID, wildcard, wildcard}
+			// For gRPC APIs, always interpret the op Name as a gRPC method, so add it as a
+			// child of the API.
+
+			if isGRPC {
+				split := []string{api.ID, "POST", op.Name}
 				opMatch := OpTemplateMatch{&op, nil}
 				ec.opPathTree.AddChild(split, 0, &opMatch)
-			} else {
+			}
+
+			if !isGRPC && len(op.HTTPMatches) == 0 { // empty is wildcard
+				split := []string{api.ID, wildcard, wildcard}
+				opMatch := OpTemplateMatch{&op, nil}
+				ec.opPathTree.AddChild(split, 0, &opMatch)
+			} else if len(op.HTTPMatches) > 0 {
 				for _, m := range op.HTTPMatches {
-					split = strings.Split(m.PathTemplate, "/")
+					split := strings.Split(m.PathTemplate, "/")
 					method := m.Method
 					if method == anyMethod {
 						method = wildcard

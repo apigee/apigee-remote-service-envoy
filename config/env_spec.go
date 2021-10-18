@@ -31,11 +31,28 @@ const anyMethod = ""
 var allMethods = map[string]interface{}{"GET": nil, "POST": nil, "PUT": nil,
 	"PATCH": nil, "DELETE": nil, "HEAD": nil, "OPTIONS": nil, "CONNECT": nil, "TRACE": nil}
 
+// Validate HTTP Request Transforms.
+//   * If GrpcService is specified on the API
+func validateHttpRequestTransforms(api *APISpec, t HTTPRequestTransforms) error {
+	if api.GrpcService == "" {
+		return nil
+	}
+
+	if len(t.QueryTransforms.Add) > 0 || len(t.QueryTransforms.Remove) > 0 {
+		return fmt.Errorf("cannot use HTTP Query transforms with GRPC services.")
+	}
+	if t.PathTransform != "" {
+		return fmt.Errorf("cannot use HTTP Path transform with GRPC services.")
+	}
+	return nil
+}
+
 // ValidateEnvironmentSpecs checks if there are
 //   * environment configs with the same ID,
 //   * API configs under the same environment config with the same ID,
 //   * JWT authentication requirement under the same API or operation with the same name
 // and report them as errors.
+//   * missing basepaths (unless GrpcService is set, in which case that is allowed)
 // jwtAuthentications of each API and Operation will be populated upon successful
 func ValidateEnvironmentSpecs(ess []EnvironmentSpec) error {
 	configIDSet := make(map[string]bool)
@@ -49,15 +66,32 @@ func ValidateEnvironmentSpecs(ess []EnvironmentSpec) error {
 		}
 		configIDSet[es.ID] = true
 		basePathsSet := make(map[string]bool)
+		gRPCServiceSet := make(map[string]bool)
 		for j := range es.APIs {
 			api := &es.APIs[j]
 			if api.ID == "" {
 				return fmt.Errorf("API spec IDs must be non-empty")
 			}
-			if basePathsSet[api.BasePath] {
-				return fmt.Errorf("API spec basepaths within each environment spec must be unique, got multiple %s", api.BasePath)
+			// if GrpcService is not set, then BasePath must be.
+			if api.GrpcService == "" && api.BasePath == "" {
+				return fmt.Errorf("API %q does not have a BasePath set. BasePath is required unless GrpcService is specified.", api.ID)
 			}
-			basePathsSet[api.BasePath] = true
+			if api.BasePath != "" {
+				if basePathsSet[api.BasePath] {
+					return fmt.Errorf("API spec basepaths within each environment spec must be unique, got multiple %s", api.BasePath)
+				}
+				basePathsSet[api.BasePath] = true
+			}
+			if api.GrpcService != "" {
+				if gRPCServiceSet[api.GrpcService] {
+					return fmt.Errorf("API spec grpc_service must be unique within each environment, found multiple APIs for %q", api.GrpcService)
+				}
+				gRPCServiceSet[api.GrpcService] = true
+			}
+			if err := validateHttpRequestTransforms(api, api.HTTPRequestTransforms); err != nil {
+				return fmt.Errorf("API %q: error validating HttpRequestTransforms: %w", api.ID, err)
+			}
+
 			api.jwtAuthentications = make(map[string]*JWTAuthentication)
 			if err := validateJWTAuthenticationName(&api.Authentication, api.jwtAuthentications); err != nil {
 				return err
@@ -81,6 +115,10 @@ func ValidateEnvironmentSpecs(ess []EnvironmentSpec) error {
 				if err := validateJWTAuthenticationName(&op.Authentication, op.jwtAuthentications); err != nil {
 					return err
 				}
+				if err := validateHttpRequestTransforms(api, op.HTTPRequestTransforms); err != nil {
+					return fmt.Errorf("API %q, Operation %q: error validating HttpRequestTransforms: %w", api.ID, op.Name, err)
+				}
+
 				for _, p := range op.ConsumerAuthorization.In {
 					if err := validateAPIOperationParameter(&p, op.jwtAuthentications, api.jwtAuthentications); err != nil {
 						return err
@@ -186,6 +224,9 @@ type EnvironmentSpec struct {
 type APISpec struct {
 	// ID of the API, used to match the api_source of API Product Operations.
 	ID string `yaml:"id" mapstructure:"id"`
+
+	// Name of the gRPC service provided by this API. Used to map native gRPC method calls.
+	GrpcService string `yaml:"grpc_service,omitempty" mapstructure:"grpc_service,omitempty"`
 
 	// Base path for this API.
 	BasePath string `yaml:"base_path,omitempty" mapstructure:"base_path,omitempty"`

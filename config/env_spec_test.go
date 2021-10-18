@@ -39,11 +39,12 @@ func TestValidateEnvironmentSpecs(t *testing.T) {
 			configs: []EnvironmentSpec{createGoodEnvSpec()},
 		},
 		{
-			desc: "good environment specs",
+			desc: "ConsumerAuthorization in JWT claim",
 			configs: []EnvironmentSpec{{
 				ID: "spec",
 				APIs: []APISpec{{
-					ID: "api",
+					ID:       "api",
+					BasePath: "/",
 					Authentication: AuthenticationRequirement{
 						Requirements: JWTAuthentication{Name: "oidc"},
 					},
@@ -86,6 +87,21 @@ func TestValidateEnvironmentSpecs(t *testing.T) {
 			wantErr: "API spec IDs must be non-empty",
 		},
 		{
+			desc: "BasePath is empty for non-GRPC API",
+			configs: []EnvironmentSpec{
+				{
+					ID: "spec",
+					APIs: []APISpec{
+						{
+							ID: "not-grpc",
+						},
+					},
+				},
+			},
+			hasErr:  true,
+			wantErr: `API "not-grpc" does not have a BasePath set. BasePath is required unless GrpcService is specified.`,
+		},
+		{
 			desc: "duplicate API basepaths",
 			configs: []EnvironmentSpec{
 				{
@@ -106,11 +122,112 @@ func TestValidateEnvironmentSpecs(t *testing.T) {
 			wantErr: "API spec basepaths within each environment spec must be unique, got multiple /v1",
 		},
 		{
+			desc: "duplicate gRPC services",
+			configs: []EnvironmentSpec{
+				{
+					ID: "spec",
+					APIs: []APISpec{
+						{
+							ID:          "api-1",
+							GrpcService: "echo.EchoService",
+						},
+						{
+							ID:          "api-2",
+							GrpcService: "echo.EchoService",
+						},
+					},
+				},
+			},
+			hasErr:  true,
+			wantErr: `API spec grpc_service must be unique within each environment, found multiple APIs for "echo.EchoService"`,
+		},
+		{
+			desc: "gRPC services with path transforms (not allowed)",
+			configs: []EnvironmentSpec{
+				{
+					ID: "spec",
+					APIs: []APISpec{
+						{
+							ID:          "api-1",
+							GrpcService: "echo.EchoService",
+							HTTPRequestTransforms: HTTPRequestTransforms{
+								HeaderTransforms: NameValueTransforms{
+									Add: []AddNameValue{
+										{Name: "x-apigee-target", Value: "target"},
+									},
+								},
+								PathTransform: "/target_prefix/{path}",
+							},
+						},
+					},
+				},
+			},
+			hasErr:  true,
+			wantErr: `API "api-1": error validating HttpRequestTransforms: cannot use HTTP Path transform with GRPC services.`,
+		},
+		{
+			desc: "gRPC services with query transforms (not allowed)",
+			configs: []EnvironmentSpec{
+				{
+					ID: "spec",
+					APIs: []APISpec{
+						{
+							ID:          "api-1",
+							GrpcService: "echo.EchoService",
+							HTTPRequestTransforms: HTTPRequestTransforms{
+								QueryTransforms: NameValueTransforms{
+									Add: []AddNameValue{
+										{
+											Name:  "param_a",
+											Value: "value_a",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			hasErr:  true,
+			wantErr: `API "api-1": error validating HttpRequestTransforms: cannot use HTTP Query transforms with GRPC services.`,
+		},
+		{
+			desc: "gRPC service with invalid transform on Operation",
+			configs: []EnvironmentSpec{
+				{
+					ID: "spec",
+					APIs: []APISpec{
+						{
+							ID:          "api-1",
+							GrpcService: "echo.EchoService",
+							Operations: []APIOperation{
+								{
+									Name: "operation1",
+									HTTPRequestTransforms: HTTPRequestTransforms{
+										QueryTransforms: NameValueTransforms{
+											Add: []AddNameValue{
+												{
+													Name:  "param_a",
+													Value: "value_a",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			hasErr:  true,
+			wantErr: `API "api-1", Operation "operation1": error validating HttpRequestTransforms: cannot use HTTP Query transforms with GRPC services.`,
+		},
+		{
 			desc: "empty operation name",
 			configs: []EnvironmentSpec{
 				{
 					ID:   "spec",
-					APIs: []APISpec{{ID: "api", Operations: []APIOperation{{}}}},
+					APIs: []APISpec{{ID: "api", BasePath: "/", Operations: []APIOperation{{}}}},
 				},
 			},
 			hasErr:  true,
@@ -123,7 +240,8 @@ func TestValidateEnvironmentSpecs(t *testing.T) {
 					ID: "spec",
 					APIs: []APISpec{
 						{
-							ID: "api",
+							ID:       "api",
+							BasePath: "/",
 							Operations: []APIOperation{
 								{
 									Name: "duplicate-op",
@@ -144,10 +262,16 @@ func TestValidateEnvironmentSpecs(t *testing.T) {
 			configs: []EnvironmentSpec{
 				{
 					ID: "spec",
-					APIs: []APISpec{{ID: "api", Operations: []APIOperation{{
-						Name:        "op",
-						HTTPMatches: []HTTPMatch{{Method: "foo"}},
-					}}}},
+					APIs: []APISpec{{
+						ID:       "api",
+						BasePath: "/",
+						Operations: []APIOperation{
+							{
+								Name:        "op",
+								HTTPMatches: []HTTPMatch{{Method: "foo"}},
+							},
+						},
+					}},
 				},
 			},
 			hasErr:  true,
@@ -160,7 +284,8 @@ func TestValidateEnvironmentSpecs(t *testing.T) {
 					ID: "spec",
 					APIs: []APISpec{
 						{
-							ID: "api",
+							ID:       "api",
+							BasePath: "/",
 							Authentication: AuthenticationRequirement{
 								Requirements: AllAuthenticationRequirements([]AuthenticationRequirement{
 									{
@@ -189,7 +314,8 @@ func TestValidateEnvironmentSpecs(t *testing.T) {
 					ID: "spec",
 					APIs: []APISpec{
 						{
-							ID: "api",
+							ID:       "api",
+							BasePath: "/",
 							Authentication: AuthenticationRequirement{
 								Requirements: AllAuthenticationRequirements([]AuthenticationRequirement{
 									{
@@ -211,7 +337,8 @@ func TestValidateEnvironmentSpecs(t *testing.T) {
 					ID: "spec",
 					APIs: []APISpec{
 						{
-							ID: "api",
+							ID:       "api",
+							BasePath: "/",
 							ConsumerAuthorization: ConsumerAuthorization{
 								In: []APIOperationParameter{
 									{
@@ -233,7 +360,8 @@ func TestValidateEnvironmentSpecs(t *testing.T) {
 					ID: "spec",
 					APIs: []APISpec{
 						{
-							ID: "api",
+							ID:       "api",
+							BasePath: "/",
 							Authentication: AuthenticationRequirement{
 								Requirements: AllAuthenticationRequirements([]AuthenticationRequirement{
 									{
@@ -262,7 +390,8 @@ func TestValidateEnvironmentSpecs(t *testing.T) {
 					ID: "spec",
 					APIs: []APISpec{
 						{
-							ID: "api",
+							ID:       "api",
+							BasePath: "/",
 							Operations: []APIOperation{
 								{
 									Name: "op",
@@ -289,7 +418,8 @@ func TestValidateEnvironmentSpecs(t *testing.T) {
 					ID: "spec",
 					APIs: []APISpec{
 						{
-							ID: "api",
+							ID:       "api",
+							BasePath: "/",
 							Operations: []APIOperation{
 								{
 									Name: "op",
@@ -319,7 +449,7 @@ func TestValidateEnvironmentSpecs(t *testing.T) {
 			if err := ValidateEnvironmentSpecs(test.configs); (err != nil) != test.hasErr {
 				t.Errorf("c.ValidateEnvironmentSpecs() returns no error, should have got error")
 			} else if test.wantErr != "" && test.wantErr != err.Error() {
-				t.Errorf("c.ValidateEnvironmentSpecs() returns error %v, want %s", err, test.wantErr)
+				t.Errorf("c.ValidateEnvironmentSpecs() unexpected error (got: %v, want: %q)", err, test.wantErr)
 			}
 		})
 	}
@@ -1064,6 +1194,32 @@ func createGoodEnvSpec() EnvironmentSpec {
 					In: []APIOperationParameter{
 						{Match: Query("x-api-key")},
 						{Match: Header("x-api-key")},
+					},
+				},
+			},
+			{
+				ID:          "grpcapispec",
+				GrpcService: "foo.petstore.PetstoreService",
+				Authentication: AuthenticationRequirement{
+					Requirements: JWTAuthentication{
+						Name:       "foo",
+						Issuer:     "issuer-grpc",
+						JWKSSource: RemoteJWKS{URL: "url", CacheDuration: time.Hour},
+						In: []APIOperationParameter{
+							{Match: Header("jwt")},
+							{Match: Header("x-custom-auth-token")},
+						},
+					},
+				},
+				ConsumerAuthorization: ConsumerAuthorization{
+					In: []APIOperationParameter{
+						{Match: Query("x-api-key")},
+						{Match: Header("x-api-key")},
+					},
+				},
+				Operations: []APIOperation{
+					{
+						Name: "ListPets",
 					},
 				},
 			}},

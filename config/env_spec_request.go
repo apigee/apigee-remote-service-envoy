@@ -33,6 +33,9 @@ import (
 const TruncateDebugRequestValuesAt = 5
 
 const (
+	ContentTypeHeader = "content-type"
+	GRPCContentType   = "application/grpc"
+
 	CORSOriginHeader   = "origin"
 	CORSOriginWildcard = "*"
 	CORSRequestMethod  = "access-control-request-method"
@@ -79,6 +82,7 @@ func NewEnvironmentSpecRequest(authMan auth.Manager, e *EnvironmentSpecExt, req 
 type EnvironmentSpecRequest struct {
 	*EnvironmentSpecExt
 	Request               *authv3.CheckRequest
+	originalRequestPath   string
 	authMan               auth.Manager
 	jwtResults            map[string]*jwtResult // JWTAuthentication.Name ->
 	apiSpec               *APISpec
@@ -98,6 +102,8 @@ func (e *EnvironmentSpecRequest) parseRequest() {
 		}
 		return path, queryString
 	}()
+	// Save the original path, pre-basepath removal, in case we need it (e.g., for gRPC requests).
+	e.originalRequestPath = path
 
 	// find API
 	pathSegments := strings.Split(path, "/")
@@ -118,7 +124,6 @@ func (e *EnvironmentSpecRequest) parseRequest() {
 	}
 
 	var pathTemplate *transform.Template
-
 	if len(e.apiSpec.Operations) == 0 { // if no operations, match any for api
 		e.operation = defaultOperation
 	} else {
@@ -136,7 +141,6 @@ func (e *EnvironmentSpecRequest) parseRequest() {
 			pathTemplate = match.template
 		}
 	}
-
 	e.variables = e.parseRequestVariables(pathTemplate, opPath, queryString)
 }
 
@@ -247,7 +251,25 @@ func (e *EnvironmentSpecRequest) GetAPISpec() *APISpec {
 	return e.apiSpec
 }
 
+// isGRPCRequest returns true if this request looks like a gRPC request.
+func (e *EnvironmentSpecRequest) isGRPCRequest() bool {
+	return e.apiSpec != nil &&
+		e.apiSpec.GrpcService != "" &&
+		e.variables.headers[ContentTypeHeader] == GRPCContentType &&
+		e.Request.Attributes.Request.Http.Method == "POST"
+}
+
+// GetTargetRequestPath returns the path for the request that should be sent to the target.
+// The returned value is prior to {path,query,header} transformation.
+func (e *EnvironmentSpecRequest) GetTargetRequestPath() string {
+	if e.isGRPCRequest() {
+		return e.originalRequestPath
+	}
+	return e.GetOperationPath()
+}
+
 // GetOperationPath returns path of Operation, no basepath or querystring
+// The returned value is prior to {path,query,header} transformation.
 func (e *EnvironmentSpecRequest) GetOperationPath() string {
 	if e.GetOperation() == nil {
 		return ""
