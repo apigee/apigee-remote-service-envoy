@@ -670,6 +670,7 @@ type targetAuthenticationWrapper struct {
 	GoogleOAuth *GoogleOAuth `yaml:"google_oauth,omitempty" mapstructure:"google_oauth,omitempty"`
 }
 
+// UnmarshalYAML implements the yaml.Unmarshaler interface.
 func (t *TargetAuthentication) UnmarshalYAML(node *yaml.Node) error {
 	type Unmarsh TargetAuthentication
 	if err := node.Decode((*Unmarsh)(t)); err != nil {
@@ -687,6 +688,7 @@ func (t *TargetAuthentication) UnmarshalYAML(node *yaml.Node) error {
 	return nil
 }
 
+// MarshalYAML implements the yaml.Marshaler interface.
 func (t TargetAuthentication) MarshalYAML() (interface{}, error) {
 	w := &targetAuthenticationWrapper{
 		RefreshInterval: t.RefreshInterval,
@@ -700,10 +702,12 @@ func (t TargetAuthentication) MarshalYAML() (interface{}, error) {
 	return w, nil
 }
 
+// OAuthProvider defines the OAuth provider information.
 type OAuthProvider interface {
 	oauthProvider()
 }
 
+// GoogleOAuth contains information to generate Google OAuth token.
 type GoogleOAuth struct {
 	// Service account that will be impersonated for backend access.
 	ServiceAccountEmail string `yaml:"service_account_email,omitempty" mapstructure:"service_account_email,omitempty"`

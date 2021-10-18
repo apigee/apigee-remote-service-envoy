@@ -394,7 +394,7 @@ func addRequestHeaderTransforms(req *authv3.CheckRequest, envRequest *config.Env
 
 		// http path transformation
 		pathTransform := transforms.PathTransform
-		var targetPath = envRequest.GetOperationPath()
+		var targetPath = envRequest.GetTargetRequestPath()
 		if pathTransform != "" {
 			targetPath = envRequest.Reify(pathTransform)
 			targetPath = path.Clean(targetPath)
@@ -434,13 +434,6 @@ func addRequestHeaderTransforms(req *authv3.CheckRequest, envRequest *config.Env
 			t = strings.ToLower(t)
 			if t == authHeader {
 				removeAuth = true
-			}
-			// http path transformation
-			pathTransform := transforms.PathTransform
-			var targetPath = envRequest.GetTargetRequestPath()
-			if pathTransform != "" {
-				targetPath = envRequest.Reify(pathTransform)
-				targetPath = path.Clean(targetPath)
 			}
 			for hdr := range req.Attributes.Request.Http.Headers {
 				if util.SimpleGlobMatch(t, hdr) {
