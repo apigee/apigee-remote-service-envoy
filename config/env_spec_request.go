@@ -260,6 +260,7 @@ func (e *EnvironmentSpecRequest) isGRPCRequest() bool {
 }
 
 // GetTargetRequestPath returns the path for the request that should be sent to the target.
+// The returned value is prior to {path,query,header} transformation.
 func (e *EnvironmentSpecRequest) GetTargetRequestPath() string {
 	if e.isGRPCRequest() {
 		return e.originalRequestPath
@@ -268,6 +269,7 @@ func (e *EnvironmentSpecRequest) GetTargetRequestPath() string {
 }
 
 // GetOperationPath returns path of Operation, no basepath or querystring
+// The returned value is prior to {path,query,header} transformation.
 func (e *EnvironmentSpecRequest) GetOperationPath() string {
 	if e.GetOperation() == nil {
 		return ""
