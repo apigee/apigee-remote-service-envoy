@@ -975,6 +975,204 @@ func TestParamMatchTypes(t *testing.T) {
 	j.paramMatch()
 }
 
+func TestMarshalAndUnmarshalContextVariable(t *testing.T) {
+	tests := []struct {
+		desc string
+		want *ContextVariable
+	}{
+		{
+			desc: "a good context variable with google iam",
+			want: &ContextVariable{
+				Name: "iam_token",
+				Value: GoogleIAMCredentials{
+					ServiceAccountEmail: "foo@bar.com",
+					Token: IdentityToken{
+						Audience: "aud",
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			out, err := yaml.Marshal(test.want)
+			if err != nil {
+				t.Fatalf("yaml.Marshal() returns unexpected: %v", err)
+			}
+			got := &ContextVariable{}
+			if err := yaml.Unmarshal(out, got); err != nil {
+				t.Errorf("yaml.Unmarshal() returns unexpected: %v", err)
+			}
+			if diff := cmp.Diff(test.want, got); diff != "" {
+				t.Errorf("Marshal and unmarshal results in unexpected ContextVariable diff (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestUnmarshalContextVariableError(t *testing.T) {
+	tests := []struct {
+		desc string
+		data []byte
+	}{
+		{
+			desc: "name in bad format",
+			data: []byte(`
+name:
+- foo
+- bar`),
+		},
+		{
+			desc: "google_iam in bad format",
+			data: []byte(`
+google_iam: bad
+`),
+		},
+		{
+			desc: "no value",
+			data: []byte(`
+name: foo
+`),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			c := &ContextVariable{}
+			if err := yaml.Unmarshal(test.data, c); err == nil {
+				t.Errorf("yaml.Unmarshal() returns no error, should have got error")
+			}
+		})
+	}
+}
+
+func TestMarshalContextVariableError(t *testing.T) {
+	tests := []struct {
+		desc  string
+		input *ContextVariable
+	}{
+		{
+			desc: "no value",
+			input: &ContextVariable{
+				Name: "foo",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			if _, err := yaml.Marshal(*test.input); err == nil {
+				t.Errorf("yaml.Unmarshal() returns no error, should have got error")
+			}
+		})
+	}
+}
+
+func TestMarshalAndUnmarshalGoogleIAMCredentials(t *testing.T) {
+	tests := []struct {
+		desc string
+		want *GoogleIAMCredentials
+	}{
+		{
+			desc: "valid access token info",
+			want: &GoogleIAMCredentials{
+				ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
+				RefreshInterval:     time.Hour,
+				Endpoint:            "iam-endpoint",
+				Token: AccessToken{
+					Scopes: []string{
+						"https://www.googleapis.com/auth/cloud-platform",
+					},
+				},
+			},
+		},
+		{
+			desc: "valid id token info",
+			want: &GoogleIAMCredentials{
+				ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
+				Token: IdentityToken{
+					Audience:     "aud",
+					IncludeEmail: true,
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			out, err := yaml.Marshal(test.want)
+			if err != nil {
+				t.Fatalf("yaml.Marshal() returns unexpected: %v", err)
+			}
+			got := &GoogleIAMCredentials{}
+			if err := yaml.Unmarshal(out, got); err != nil {
+				t.Errorf("yaml.Unmarshal() returns unexpected: %v", err)
+			}
+			if diff := cmp.Diff(test.want, got); diff != "" {
+				t.Errorf("Marshal and unmarshal results in unexpected GoogleIAMCredentials diff (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestUnmarshalGoogleIAMCredentialsError(t *testing.T) {
+	tests := []struct {
+		desc    string
+		data    []byte
+		wantErr string
+	}{
+		{
+			desc: "service account in bad format",
+			data: []byte(`
+service_account_email:
+- foo
+- bar`),
+		},
+		{
+			desc: "access_token in bad format",
+			data: []byte(`
+access_token: bad
+`),
+		},
+		{
+			desc: "access and id token info coexist",
+			data: []byte(`
+access_token:
+  scope:
+  - scope1
+id_token:
+  audience: mock
+`),
+			wantErr: "precisely one of access_token or id_token should be set",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			g := &GoogleIAMCredentials{}
+			if err := yaml.Unmarshal(test.data, g); err == nil {
+				t.Errorf("yaml.Unmarshal() returns no error, should have got error")
+			} else if test.wantErr != "" && err.Error() != test.wantErr {
+				t.Errorf("yaml.Unmarshal() returns error %v, want %s", err, test.wantErr)
+			}
+		})
+	}
+}
+
+func TestValueTypes(t *testing.T) {
+	g := GoogleIAMCredentials{}
+	g.value()
+}
+
+func TestTokenTypes(t *testing.T) {
+	a := AccessToken{}
+	a.token()
+
+	i := IdentityToken{}
+	i.token()
+}
+
 func createGoodEnvSpec() EnvironmentSpec {
 	envSpecs := []EnvironmentSpec{{
 		ID: "good-env-config",

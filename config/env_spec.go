@@ -246,6 +246,10 @@ type APISpec struct {
 	// CORS Policy
 	Cors CorsPolicy `yaml:"cors,omitempty" mapstructure:"cors,omitempty"`
 
+	// ContextVariables are variables generated and used in the request transform.
+	// Can be overridden at the operation level.
+	ContextVariables []ContextVariable `yaml:"context_variables,omitempty" mapstructure:"context_variables,omitempty"`
+
 	// JWTAuthentication.Name -> *JWTAuthentication
 	jwtAuthentications map[string]*JWTAuthentication `yaml:"-" mapstructure:"-"`
 }
@@ -266,6 +270,10 @@ type APIOperation struct {
 
 	// Transformation rules applied to HTTP requests for this Operation. Overrides the rules set at the API level.
 	HTTPRequestTransforms HTTPRequestTransforms `yaml:"http_request_transforms,omitempty" mapstructure:"http_request_transforms,omitempty"`
+
+	// ContextVariables are variables generated and used in the request transform.
+	// Completely overrides the API (proxy) level settings. No merging will happen.
+	ContextVariables []ContextVariable `yaml:"context_variables,omitempty" mapstructure:"context_variables,omitempty"`
 
 	// JWTAuthentication.Name -> *JWTAuthentication
 	jwtAuthentications map[string]*JWTAuthentication `yaml:"-" mapstructure:"-"`
@@ -643,3 +651,154 @@ type CorsPolicy struct {
 func (c CorsPolicy) IsEmpty() bool {
 	return len(c.AllowOrigins) == 0 && len(c.AllowOriginsRegexes) == 0
 }
+
+// ContextVariable defines a variable that will be generated and used in the request transform.
+type ContextVariable struct {
+	// Name is the variable identifier, i.e., {context.name}.
+	Name string `yaml:"name" mapstructure:"name"`
+
+	// Value describes how the variable value is generated.
+	Value Value `yaml:"-" mapstructure:"-"`
+}
+
+type Value interface {
+	value()
+}
+
+type contextVariableWrapper struct {
+	Name      string                `yaml:"name" mapstructure:"name"`
+	GoogleIAM *GoogleIAMCredentials `yaml:"google_iam,omitempty" mapstructure:"google_iam,omitempty"`
+}
+
+// UnmarshalYAML implements the yaml.Unmarshaler interface.
+func (c *ContextVariable) UnmarshalYAML(node *yaml.Node) error {
+	type Unmarsh ContextVariable
+	if err := node.Decode((*Unmarsh)(c)); err != nil {
+		return err
+	}
+
+	w := &contextVariableWrapper{}
+	if err := node.Decode(w); err != nil {
+		return err
+	}
+	if w.GoogleIAM == nil {
+		return fmt.Errorf("google_iam is required")
+	}
+	c.Value = *w.GoogleIAM
+	return nil
+}
+
+// MarshalYAML implements the yaml.Marshaler interface.
+func (c ContextVariable) MarshalYAML() (interface{}, error) {
+	w := &contextVariableWrapper{
+		Name: c.Name,
+	}
+
+	switch v := c.Value.(type) {
+	case GoogleIAMCredentials:
+		w.GoogleIAM = &v
+	default:
+		return nil, fmt.Errorf("value cannot be unspecified.")
+	}
+
+	return w, nil
+}
+
+// GoogleIAMCredentials contains information to get Google IAM tokens.
+// It implements the Value interface.
+type GoogleIAMCredentials struct {
+	// Service account email used to generate ID or access token.
+	ServiceAccountEmail string `yaml:"service_account_email" mapstructure:"service_account_email"`
+
+	// The time between two adjacent token refreshes.
+	RefreshInterval time.Duration `yaml:"refresh_interval,omitempty" mapstructure:"refresh_interval,omitempty"`
+
+	// Token describes how to generate the token.
+	Token Token `yaml:"-" mapstructure:"-"`
+
+	// Endpoint overrides the default Google IAM Credentials service endpoint,
+	// which is `iamcredentials.googleapis.com`.
+	Endpoint string `yaml:"endpoint,omitempty" mapstructure:"endpoint,omitempty"`
+}
+
+func (g GoogleIAMCredentials) value() {}
+
+type Token interface {
+	token()
+}
+
+type googleIAMCredentialsWrapper struct {
+	ServiceAccountEmail string         `yaml:"service_account_email,omitempty"`
+	RefreshInterval     time.Duration  `yaml:"refresh_interval,omitempty" mapstructure:"refresh_interval,omitempty"`
+	Endpoint            string         `yaml:"endpoint,omitempty" mapstructure:"endpoint,omitempty"`
+	AccessToken         *AccessToken   `yaml:"access_token,omitempty"`
+	IdentityToken       *IdentityToken `yaml:"id_token,omitempty"`
+}
+
+// UnmarshalYAML implements the yaml.Unmarshaler interface
+func (g *GoogleIAMCredentials) UnmarshalYAML(node *yaml.Node) error {
+	type Unmarsh GoogleIAMCredentials
+	if err := node.Decode((*Unmarsh)(g)); err != nil {
+		return err
+	}
+
+	w := &googleIAMCredentialsWrapper{}
+	if err := node.Decode(w); err != nil {
+		return err
+	}
+	ctr := 0
+	if w.AccessToken != nil {
+		ctr++
+		g.Token = *w.AccessToken
+	}
+	if w.IdentityToken != nil {
+		ctr++
+		g.Token = *w.IdentityToken
+	}
+	if ctr != 1 {
+		return fmt.Errorf("precisely one of access_token or id_token should be set")
+	}
+
+	return nil
+}
+
+// MarshalYAML implements the yaml.Marshaler interface
+func (g GoogleIAMCredentials) MarshalYAML() (interface{}, error) {
+	w := &googleIAMCredentialsWrapper{
+		ServiceAccountEmail: g.ServiceAccountEmail,
+		RefreshInterval:     g.RefreshInterval,
+		Endpoint:            g.Endpoint,
+	}
+
+	switch v := g.Token.(type) {
+	case AccessToken:
+		w.AccessToken = &v
+	case IdentityToken:
+		w.IdentityToken = &v
+	}
+
+	return w, nil
+}
+
+// AccessToken contains information about the access token.
+type AccessToken struct {
+	// Code to identify the scopes to be included in the OAuth 2.0 access token.
+	// See https://developers.google.com/identity/protocols/googlescopes for more
+	// information.
+	Scopes []string `yaml:"scopes,omitempty" mapstucture:"scopes,omitempty"`
+}
+
+func (a AccessToken) token() {}
+
+// IdentityToken contains information about the ID token.
+type IdentityToken struct {
+	// The audience for the token, such as the API or account that this token
+	// grants access to.
+	Audience string `yaml:"audience" mapstructure:"audience"`
+
+	// Include the service account email in the token. If set to `true`, the
+	// token will contain `email` and `email_verified` claims.
+	IncludeEmail bool `yaml:"include_email,omitempty" mapstructure:"include_email,omitempty"`
+}
+
+func (i IdentityToken) token() {}
