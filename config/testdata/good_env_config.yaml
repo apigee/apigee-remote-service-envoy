@@ -28,3 +28,14 @@ apis:
       add:
       - name: x-apigee-route
         value: route
+      - name: x-forwarded-authorization
+        value: "{header.authorization}"
+      - name: authorization
+        value: "{context.iam_token}"
+  context_variables:
+  - name: iam_token
+    google_iam:
+      service_account_email: foo@bar.iam.gserviceaccount.com
+      id_token:
+        audience: mock
+        include_email: true
