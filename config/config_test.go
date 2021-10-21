@@ -708,6 +708,20 @@ func TestLoadEnvironmentSpecs(t *testing.T) {
 							HeaderTransforms: NameValueTransforms{
 								Add: []AddNameValue{
 									{Name: "x-apigee-route", Value: "route"},
+									{Name: "x-forwarded-authorization", Value: "{header.authorization}"},
+									{Name: "authorization", Value: "{context.iam_token}"},
+								},
+							},
+						},
+						ContextVariables: []ContextVariable{
+							{
+								Name: "iam_token",
+								Value: GoogleIAMCredentials{
+									ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
+									Token: IdentityToken{
+										Audience:     "mock",
+										IncludeEmail: true,
+									},
 								},
 							},
 						},
