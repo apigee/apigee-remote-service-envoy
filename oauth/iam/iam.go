@@ -108,16 +108,14 @@ func (s *IAMService) AccessTokenSource(saEmail string, scopes []string, refreshI
 	looper := util.Looper{
 		Backoff: util.DefaultExponentialBackoff(),
 	}
-	c, cancel := context.WithCancel(context.Background())
 	work := func(c context.Context) error {
 		if err := ats.singleRefresh(); err != nil {
 			log.Debugf("%v", err)
 			return err
 		}
-		cancel()
 		return nil
 	}
-	looper.Start(c, work, refreshInterval, func(err error) error {
+	looper.Start(s.ctx, work, refreshInterval, func(err error) error {
 		log.Errorf("failed to refresh access token: %v", err)
 		return nil
 	})
