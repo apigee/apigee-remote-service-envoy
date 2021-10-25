@@ -24,7 +24,10 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/v2/path"
 )
 
-const wildcard = "*"
+const (
+	wildcard       = "*"
+	doubleWildcard = "**"
+)
 
 func splitAndAddToPathTree(tree path.Tree, path string, api *APISpec) {
 	split := strings.Split(path, "/")
@@ -122,7 +125,7 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
 			}
 
 			if !isGRPC && len(op.HTTPMatches) == 0 { // empty is wildcard
-				split := []string{api.ID, wildcard, wildcard}
+				split := []string{api.ID, wildcard, doubleWildcard}
 				opMatch := OpTemplateMatch{&op, nil}
 				ec.opPathTree.AddChild(split, 0, &opMatch)
 			} else if len(op.HTTPMatches) > 0 {
