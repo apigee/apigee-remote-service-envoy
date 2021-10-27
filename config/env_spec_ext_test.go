@@ -173,21 +173,6 @@ func TestNewEnvironmentSpecExtError(t *testing.T) {
 			opts: []EnvironmentSpecExtOption{WithIAMClientOptions(opts...)},
 		},
 		{
-			desc: "access token info missing scopes at the API level",
-			spec: &EnvironmentSpec{
-				APIs: []APISpec{{
-					ContextVariables: []ContextVariable{{
-						Name: "iam_token",
-						Value: GoogleIAMCredentials{
-							ServiceAccountEmail: "foo@bar.com",
-							Token:               AccessToken{},
-						},
-					}},
-				}},
-			},
-			opts: []EnvironmentSpecExtOption{WithIAMClientOptions(opts...)},
-		},
-		{
 			desc: "id token info missing audience at the API level",
 			spec: &EnvironmentSpec{
 				APIs: []APISpec{{
@@ -203,35 +188,6 @@ func TestNewEnvironmentSpecExtError(t *testing.T) {
 			opts: []EnvironmentSpecExtOption{WithIAMClientOptions(opts...)},
 		},
 		{
-			desc: "missing iam service at the operation level",
-			spec: &EnvironmentSpec{
-				APIs: []APISpec{{
-					Operations: []APIOperation{{
-						ContextVariables: []ContextVariable{{
-							Name:  "iam_token",
-							Value: GoogleIAMCredentials{},
-						}},
-					}},
-				}},
-			},
-		},
-		{
-			desc: "missing service account at the operation level",
-			spec: &EnvironmentSpec{
-				APIs: []APISpec{{
-					Operations: []APIOperation{{
-						ContextVariables: []ContextVariable{{
-							Name: "iam_token",
-							Value: GoogleIAMCredentials{
-								Token: AccessToken{},
-							},
-						}},
-					}},
-				}},
-			},
-			opts: []EnvironmentSpecExtOption{WithIAMClientOptions(opts...)},
-		},
-		{
 			desc: "access token info missing scopes at the operation level",
 			spec: &EnvironmentSpec{
 				APIs: []APISpec{{
@@ -240,22 +196,6 @@ func TestNewEnvironmentSpecExtError(t *testing.T) {
 							Name: "iam_token",
 							Value: GoogleIAMCredentials{
 								Token: AccessToken{},
-							},
-						}},
-					}},
-				}},
-			},
-			opts: []EnvironmentSpecExtOption{WithIAMClientOptions(opts...)},
-		},
-		{
-			desc: "id token info missing audience at the operation level",
-			spec: &EnvironmentSpec{
-				APIs: []APISpec{{
-					Operations: []APIOperation{{
-						ContextVariables: []ContextVariable{{
-							Name: "iam_token",
-							Value: GoogleIAMCredentials{
-								Token: IdentityToken{},
 							},
 						}},
 					}},
