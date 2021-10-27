@@ -17,9 +17,11 @@
 package config
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 
+	"github.com/apigee/apigee-remote-service-envoy/v2/iam/google"
 	"github.com/apigee/apigee-remote-service-envoy/v2/transform"
 	"github.com/apigee/apigee-remote-service-golib/v2/path"
 )
@@ -29,6 +31,14 @@ const (
 	doubleWildcard = "**"
 )
 
+type EnvironmentSpecExtOption func(e *EnvironmentSpecExt)
+
+func WithIAMService(iamsvc *google.IAMService) EnvironmentSpecExtOption {
+	return func(e *EnvironmentSpecExt) {
+		e.iamsvc = iamsvc
+	}
+}
+
 func splitAndAddToPathTree(tree path.Tree, path string, api *APISpec) {
 	split := strings.Split(path, "/")
 	split = append([]string{"/"}, split...)
@@ -36,7 +46,7 @@ func splitAndAddToPathTree(tree path.Tree, path string, api *APISpec) {
 }
 
 // NewEnvironmentSpecExt creates an EnvironmentSpecExt
-func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
+func NewEnvironmentSpecExt(spec *EnvironmentSpec, options ...EnvironmentSpecExtOption) (*EnvironmentSpecExt, error) {
 	ec := &EnvironmentSpecExt{
 		EnvironmentSpec:    spec,
 		apiPathTree:        path.NewTree(),
@@ -45,6 +55,13 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
 		corsVary:           make(map[string]bool, len(spec.APIs)),
 		corsAllowedOrigins: make(map[string]map[string]bool, len(spec.APIs)),
 		compiledRegExps:    make(map[string]*regexp.Regexp),
+		apiTokenSources:    make(map[string]Variable),
+		opTokenSources:     make(map[string]map[string]Variable),
+	}
+
+	// Apply options to mutate ec
+	for _, opt := range options {
+		opt(ec)
 	}
 
 	for i := range spec.APIs {
@@ -111,6 +128,30 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
 			return nil, err
 		}
 
+		for _, cv := range api.ContextVariables {
+			switch v := cv.Value.(type) {
+			case GoogleIAMCredentials:
+				if ec.iamsvc == nil {
+					return nil, fmt.Errorf("google oauth required iam service to be configured")
+				}
+				switch tk := v.Token.(type) {
+				case AccessToken:
+					ts, err := ec.iamsvc.AccessTokenSource(v.ServiceAccountEmail, tk.Scopes, v.RefreshInterval)
+					if err != nil {
+						return nil, err
+					}
+					ec.apiTokenSources[api.ID] = ts
+				case IdentityToken:
+					ts, err := ec.iamsvc.IdentityTokenSource(v.ServiceAccountEmail, tk.Audience, tk.IncludeEmail, v.RefreshInterval)
+					if err != nil {
+						return nil, err
+					}
+					ec.apiTokenSources[api.ID] = ts
+				}
+			}
+		}
+
+		ec.opTokenSources[api.ID] = make(map[string]Variable)
 		for i := range api.Operations {
 			isGRPC := api.GrpcService != ""
 			op := api.Operations[i]
@@ -159,6 +200,29 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
 			if err != nil {
 				return nil, err
 			}
+
+			for _, cv := range op.ContextVariables {
+				switch v := cv.Value.(type) {
+				case GoogleIAMCredentials:
+					if ec.iamsvc == nil {
+						return nil, fmt.Errorf("google oauth required iam service to be configured")
+					}
+					switch tk := v.Token.(type) {
+					case AccessToken:
+						ts, err := ec.iamsvc.AccessTokenSource(v.ServiceAccountEmail, tk.Scopes, v.RefreshInterval)
+						if err != nil {
+							return nil, err
+						}
+						ec.opTokenSources[api.ID][op.Name] = ts
+					case IdentityToken:
+						ts, err := ec.iamsvc.IdentityTokenSource(v.ServiceAccountEmail, tk.Audience, tk.IncludeEmail, v.RefreshInterval)
+						if err != nil {
+							return nil, err
+						}
+						ec.opTokenSources[api.ID][op.Name] = ts
+					}
+				}
+			}
 		}
 	}
 
@@ -172,6 +236,10 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec) (*EnvironmentSpecExt, error) {
 	}
 
 	return ec, nil
+}
+
+type Variable interface {
+	Value() (string, error)
 }
 
 type OpTemplateMatch struct {
@@ -189,6 +257,9 @@ type EnvironmentSpecExt struct {
 	corsVary           map[string]bool                // api ID -> true if vary header should be true
 	corsAllowedOrigins map[string]map[string]bool     // api ID -> statically allowed origin -> true
 	compiledRegExps    map[string]*regexp.Regexp      // uncompiled -> compiled
+	iamsvc             *google.IAMService
+	apiTokenSources    map[string]Variable            // api ID -> token source
+	opTokenSources     map[string]map[string]Variable // api ID -> op Name -> token source
 }
 
 // JWTAuthentications returns a list of all JWTAuthentications for the Spec

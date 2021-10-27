@@ -17,6 +17,8 @@ package google
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -34,11 +36,27 @@ const (
 	serviceAccountNameFormat = "projects/-/serviceAccounts/%s"
 )
 
+type accessTokenSourceKey struct {
+	saEmail         string
+	scopes          string
+	refreshInterval time.Duration
+}
+
+type identityTokenSourceKey struct {
+	saEmail         string
+	audience        string
+	includeEmail    bool
+	refreshInterval time.Duration
+}
+
 // IAMService defines the IAM service for a particular service account.
 type IAMService struct {
 	ctx        context.Context
 	cancelFunc context.CancelFunc
 	svc        *iamv1.Service
+
+	accessTokenSourcePool map[accessTokenSourceKey]*AccessTokenSource
+	idTokenSourcePool     map[identityTokenSourceKey]*IdentityTokenSource
 }
 
 // AccessTokenSource defines an access token source.
@@ -50,7 +68,7 @@ type AccessTokenSource struct {
 
 	token      *oauth2.Token
 	err        error
-	mu         sync.Mutex
+	mu         sync.RWMutex
 	herdBuster singleflight.Group
 }
 
@@ -64,7 +82,7 @@ type IdentityTokenSource struct {
 
 	token      *oauth2.Token
 	err        error
-	mu         sync.Mutex
+	mu         sync.RWMutex
 	herdBuster singleflight.Group
 }
 
@@ -77,9 +95,11 @@ func NewIAMService(opts ...option.ClientOption) (*IAMService, error) {
 		return nil, fmt.Errorf("failed to create new IAM credentials service: %v", err)
 	}
 	return &IAMService{
-		ctx:        ctxWithCancel,
-		cancelFunc: cancelFunc,
-		svc:        iamsvc,
+		ctx:                   ctxWithCancel,
+		cancelFunc:            cancelFunc,
+		svc:                   iamsvc,
+		accessTokenSourcePool: make(map[accessTokenSourceKey]*AccessTokenSource),
+		idTokenSourcePool:     make(map[identityTokenSourceKey]*IdentityTokenSource),
 	}, nil
 }
 
@@ -95,12 +115,22 @@ func (s *IAMService) AccessTokenSource(saEmail string, scopes []string, refreshI
 	if len(scopes) == 0 {
 		return nil, fmt.Errorf("scopes are required to create access token source")
 	}
+
+	sort.Strings(scopes)
+	key := accessTokenSourceKey{
+		saEmail:         saEmail,
+		scopes:          strings.Join(scopes, "-"),
+		refreshInterval: refreshInterval,
+	}
+	if ts, ok := s.accessTokenSourcePool[key]; ok {
+		return ts, nil
+	}
+
 	ats := &AccessTokenSource{
 		iamsvc: s.svc,
 		saName: fmt.Sprintf(serviceAccountNameFormat, saEmail),
 		scopes: scopes,
 	}
-
 	if refreshInterval == 0 {
 		refreshInterval = defaultRefreshInterval
 	}
@@ -119,6 +149,8 @@ func (s *IAMService) AccessTokenSource(saEmail string, scopes []string, refreshI
 		log.Errorf("failed to refresh access token: %v", err)
 		return nil
 	})
+
+	s.accessTokenSourcePool[key] = ats
 	return ats, nil
 }
 
@@ -130,6 +162,17 @@ func (s *IAMService) IdentityTokenSource(saEmail, audience string, includeEmail 
 	if audience == "" {
 		return nil, fmt.Errorf("audience is required to create id token source")
 	}
+
+	key := identityTokenSourceKey{
+		saEmail:         saEmail,
+		audience:        audience,
+		includeEmail:    includeEmail,
+		refreshInterval: refreshInterval,
+	}
+	if ts, ok := s.idTokenSourcePool[key]; ok {
+		return ts, nil
+	}
+
 	its := &IdentityTokenSource{
 		iamsvc:       s.svc,
 		saName:       fmt.Sprintf(serviceAccountNameFormat, saEmail),
@@ -156,21 +199,22 @@ func (s *IAMService) IdentityTokenSource(saEmail, audience string, includeEmail 
 		return nil
 	})
 
+	s.idTokenSourcePool[key] = its
 	return its, nil
 }
 
 // Value returns the authorization header based on the access token.
 // Error will be returned if the recent token refresh failed.
 func (ats *AccessTokenSource) Value() (string, error) {
-	ats.mu.Lock()
-	defer ats.mu.Unlock()
+	ats.mu.RLock()
+	defer ats.mu.RUnlock()
 	if ats.err != nil {
 		return "", ats.err
 	}
 	if !ats.token.Valid() {
-		ats.mu.Unlock()
+		ats.mu.RUnlock()
 		err := ats.singleRefresh()
-		ats.mu.Lock()
+		ats.mu.RLock()
 		if err != nil {
 			return "", err
 		}
@@ -215,15 +259,15 @@ func (ats *AccessTokenSource) refresh() (*oauth2.Token, error) {
 // Value returns the authorization header based on the ID token.
 // Error will be returned if the recent token refresh failed.
 func (its *IdentityTokenSource) Value() (string, error) {
-	its.mu.Lock()
-	defer its.mu.Unlock()
+	its.mu.RLock()
+	defer its.mu.RUnlock()
 	if its.err != nil {
 		return "", its.err
 	}
 	if !its.token.Valid() {
-		its.mu.Unlock()
+		its.mu.RUnlock()
 		err := its.singleRefresh()
-		its.mu.Lock()
+		its.mu.RLock()
 		if err != nil {
 			return "", err
 		}

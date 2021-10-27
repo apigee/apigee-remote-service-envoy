@@ -227,7 +227,6 @@ func TestGetParamValueQuery(t *testing.T) {
 			envoyReq := testutil.NewEnvoyRequest(http.MethodGet, test.path, nil, nil)
 			specReq := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
 			got := specReq.GetParamValue(param)
-
 			if test.want != got {
 				t.Errorf("want: %q, got: %q", test.want, got)
 			}
@@ -266,7 +265,6 @@ func TestGetParamValueHeader(t *testing.T) {
 			envoyReq := testutil.NewEnvoyRequest(http.MethodGet, "/", test.headers, nil)
 			specReq := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
 			got := specReq.GetParamValue(param)
-
 			if test.want != got {
 				t.Errorf("want: %q, got: %q", test.want, got)
 			}
@@ -320,7 +318,6 @@ func TestGetParamValueJWTClaim(t *testing.T) {
 			specReq := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
 
 			got := specReq.GetParamValue(param)
-
 			if test.want != got {
 				t.Errorf("want: %q, got: %q", test.want, got)
 			}
@@ -845,6 +842,148 @@ func TestAllowedOrigin(t *testing.T) {
 				t.Errorf("want vary %v, got %v", test.wantVary, vary)
 			}
 
+		})
+	}
+}
+
+func TestGoogleIAM(t *testing.T) {
+	srv := testutil.IAMServer()
+	defer srv.Close()
+
+	iamsvc, err := testutil.IAMService(srv)
+	if err != nil {
+		t.Fatalf("failed to create test IAMService: %v", err)
+	}
+	defer iamsvc.Close()
+
+	envSpec := &EnvironmentSpec{
+		APIs: []APISpec{
+			{
+				ID:       "petstore", // required for the test to work
+				BasePath: "/v1",
+				ContextVariables: []ContextVariable{{
+					Name: "iam_token",
+					Value: GoogleIAMCredentials{
+						ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
+						Token: AccessToken{
+							Scopes: []string{ApigeeAPIScope},
+						},
+					},
+				}},
+				Operations: []APIOperation{
+					{
+						Name: "op1",
+						HTTPMatches: []HTTPMatch{{
+							PathTemplate: "/op-1",
+						}},
+					},
+					{
+						Name: "op2",
+						HTTPMatches: []HTTPMatch{{
+							PathTemplate: "/op-2",
+						}},
+						ContextVariables: []ContextVariable{{
+							Name: "iam_token",
+							Value: GoogleIAMCredentials{
+								ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
+								Token: IdentityToken{
+									Audience: "aud",
+								},
+							},
+						}},
+					},
+				},
+			},
+			{
+				ID:       "bookstore",
+				BasePath: "/v2",
+				ContextVariables: []ContextVariable{{
+					Name: "iam_token",
+					Value: GoogleIAMCredentials{
+						ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
+						Token: IdentityToken{
+							Audience: "aud",
+						},
+					},
+				}},
+				Operations: []APIOperation{
+					{
+						Name: "op1",
+						HTTPMatches: []HTTPMatch{{
+							PathTemplate: "/op-1",
+						}},
+					},
+					{
+						Name: "op2",
+						HTTPMatches: []HTTPMatch{{
+							PathTemplate: "/op-2",
+						}},
+						ContextVariables: []ContextVariable{{
+							Name: "iam_token",
+							Value: GoogleIAMCredentials{
+								ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
+								Token: AccessToken{
+									Scopes: []string{ApigeeAPIScope},
+								},
+							},
+						}},
+					},
+				},
+			},
+			{
+				BasePath: "/v3",
+			},
+		},
+	}
+
+	specExt, err := NewEnvironmentSpecExt(envSpec, WithIAMService(iamsvc))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		desc           string
+		path           string
+		wantTargetAuth string
+	}{
+		{
+			desc:           "access token at api level",
+			path:           "/v1/op-1",
+			wantTargetAuth: "Bearer access-token",
+		},
+		{
+			desc:           "id token at op level",
+			path:           "/v1/op-2",
+			wantTargetAuth: "Bearer id-token",
+		},
+		{
+			desc:           "id token at api level",
+			path:           "/v2/op-1",
+			wantTargetAuth: "Bearer id-token",
+		},
+		{
+			desc:           "access token at op level",
+			path:           "/v2/op-2",
+			wantTargetAuth: "Bearer access-token",
+		},
+		{
+			desc:           "none",
+			path:           "/v3",
+			wantTargetAuth: "",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			envoyReq := testutil.NewEnvoyRequest(http.MethodGet, test.path, nil, nil)
+			req := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
+			err := req.FetchIAMToken()
+			if err != nil {
+				t.Fatalf("FetchIAMToken() err = %v, wanted no error", err)
+			}
+			if got := req.variables.context["iam_token"]; test.wantTargetAuth != got {
+				t.Errorf("{context.iam_token} = %q, wanted %q", got, test.wantTargetAuth)
+			}
 		})
 	}
 }

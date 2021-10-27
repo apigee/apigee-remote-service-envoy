@@ -156,6 +156,27 @@ func TestNewHandlerWithEnvSpec(t *testing.T) {
 		PrivateKey:       privateKey,
 	}
 
+	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "no such file")
+	_, err = NewHandler(cfg)
+	if err != nil {
+		t.Fatalf("NewHandler() should return error for bad application default credentials")
+	}
+
+	tf, err := os.CreateTemp("", "creds.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tf.Name())
+
+	_, err = tf.Write(testutil.FakeServiceAccount())
+	if err != nil {
+		t.Fatal(err)
+	}
+	tf.Close()
+
+	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", tf.Name())
+	defer os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "")
+
 	h, err := NewHandler(cfg)
 	if err != nil {
 		t.Fatal(err)

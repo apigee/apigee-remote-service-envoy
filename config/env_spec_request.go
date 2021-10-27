@@ -56,8 +56,10 @@ const (
 	QueryNamespace             = "query"
 	PathNamespace              = "path"
 	HeaderNamespace            = "headers"
+	ContextNamespace           = "context"
 	RequestPath                = "path"
 	RequestQuerystring         = "querystring"
+	IAMToken                   = "iam_token"
 )
 
 // a "match all" operation for apis without operations
@@ -158,6 +160,7 @@ func (e *EnvironmentSpecRequest) parseRequestVariables(pathTemplate *transform.T
 		headers: e.Request.Attributes.Request.Http.Headers,
 		request: map[string]string{},
 		query:   map[string]string{},
+		context: map[string]string{},
 	}
 
 	vars.request[RequestPath] = opPath
@@ -182,6 +185,7 @@ type requestVariables struct {
 	request map[string]string
 	query   map[string]string
 	path    map[string]string
+	context map[string]string
 }
 
 func (rv requestVariables) LookupValue(name string) (string, bool) {
@@ -198,6 +202,8 @@ func (rv requestVariables) LookupValue(name string) (string, bool) {
 			mapping = rv.path
 		case HeaderNamespace:
 			mapping = rv.headers
+		case ContextNamespace:
+			mapping = rv.context
 		}
 	}
 
@@ -207,6 +213,29 @@ func (rv requestVariables) LookupValue(name string) (string, bool) {
 
 	val, ok := mapping[splits[1]]
 	return val, ok
+}
+
+// FetchIAMToken gets the auth token value and add it to the
+// specific context variable {context.iam_token}.
+// Error will be returned here if token fetching fails.
+func (e *EnvironmentSpecRequest) FetchIAMToken() error {
+	if e == nil || e.apiSpec == nil {
+		return nil
+	}
+	tokenSource := e.apiTokenSources[e.apiSpec.ID]
+	if ts := e.opTokenSources[e.apiSpec.ID][e.operation.Name]; ts != nil {
+		tokenSource = ts
+	}
+	// No token source configured means no need to fetch a token.
+	if tokenSource == nil {
+		return nil
+	}
+	val, err := tokenSource.Value()
+	if err != nil {
+		return err
+	}
+	e.variables.context[IAMToken] = val
+	return nil
 }
 
 // GetQueryParams returns a safe copy of the QueryParams map
@@ -510,7 +539,7 @@ func (e *EnvironmentSpecRequest) GetAPIKey() (key string) {
 		auth := e.GetConsumerAuthorization()
 		if !auth.Disabled {
 			for _, authorization := range auth.In {
-				if key = e.GetParamValue(authorization); key != "" {
+				if key := e.GetParamValue(authorization); key != "" {
 					// First match wins.
 					return key
 				}
