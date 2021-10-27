@@ -30,6 +30,7 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/v2/context"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"google.golang.org/api/option"
 )
 
 func TestNilReceivers(t *testing.T) {
@@ -846,15 +847,9 @@ func TestAllowedOrigin(t *testing.T) {
 	}
 }
 
-func TestGoogleIAM(t *testing.T) {
+func TestPrepareVariable(t *testing.T) {
 	srv := testutil.IAMServer()
 	defer srv.Close()
-
-	iamsvc, err := testutil.IAMService(srv)
-	if err != nil {
-		t.Fatalf("failed to create test IAMService: %v", err)
-	}
-	defer iamsvc.Close()
 
 	envSpec := &EnvironmentSpec{
 		APIs: []APISpec{
@@ -936,7 +931,11 @@ func TestGoogleIAM(t *testing.T) {
 		},
 	}
 
-	specExt, err := NewEnvironmentSpecExt(envSpec, WithIAMService(iamsvc))
+	opts := []option.ClientOption{
+		option.WithEndpoint(srv.URL),
+		option.WithHTTPClient(http.DefaultClient),
+	}
+	specExt, err := NewEnvironmentSpecExt(envSpec, WithIAMClientOptions(opts...))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -977,9 +976,9 @@ func TestGoogleIAM(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			envoyReq := testutil.NewEnvoyRequest(http.MethodGet, test.path, nil, nil)
 			req := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
-			err := req.FetchIAMToken()
+			err := req.PrepareVariables()
 			if err != nil {
-				t.Fatalf("FetchIAMToken() err = %v, wanted no error", err)
+				t.Fatalf("PrepareVariables() err = %v, wanted no error", err)
 			}
 			if got := req.variables.context["iam_token"]; test.wantTargetAuth != got {
 				t.Errorf("{context.iam_token} = %q, wanted %q", got, test.wantTargetAuth)

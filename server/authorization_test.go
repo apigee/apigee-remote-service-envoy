@@ -40,6 +40,7 @@ import (
 	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	"github.com/gogo/googleapis/google/rpc"
 	"github.com/google/go-cmp/cmp"
+	"google.golang.org/api/option"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -1071,25 +1072,13 @@ func TestCORSResponseHeaders(t *testing.T) {
 	}
 }
 
-func TestGoogleIAM(t *testing.T) {
+func TestPrepareContextVariable(t *testing.T) {
 	srv := testutil.IAMServer()
 	defer srv.Close()
 
 	badSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "server not ready", http.StatusInternalServerError)
 	}))
-
-	iamsvc, err := testutil.IAMService(srv)
-	if err != nil {
-		t.Fatalf("failed to create test IAMService: %v", err)
-	}
-	defer iamsvc.Close()
-
-	iamsvc2, err := testutil.IAMService(badSrv)
-	if err != nil {
-		t.Fatalf("failed to create test IAMService: %v", err)
-	}
-	defer iamsvc2.Close()
 
 	goodEnvSpec := &config.EnvironmentSpec{
 		ID: "good-iam",
@@ -1195,11 +1184,19 @@ func TestGoogleIAM(t *testing.T) {
 		},
 	}
 
-	specExt, err := config.NewEnvironmentSpecExt(goodEnvSpec, config.WithIAMService(iamsvc))
+	opts := []option.ClientOption{
+		option.WithEndpoint(srv.URL),
+		option.WithHTTPClient(http.DefaultClient),
+	}
+	specExt, err := config.NewEnvironmentSpecExt(goodEnvSpec, config.WithIAMClientOptions(opts...))
 	if err != nil {
 		t.Fatal(err)
 	}
-	badSpecExt, err := config.NewEnvironmentSpecExt(badEnvSpec, config.WithIAMService(iamsvc2))
+	badOpts := []option.ClientOption{
+		option.WithEndpoint(badSrv.URL),
+		option.WithHTTPClient(http.DefaultClient),
+	}
+	badSpecExt, err := config.NewEnvironmentSpecExt(badEnvSpec, config.WithIAMClientOptions(badOpts...))
 	if err != nil {
 		t.Fatal(err)
 	}

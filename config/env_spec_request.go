@@ -59,7 +59,6 @@ const (
 	ContextNamespace           = "context"
 	RequestPath                = "path"
 	RequestQuerystring         = "querystring"
-	IAMToken                   = "iam_token"
 )
 
 // a "match all" operation for apis without operations
@@ -215,26 +214,23 @@ func (rv requestVariables) LookupValue(name string) (string, bool) {
 	return val, ok
 }
 
-// FetchIAMToken gets the auth token value and add it to the
-// specific context variable {context.iam_token}.
-// Error will be returned here if token fetching fails.
-func (e *EnvironmentSpecRequest) FetchIAMToken() error {
+// PrepareVariables go over all the variables for the specific request
+// and populate them for the http request transform.
+func (e *EnvironmentSpecRequest) PrepareVariables() error {
 	if e == nil || e.apiSpec == nil {
 		return nil
 	}
-	tokenSource := e.apiTokenSources[e.apiSpec.ID]
-	if ts := e.opTokenSources[e.apiSpec.ID][e.operation.Name]; ts != nil {
-		tokenSource = ts
+	variables := e.apiVariables[e.apiSpec.ID]
+	if vs := e.opVariables[e.apiSpec.ID][e.GetOperation().Name]; len(vs) != 0 {
+		variables = vs
 	}
-	// No token source configured means no need to fetch a token.
-	if tokenSource == nil {
-		return nil
+	for _, v := range variables {
+		val, err := v.Value()
+		if err != nil {
+			return err
+		}
+		e.variables.context[v.Name()] = val
 	}
-	val, err := tokenSource.Value()
-	if err != nil {
-		return err
-	}
-	e.variables.context[IAMToken] = val
 	return nil
 }
 

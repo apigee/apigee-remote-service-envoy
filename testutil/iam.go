@@ -21,9 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/apigee/apigee-remote-service-envoy/v2/iam/google"
 	iamv1 "google.golang.org/api/iamcredentials/v1"
-	"google.golang.org/api/option"
 )
 
 // IAMServer returns a test IAM server.
@@ -46,18 +44,4 @@ func IAMServer() *httptest.Server {
 			http.Error(w, "bad request", http.StatusBadRequest)
 		}
 	}))
-}
-
-// IAMService returns a test iam service client.
-func IAMService(srv *httptest.Server) (*google.IAMService, error) {
-	opts := []option.ClientOption{
-		option.WithHTTPClient(http.DefaultClient),
-		option.WithEndpoint(srv.URL),
-	}
-
-	s, err := google.NewIAMService(opts...)
-	if err != nil {
-		return nil, err
-	}
-	return s, nil
 }

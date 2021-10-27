@@ -144,8 +144,8 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 
 		if !envRequest.IsAuthorizationRequired() {
 			log.Debugf("no authorization requirements")
-			if err := envRequest.FetchIAMToken(); err != nil {
-				log.Errorf("failed to fetch IAM token: %v", err)
+			if err := envRequest.PrepareVariables(); err != nil {
+				log.Errorf("failed to populate context variable: %v", err)
 				return a.denied(req, envRequest, tracker, &auth.Context{Context: rootContext}, api), nil
 			}
 			// Send the root context for limited dynamic metadata.
@@ -222,8 +222,8 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 	case auth.ErrNetworkError:
 		if envRequest != nil && envRequest.GetConsumerAuthorization().FailOpen {
 			log.Debugf("FailOpen on operation: %v", envRequest.GetOperation().Name)
-			if err := envRequest.FetchIAMToken(); err != nil {
-				log.Errorf("failed to fetch IAM token: %v", err)
+			if err := envRequest.PrepareVariables(); err != nil {
+				log.Errorf("failed to populate context variable: %v", err)
 				return a.denied(req, envRequest, tracker, authContext, api), nil
 			}
 			return a.authOK(req, tracker, authContext, api, envRequest), nil
@@ -252,8 +252,8 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 		return a.quotaExceeded(req, envRequest, tracker, authContext, api), nil
 	}
 
-	if err := envRequest.FetchIAMToken(); err != nil {
-		log.Errorf("failed to fetch IAM token: %v", err)
+	if err := envRequest.PrepareVariables(); err != nil {
+		log.Errorf("failed to populate context variable: %v", err)
 		return a.denied(req, envRequest, tracker, authContext, api), nil
 	}
 	return a.authOK(req, tracker, authContext, api, envRequest), nil
@@ -547,8 +547,8 @@ func (a *AuthorizationServer) createConditionalEnvoyDenied(
 	}
 
 	if authContext != nil && a.handler.allowUnauthorized {
-		if err := envRequest.FetchIAMToken(); err != nil {
-			log.Errorf("failed to fetch IAM token: %v", err)
+		if err := envRequest.PrepareVariables(); err != nil {
+			log.Errorf("failed to populate context variable: %v", err)
 			return a.createEnvoyDenied(req, envRequest, tracker, authContext, api, rpc.PERMISSION_DENIED, typev3.StatusCode_Forbidden)
 		}
 		log.Debugf("sending ok (actual: %s)", code.String())

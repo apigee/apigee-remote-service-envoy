@@ -26,7 +26,6 @@ import (
 	"sync"
 
 	"github.com/apigee/apigee-remote-service-envoy/v2/config"
-	iam "github.com/apigee/apigee-remote-service-envoy/v2/iam/google"
 	"github.com/apigee/apigee-remote-service-golib/v2/analytics"
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
 	"github.com/apigee/apigee-remote-service-golib/v2/auth/jwt"
@@ -162,24 +161,18 @@ func NewHandler(cfg *config.Config) (*Handler, error) {
 
 	environmentSpecsByID := make(map[string]*config.EnvironmentSpecExt, len(cfg.EnvironmentSpecs.Inline))
 	var jwtProviders []jwt.Provider
-	var iamsvc *iam.IAMService
+	var iamClient *http.Client
 	if len(cfg.EnvironmentSpecs.Inline) != 0 {
 		if creds, err := google.FindDefaultCredentials(context.Background(), config.ApigeeAPIScope); err != nil {
 			log.Warnf("failed to find application default credentials for google oauth: %v", err)
 		} else {
-			client := clientAuthorizedByCredentials(cfg, "google-oauth", creds)
-			svc, err := iam.NewIAMService(option.WithHTTPClient(client))
-			if err != nil {
-				log.Warnf("failed to create iam service: %v", err)
-			} else {
-				iamsvc = svc
-			}
+			iamClient = clientAuthorizedByCredentials(cfg, "google-oauth", creds)
 		}
 	}
 	for i := range cfg.EnvironmentSpecs.Inline {
 		// make EnvironmentSpecExt lookup table
 		spec := cfg.EnvironmentSpecs.Inline[i]
-		envSpec, err := config.NewEnvironmentSpecExt(&spec, config.WithIAMService(iamsvc))
+		envSpec, err := config.NewEnvironmentSpecExt(&spec, config.WithIAMClientOptions(option.WithHTTPClient(iamClient)))
 		if err != nil {
 			return nil, err
 		}

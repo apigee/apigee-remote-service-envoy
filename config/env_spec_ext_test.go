@@ -18,10 +18,12 @@
 package config
 
 import (
+	"net/http"
 	"strings"
 	"testing"
 
 	"github.com/apigee/apigee-remote-service-envoy/v2/testutil"
+	"google.golang.org/api/option"
 )
 
 func TestNewEnvironmentSpecExt(t *testing.T) {
@@ -135,11 +137,10 @@ func TestNewEnvironmentSpecExtError(t *testing.T) {
 	srv := testutil.IAMServer()
 	defer srv.Close()
 
-	iamsvc, err := testutil.IAMService(srv)
-	if err != nil {
-		t.Fatalf("failed to create test IAMService: %v", err)
+	opts := []option.ClientOption{
+		option.WithEndpoint(srv.URL),
+		option.WithHTTPClient(http.DefaultClient),
 	}
-	defer iamsvc.Close()
 
 	tests := []struct {
 		desc string
@@ -169,7 +170,7 @@ func TestNewEnvironmentSpecExtError(t *testing.T) {
 					}},
 				}},
 			},
-			opts: []EnvironmentSpecExtOption{WithIAMService(iamsvc)},
+			opts: []EnvironmentSpecExtOption{WithIAMClientOptions(opts...)},
 		},
 		{
 			desc: "access token info missing scopes at the API level",
@@ -184,7 +185,7 @@ func TestNewEnvironmentSpecExtError(t *testing.T) {
 					}},
 				}},
 			},
-			opts: []EnvironmentSpecExtOption{WithIAMService(iamsvc)},
+			opts: []EnvironmentSpecExtOption{WithIAMClientOptions(opts...)},
 		},
 		{
 			desc: "id token info missing audience at the API level",
@@ -199,7 +200,7 @@ func TestNewEnvironmentSpecExtError(t *testing.T) {
 					}},
 				}},
 			},
-			opts: []EnvironmentSpecExtOption{WithIAMService(iamsvc)},
+			opts: []EnvironmentSpecExtOption{WithIAMClientOptions(opts...)},
 		},
 		{
 			desc: "missing iam service at the operation level",
@@ -228,7 +229,7 @@ func TestNewEnvironmentSpecExtError(t *testing.T) {
 					}},
 				}},
 			},
-			opts: []EnvironmentSpecExtOption{WithIAMService(iamsvc)},
+			opts: []EnvironmentSpecExtOption{WithIAMClientOptions(opts...)},
 		},
 		{
 			desc: "access token info missing scopes at the operation level",
@@ -244,7 +245,7 @@ func TestNewEnvironmentSpecExtError(t *testing.T) {
 					}},
 				}},
 			},
-			opts: []EnvironmentSpecExtOption{WithIAMService(iamsvc)},
+			opts: []EnvironmentSpecExtOption{WithIAMClientOptions(opts...)},
 		},
 		{
 			desc: "id token info missing audience at the operation level",
@@ -260,7 +261,7 @@ func TestNewEnvironmentSpecExtError(t *testing.T) {
 					}},
 				}},
 			},
-			opts: []EnvironmentSpecExtOption{WithIAMService(iamsvc)},
+			opts: []EnvironmentSpecExtOption{WithIAMClientOptions(opts...)},
 		},
 	}
 
