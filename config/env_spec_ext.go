@@ -31,8 +31,10 @@ const (
 	doubleWildcard = "**"
 )
 
+// EnvironmentSpecExtOption applies to the EnvironmentSpecExt.
 type EnvironmentSpecExtOption func(e *EnvironmentSpecExt)
 
+// WithIAMService returns an EnvironmentSpecExtOption that configures its iamsvc.
 func WithIAMService(iamsvc *google.IAMService) EnvironmentSpecExtOption {
 	return func(e *EnvironmentSpecExt) {
 		e.iamsvc = iamsvc
