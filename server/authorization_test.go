@@ -20,6 +20,7 @@ import (
 	"crypto/rsa"
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"reflect"
@@ -39,6 +40,7 @@ import (
 	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	"github.com/gogo/googleapis/google/rpc"
 	"github.com/google/go-cmp/cmp"
+	"google.golang.org/api/option"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -1065,6 +1067,284 @@ func TestCORSResponseHeaders(t *testing.T) {
 			logged := printHeaderMods(okResponse)
 			if test.expectedLog != logged {
 				t.Errorf("want: %q\n, got: %q\n", test.expectedLog, logged)
+			}
+		})
+	}
+}
+
+func TestPrepareContextVariable(t *testing.T) {
+	srv := testutil.IAMServer()
+	defer srv.Close()
+
+	badSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "server not ready", http.StatusInternalServerError)
+	}))
+
+	goodEnvSpec := &config.EnvironmentSpec{
+		ID: "good-iam",
+		APIs: []config.APISpec{
+			{
+				ID:       "petstore",
+				BasePath: "/v1",
+				ContextVariables: []config.ContextVariable{{
+					Name: "iam_token",
+					Value: config.GoogleIAMCredentials{
+						ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
+						Token: config.AccessToken{
+							Scopes: []string{config.ApigeeAPIScope},
+						},
+					},
+				}},
+				HTTPRequestTransforms: config.HTTPRequestTransforms{
+					HeaderTransforms: config.NameValueTransforms{
+						Add: []config.AddNameValue{
+							{Name: "authorization", Value: "{context.iam_token}"},
+							{Name: "x-forwarded-authorization", Value: "{headers.authorization}"},
+						},
+					},
+				},
+				Operations: []config.APIOperation{
+					{
+						Name: "op1",
+						HTTPMatches: []config.HTTPMatch{{
+							PathTemplate: "/op-1",
+						}},
+					},
+					{
+						Name: "op2",
+						HTTPMatches: []config.HTTPMatch{{
+							PathTemplate: "/op-2",
+						}},
+						ContextVariables: []config.ContextVariable{{
+							Name: "iam_token",
+							Value: config.GoogleIAMCredentials{
+								ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
+								Token: config.IdentityToken{
+									Audience: "aud",
+								},
+							},
+						}},
+					},
+					{
+						Name: "op3",
+						HTTPMatches: []config.HTTPMatch{{
+							PathTemplate: "/op-3",
+						}},
+						// Remove original auth header
+						HTTPRequestTransforms: config.HTTPRequestTransforms{
+							HeaderTransforms: config.NameValueTransforms{
+								Add: []config.AddNameValue{
+									{Name: "authorization", Value: "{context.iam_token}"},
+								},
+								// Remove should happen before add so this should not break anything.
+								Remove: []string{"authorization"},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	badEnvSpec := &config.EnvironmentSpec{
+		ID: "bad_iam",
+		APIs: []config.APISpec{
+			{
+				ID:       "petstore",
+				BasePath: "/v1",
+				ContextVariables: []config.ContextVariable{{
+					Name: "iam_token",
+					Value: config.GoogleIAMCredentials{
+						ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
+						Token: config.AccessToken{
+							Scopes: []string{config.ApigeeAPIScope},
+						},
+					},
+				}},
+				ConsumerAuthorization: config.ConsumerAuthorization{
+					In: []config.APIOperationParameter{{
+						Match: config.Header("x-api-key"),
+					}},
+					FailOpen: true,
+				},
+				Operations: []config.APIOperation{
+					{
+						HTTPMatches: []config.HTTPMatch{{
+							PathTemplate: "/op-1",
+						}},
+					},
+					{
+						HTTPMatches: []config.HTTPMatch{{
+							PathTemplate: "/op-2",
+						}},
+						ConsumerAuthorization: config.ConsumerAuthorization{Disabled: true},
+					},
+				},
+			},
+		},
+	}
+
+	opts := []option.ClientOption{
+		option.WithEndpoint(srv.URL),
+		option.WithHTTPClient(http.DefaultClient),
+	}
+	specExt, err := config.NewEnvironmentSpecExt(goodEnvSpec, config.WithIAMClientOptions(opts...))
+	if err != nil {
+		t.Fatal(err)
+	}
+	badOpts := []option.ClientOption{
+		option.WithEndpoint(badSrv.URL),
+		option.WithHTTPClient(http.DefaultClient),
+	}
+	badSpecExt, err := config.NewEnvironmentSpecExt(badEnvSpec, config.WithIAMClientOptions(badOpts...))
+	if err != nil {
+		t.Fatal(err)
+	}
+	environmentSpecsByID := map[string]*config.EnvironmentSpecExt{
+		goodEnvSpec.ID: specExt,
+		badSpecExt.ID:  badSpecExt,
+	}
+
+	testAuthMan := &testAuthMan{}
+	testProductMan := &testProductMan{
+		api:     "petstore",
+		resolve: true,
+		products: product.ProductsNameMap{
+			"product1": &product.APIProduct{
+				DisplayName: "product1",
+			},
+		},
+	}
+	testQuotaMan := &testQuotaMan{}
+	testAnalyticsMan := &testAnalyticsMan{}
+	server := AuthorizationServer{
+		handler: &Handler{
+			authMan:               testAuthMan,
+			productMan:            testProductMan,
+			quotaMan:              testQuotaMan,
+			jwtProviderKey:        "apigee",
+			appendMetadataHeaders: true,
+			analyticsMan:          testAnalyticsMan,
+			envSpecsByID:          environmentSpecsByID,
+			ready:                 util.NewAtomicBool(true),
+		},
+	}
+
+	tests := []struct {
+		desc        string
+		path        string
+		headers     map[string]string
+		wantHeaders map[string]string // header -> value
+		specExtID   string
+		statusCode  int32
+		authContext *auth.Context
+		authErr     error
+	}{
+		{
+			desc:      "access token at api level",
+			path:      "/v1/op-1",
+			specExtID: goodEnvSpec.ID,
+			wantHeaders: map[string]string{
+				"authorization": "Bearer access-token",
+			},
+		},
+		{
+			desc:      "id token at api level",
+			path:      "/v1/op-2",
+			specExtID: goodEnvSpec.ID,
+			wantHeaders: map[string]string{
+				"authorization": "Bearer id-token",
+			},
+		},
+		{
+			desc:      "original auth forwarded",
+			path:      "/v1/op-1",
+			specExtID: goodEnvSpec.ID,
+			headers: map[string]string{
+				"authorization": "original",
+			},
+			wantHeaders: map[string]string{
+				"authorization":             "Bearer access-token",
+				"x-forwarded-authorization": "original",
+			},
+		},
+		{
+			desc:      "original auth not forwarded because it's configured to be removed",
+			path:      "/v1/op-3",
+			specExtID: goodEnvSpec.ID,
+			headers: map[string]string{
+				"authorization": "original",
+			},
+			wantHeaders: map[string]string{
+				"authorization": "Bearer access-token",
+			},
+		},
+		{
+			desc:      "denied response w/ auth from access token fetching error",
+			path:      "/v1/op-1",
+			specExtID: badEnvSpec.ID,
+			headers: map[string]string{
+				"x-api-key": "key",
+			},
+			authContext: &auth.Context{
+				APIProducts: []string{"product1"},
+			},
+			statusCode: int32(rpc.PERMISSION_DENIED),
+		},
+		{
+			desc:      "denied response w/ auth from access token fetching error",
+			path:      "/v1/op-1",
+			specExtID: badEnvSpec.ID,
+			headers: map[string]string{
+				"x-api-key": "key",
+			},
+			authContext: &auth.Context{
+				APIProducts: []string{"product1"},
+			},
+			statusCode: int32(rpc.PERMISSION_DENIED),
+		},
+		{
+			desc:       "denied response w/ auth failed open from access token fetching error",
+			path:       "/v1/op-1",
+			specExtID:  badEnvSpec.ID,
+			authErr:    auth.ErrNetworkError,
+			statusCode: int32(rpc.PERMISSION_DENIED),
+		},
+		{
+			desc:      "denied response w/o auth from access token fetching error",
+			path:      "/v1/op-2",
+			specExtID: badEnvSpec.ID,
+			authContext: &auth.Context{
+				APIProducts: []string{"product1"},
+			},
+			statusCode: int32(rpc.PERMISSION_DENIED),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			req := testutil.NewEnvoyRequest(http.MethodGet, test.path, test.headers, nil)
+			req.Attributes.ContextExtensions = map[string]string{
+				envSpecContextKey: test.specExtID,
+			}
+			testAuthMan.sendAuth(test.authContext, test.authErr)
+			resp, err := server.Check(context.Background(), req)
+			if err != nil {
+				t.Fatalf("Check(...) err = %v, wanted no error", err)
+			}
+			if code := resp.GetStatus().GetCode(); code != test.statusCode {
+				t.Fatalf("Check(...) status = %d, wanted %d", code, test.statusCode)
+			}
+			if resp.GetStatus().GetCode() == int32(rpc.OK) {
+				okr := resp.GetOkResponse()
+				if okr == nil {
+					t.Fatal("OkResponse is nil")
+				}
+				for h, v := range test.wantHeaders {
+					if !hasHeaderAdd(okr.GetHeaders(), h, v, false) {
+						t.Errorf("%q header should be: %q", h, v)
+					}
+				}
 			}
 		})
 	}

@@ -18,8 +18,12 @@
 package config
 
 import (
+	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/apigee/apigee-remote-service-envoy/v2/testutil"
+	"google.golang.org/api/option"
 )
 
 func TestNewEnvironmentSpecExt(t *testing.T) {
@@ -124,6 +128,88 @@ func TestAuthorizationRequirementIsEmpty(t *testing.T) {
 			}
 			if test.empty != req.IsEmpty() {
 				t.Errorf("expected empty == %t", test.empty)
+			}
+		})
+	}
+}
+
+func TestNewEnvironmentSpecExtError(t *testing.T) {
+	srv := testutil.IAMServer()
+	defer srv.Close()
+
+	opts := []option.ClientOption{
+		option.WithEndpoint(srv.URL),
+		option.WithHTTPClient(http.DefaultClient),
+	}
+
+	tests := []struct {
+		desc string
+		spec *EnvironmentSpec
+		opts []EnvironmentSpecExtOption
+	}{
+		{
+			desc: "missing iam service at the API level",
+			spec: &EnvironmentSpec{
+				APIs: []APISpec{{
+					ContextVariables: []ContextVariable{{
+						Name:  "iam_token",
+						Value: GoogleIAMCredentials{},
+					}},
+				}},
+			},
+		},
+		{
+			desc: "missing service account at the API level",
+			spec: &EnvironmentSpec{
+				APIs: []APISpec{{
+					ContextVariables: []ContextVariable{{
+						Name: "iam_token",
+						Value: GoogleIAMCredentials{
+							Token: AccessToken{},
+						},
+					}},
+				}},
+			},
+			opts: []EnvironmentSpecExtOption{WithIAMClientOptions(opts...)},
+		},
+		{
+			desc: "id token info missing audience at the API level",
+			spec: &EnvironmentSpec{
+				APIs: []APISpec{{
+					ContextVariables: []ContextVariable{{
+						Name: "iam_token",
+						Value: GoogleIAMCredentials{
+							ServiceAccountEmail: "foo@bar.com",
+							Token:               IdentityToken{},
+						},
+					}},
+				}},
+			},
+			opts: []EnvironmentSpecExtOption{WithIAMClientOptions(opts...)},
+		},
+		{
+			desc: "access token info missing scopes at the operation level",
+			spec: &EnvironmentSpec{
+				APIs: []APISpec{{
+					Operations: []APIOperation{{
+						ContextVariables: []ContextVariable{{
+							Name: "iam_token",
+							Value: GoogleIAMCredentials{
+								Token: AccessToken{},
+							},
+						}},
+					}},
+				}},
+			},
+			opts: []EnvironmentSpecExtOption{WithIAMClientOptions(opts...)},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			_, err := NewEnvironmentSpecExt(test.spec, test.opts...)
+			if err == nil {
+				t.Errorf("NewEnvironmentSpecExt(...) err == nil, wanted error")
 			}
 		})
 	}

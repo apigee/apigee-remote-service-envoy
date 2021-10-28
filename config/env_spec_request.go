@@ -56,6 +56,7 @@ const (
 	QueryNamespace             = "query"
 	PathNamespace              = "path"
 	HeaderNamespace            = "headers"
+	ContextNamespace           = "context"
 	RequestPath                = "path"
 	RequestQuerystring         = "querystring"
 )
@@ -158,6 +159,7 @@ func (e *EnvironmentSpecRequest) parseRequestVariables(pathTemplate *transform.T
 		headers: e.Request.Attributes.Request.Http.Headers,
 		request: map[string]string{},
 		query:   map[string]string{},
+		context: map[string]string{},
 	}
 
 	vars.request[RequestPath] = opPath
@@ -182,6 +184,7 @@ type requestVariables struct {
 	request map[string]string
 	query   map[string]string
 	path    map[string]string
+	context map[string]string
 }
 
 func (rv requestVariables) LookupValue(name string) (string, bool) {
@@ -198,6 +201,8 @@ func (rv requestVariables) LookupValue(name string) (string, bool) {
 			mapping = rv.path
 		case HeaderNamespace:
 			mapping = rv.headers
+		case ContextNamespace:
+			mapping = rv.context
 		}
 	}
 
@@ -207,6 +212,26 @@ func (rv requestVariables) LookupValue(name string) (string, bool) {
 
 	val, ok := mapping[splits[1]]
 	return val, ok
+}
+
+// PrepareVariables go over all the variables for the specific request
+// and populate them for the http request transform.
+func (e *EnvironmentSpecRequest) PrepareVariables() error {
+	if e == nil || e.apiSpec == nil {
+		return nil
+	}
+	variables := e.apiVariables[e.apiSpec.ID]
+	if vs := e.opVariables[e.apiSpec.ID][e.GetOperation().Name]; len(vs) != 0 {
+		variables = vs
+	}
+	for _, v := range variables {
+		val, err := v.Value()
+		if err != nil {
+			return err
+		}
+		e.variables.context[v.Name()] = val
+	}
+	return nil
 }
 
 // GetQueryParams returns a safe copy of the QueryParams map
@@ -510,7 +535,7 @@ func (e *EnvironmentSpecRequest) GetAPIKey() (key string) {
 		auth := e.GetConsumerAuthorization()
 		if !auth.Disabled {
 			for _, authorization := range auth.In {
-				if key = e.GetParamValue(authorization); key != "" {
+				if key := e.GetParamValue(authorization); key != "" {
 					// First match wins.
 					return key
 				}

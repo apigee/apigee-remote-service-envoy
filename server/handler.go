@@ -38,6 +38,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	"google.golang.org/api/option"
 )
 
 // A Handler is the main entry
@@ -160,10 +161,18 @@ func NewHandler(cfg *config.Config) (*Handler, error) {
 
 	environmentSpecsByID := make(map[string]*config.EnvironmentSpecExt, len(cfg.EnvironmentSpecs.Inline))
 	var jwtProviders []jwt.Provider
+	var iamClient *http.Client
+	if len(cfg.EnvironmentSpecs.Inline) != 0 {
+		if creds, err := google.FindDefaultCredentials(context.Background(), config.ApigeeAPIScope); err != nil {
+			log.Warnf("failed to find application default credentials for google oauth: %v", err)
+		} else {
+			iamClient = clientAuthorizedByCredentials(cfg, "google-oauth", creds)
+		}
+	}
 	for i := range cfg.EnvironmentSpecs.Inline {
 		// make EnvironmentSpecExt lookup table
 		spec := cfg.EnvironmentSpecs.Inline[i]
-		envSpec, err := config.NewEnvironmentSpecExt(&spec)
+		envSpec, err := config.NewEnvironmentSpecExt(&spec, config.WithIAMClientOptions(option.WithHTTPClient(iamClient)))
 		if err != nil {
 			return nil, err
 		}

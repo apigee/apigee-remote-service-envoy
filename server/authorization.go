@@ -144,6 +144,10 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 
 		if !envRequest.IsAuthorizationRequired() {
 			log.Debugf("no authorization requirements")
+			if err := envRequest.PrepareVariables(); err != nil {
+				log.Errorf("failed to populate context variable: %v", err)
+				return a.denied(req, envRequest, tracker, &auth.Context{Context: rootContext}, api), nil
+			}
 			// Send the root context for limited dynamic metadata.
 			return a.authOK(req, tracker, &auth.Context{Context: rootContext}, api, envRequest), nil
 		}
@@ -218,6 +222,10 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 	case auth.ErrNetworkError:
 		if envRequest != nil && envRequest.GetConsumerAuthorization().FailOpen {
 			log.Debugf("FailOpen on operation: %v", envRequest.GetOperation().Name)
+			if err := envRequest.PrepareVariables(); err != nil {
+				log.Errorf("failed to populate context variable: %v", err)
+				return a.denied(req, envRequest, tracker, authContext, api), nil
+			}
 			return a.authOK(req, tracker, authContext, api, envRequest), nil
 		} else {
 			return a.internalError(req, envRequest, tracker, err), nil
@@ -244,6 +252,10 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 		return a.quotaExceeded(req, envRequest, tracker, authContext, api), nil
 	}
 
+	if err := envRequest.PrepareVariables(); err != nil {
+		log.Errorf("failed to populate context variable: %v", err)
+		return a.denied(req, envRequest, tracker, authContext, api), nil
+	}
 	return a.authOK(req, tracker, authContext, api, envRequest), nil
 }
 
@@ -296,10 +308,13 @@ func (a *AuthorizationServer) createEnvoyForwarded(
 
 	// apigee dynamic data response headers
 	var basepath string
-	if envRequest != nil && envRequest.GetAPISpec() != nil {
-		basepath = envRequest.GetAPISpec().BasePath
+	var dynamicDataHeaders []*corev3.HeaderValueOption
+	if envRequest != nil {
+		if envRequest.GetAPISpec() != nil {
+			basepath = envRequest.GetAPISpec().BasePath
+		}
+		dynamicDataHeaders = apigeeDynamicDataHeaders(a.handler.Organization(), a.handler.Environment(), api, basepath, false)
 	}
-	dynamicDataHeaders := apigeeDynamicDataHeaders(a.handler.Organization(), a.handler.Environment(), api, basepath, false)
 	okResponse.ResponseHeadersToAdd = append(okResponse.ResponseHeadersToAdd, dynamicDataHeaders...)
 
 	if log.DebugEnabled() {
@@ -536,6 +551,10 @@ func (a *AuthorizationServer) createConditionalEnvoyDenied(
 	}
 
 	if authContext != nil && a.handler.allowUnauthorized {
+		if err := envRequest.PrepareVariables(); err != nil {
+			log.Errorf("failed to populate context variable: %v", err)
+			return a.createEnvoyDenied(req, envRequest, tracker, authContext, api, rpc.PERMISSION_DENIED, typev3.StatusCode_Forbidden)
+		}
 		log.Debugf("sending ok (actual: %s)", code.String())
 		return a.createEnvoyForwarded(req, tracker, authContext, api, envRequest)
 	}
