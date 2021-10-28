@@ -41,29 +41,35 @@ func TestTokenSourceReuse(t *testing.T) {
 	}
 	defer s.Close()
 
-	_, err = s.IdentityTokenSource("sa", "aud", true, time.Hour)
+	its1, err := s.IdentityTokenSource("sa", "aud", true, time.Hour)
 	if err != nil {
 		t.Fatalf("IdentityTokenSource() err = %v, wanted no error", err)
 	}
-	_, err = s.IdentityTokenSource("sa", "aud", true, time.Hour)
+	its2, err := s.IdentityTokenSource("sa", "aud", true, time.Hour)
 	if err != nil {
 		t.Fatalf("IdentityTokenSource() err = %v, wanted no error", err)
 	}
 	if l := len(s.idTokenSourcePool); l != 1 {
 		t.Errorf("identity token source pool should have only 1 element, got %d", l)
 	}
+	if its1 != its2 {
+		t.Errorf("two identity token sources references should point to the same object")
+	}
 
-	_, err = s.AccessTokenSource("sa", []string{"s1", "s2"}, time.Hour)
+	ats1, err := s.AccessTokenSource("sa", []string{"s1", "s2"}, time.Hour)
 	if err != nil {
 		t.Fatalf("AccessTokenSource() err = %v, wanted no error", err)
 	}
 	// Scopes order should not matter.
-	_, err = s.AccessTokenSource("sa", []string{"s2", "s1"}, time.Hour)
+	ats2, err := s.AccessTokenSource("sa", []string{"s2", "s1"}, time.Hour)
 	if err != nil {
 		t.Fatalf("AccessTokenSource() err = %v, wanted no error", err)
 	}
 	if l := len(s.accessTokenSourcePool); l != 1 {
 		t.Errorf("access token source pool should have only 1 element, got %d", l)
+	}
+	if ats1 != ats2 {
+		t.Errorf("two access token sources references should point to the same object")
 	}
 }
 

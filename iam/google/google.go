@@ -108,6 +108,7 @@ func (s *IAMService) Close() {
 }
 
 // AccessTokenSource returns a new access token source. Service account email and scopes are required.
+// Internally, a pool of token sources is maintained and reused if all the given parameters are matched.
 func (s *IAMService) AccessTokenSource(saEmail string, scopes []string, refreshInterval time.Duration) (*AccessTokenSource, error) {
 	if saEmail == "" {
 		return nil, fmt.Errorf("service account is required to create access token source")
@@ -155,6 +156,7 @@ func (s *IAMService) AccessTokenSource(saEmail string, scopes []string, refreshI
 }
 
 // IdentityTokenSource returns a new ID token source. Service account email and audience are required.
+// Internally, a pool of token sources is maintained and reused if all the given parameters are matched.
 func (s *IAMService) IdentityTokenSource(saEmail, audience string, includeEmail bool, refreshInterval time.Duration) (*IdentityTokenSource, error) {
 	if saEmail == "" {
 		return nil, fmt.Errorf("service account is required to create id token source")
