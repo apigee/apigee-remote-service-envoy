@@ -226,10 +226,10 @@ func TestPathTransforms(t *testing.T) {
 			addQueries: []config.AddNameValue{
 				{Name: "append", Value: "append1", Append: true},
 				{Name: "append", Value: "append2", Append: true},
-				{Name: "set", Value: "set1", Append: false},
+				{Name: "query", Value: "{query.remove1}", Append: false},
 			},
 			removeQueries: []string{"Remove1", "missing"},
-			targetPath:    "/v2/petstore?append=append1&append=append2&set=set1",
+			targetPath:    "/v2/petstore?append=append1&append=append2&query=test",
 		},
 		{
 			desc:          "test3",
