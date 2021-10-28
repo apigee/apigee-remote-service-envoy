@@ -139,7 +139,7 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec, options ...EnvironmentSpecExtO
 		}
 
 		for _, cv := range api.ContextVariables {
-			v, err := cv.GenerateVariable(ec.iamsvc)
+			v, err := generateVariableForGoogleIAM(&cv, ec.iamsvc)
 			if err != nil {
 				return nil, err
 			}
@@ -197,7 +197,7 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec, options ...EnvironmentSpecExtO
 			}
 
 			for _, cv := range op.ContextVariables {
-				v, err := cv.GenerateVariable(ec.iamsvc)
+				v, err := generateVariableForGoogleIAM(&cv, ec.iamsvc)
 				if err != nil {
 					return nil, err
 				}
@@ -218,8 +218,7 @@ func NewEnvironmentSpecExt(spec *EnvironmentSpec, options ...EnvironmentSpecExtO
 	return ec, nil
 }
 
-// GenerateVariable returns a variable.
-func (cv ContextVariable) GenerateVariable(iamsvc *google.IAMService) (Variable, error) {
+func generateVariableForGoogleIAM(cv *ContextVariable, iamsvc *google.IAMService) (Variable, error) {
 	switch v := cv.Value.(type) {
 	case GoogleIAMCredentials:
 		if iamsvc == nil {
