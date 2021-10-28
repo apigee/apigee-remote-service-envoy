@@ -208,18 +208,18 @@ func TestPathTransforms(t *testing.T) {
 		},
 		{
 			desc:          "test1",
-			path:          "/v1/petstore",
+			path:          "/v1/petstore?remove1=test",
 			pathTransform: "/v2/{request.path}",
 			addQueries: []config.AddNameValue{
 				{Name: "append", Value: "append1", Append: true},
 				{Name: "set", Value: "set1", Append: false},
 			},
-			removeQueries: []string{"remove1"},
+			removeQueries: []string{"remove*"},
 			targetPath:    "/v2/petstore?append=append1&set=set1",
 		},
 		{
 			desc:          "test2",
-			path:          "/v1/petstore",
+			path:          "/v1/petstore?remove1=test",
 			pathTransform: "/v2/{request.path}",
 			addQueries: []config.AddNameValue{
 				{Name: "append", Value: "append1", Append: true},
@@ -231,7 +231,7 @@ func TestPathTransforms(t *testing.T) {
 		},
 		{
 			desc:          "test3",
-			path:          "/v1/petstore",
+			path:          "/v1/petstore?remove1=test&remove2=test",
 			pathTransform: "/v2/{request.path}",
 			addQueries:    []config.AddNameValue{},
 			removeQueries: []string{"Remove*"},

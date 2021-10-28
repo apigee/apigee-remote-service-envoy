@@ -380,7 +380,11 @@ func addRequestHeaderTransforms(req *authv3.CheckRequest, envRequest *config.Env
 			queryMap := envRequest.GetQueryParams()
 			for _, t := range transforms.QueryTransforms.Remove {
 				t = strings.ToLower(t)
-				delete(queryMap, t)
+				for ea := range queryMap {
+					if util.SimpleGlobMatch(t, ea) {
+						delete(queryMap, ea)
+					}
+				}
 			}
 			queryAppends := make(map[string][]string) // excess adds
 			for k, v := range queryMap {
