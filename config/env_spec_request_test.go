@@ -940,6 +940,8 @@ func TestPrepareVariable(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	defer specExt.Close()
+
 	tests := []struct {
 		desc           string
 		path           string

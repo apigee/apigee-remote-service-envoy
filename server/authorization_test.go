@@ -1192,6 +1192,7 @@ func TestPrepareContextVariable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer specExt.Close()
 	badOpts := []option.ClientOption{
 		option.WithEndpoint(badSrv.URL),
 		option.WithHTTPClient(http.DefaultClient),
@@ -1200,6 +1201,7 @@ func TestPrepareContextVariable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer specExt.Close()
 	environmentSpecsByID := map[string]*config.EnvironmentSpecExt{
 		goodEnvSpec.ID: specExt,
 		badSpecExt.ID:  badSpecExt,
