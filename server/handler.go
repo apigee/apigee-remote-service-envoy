@@ -67,7 +67,7 @@ type Handler struct {
 // Close waits for all managers to close
 func (h *Handler) Close() {
 	wg := sync.WaitGroup{}
-	wg.Add(4)
+	wg.Add(4 + len(h.envSpecsByID))
 	type Closable interface {
 		Close()
 	}
@@ -79,6 +79,9 @@ func (h *Handler) Close() {
 	go close(h.authMan)
 	go close(h.analyticsMan)
 	go close(h.quotaMan)
+	for _, e := range h.envSpecsByID {
+		go close(e)
+	}
 	wg.Wait()
 }
 

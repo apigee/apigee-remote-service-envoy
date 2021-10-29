@@ -285,6 +285,13 @@ type EnvironmentSpecExt struct {
 	opVariables        map[string]map[string][]Variable // api ID -> op Name -> variables
 }
 
+// Close terminates all the polling processes.
+func (e *EnvironmentSpecExt) Close() {
+	if e.iamsvc != nil {
+		e.iamsvc.Close()
+	}
+}
+
 // JWTAuthentications returns a list of all JWTAuthentications for the Spec
 func (e EnvironmentSpecExt) JWTAuthentications() []*JWTAuthentication {
 	var auths []*JWTAuthentication
