@@ -31,7 +31,7 @@ apis:
       - name: x-forwarded-authorization
         value: "{header.authorization}"
       - name: authorization
-        value: "{context.iam_token}"
+        value: "{_internal.iam_token}"
   context_variables:
   - name: iam_token
     google_iam:

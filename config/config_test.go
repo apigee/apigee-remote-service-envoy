@@ -709,7 +709,7 @@ func TestLoadEnvironmentSpecs(t *testing.T) {
 								Add: []AddNameValue{
 									{Name: "x-apigee-route", Value: "route"},
 									{Name: "x-forwarded-authorization", Value: "{header.authorization}"},
-									{Name: "authorization", Value: "{context.iam_token}"},
+									{Name: "authorization", Value: "{_internal.iam_token}"},
 								},
 							},
 						},

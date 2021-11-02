@@ -982,8 +982,8 @@ func TestPrepareVariable(t *testing.T) {
 			if err != nil {
 				t.Fatalf("PrepareVariables() err = %v, wanted no error", err)
 			}
-			if got := req.variables.context["iam_token"]; test.wantTargetAuth != got {
-				t.Errorf("{context.iam_token} = %q, wanted %q", got, test.wantTargetAuth)
+			if got := req.variables.internalContext["iam_token"]; test.wantTargetAuth != got {
+				t.Errorf("{_internal.iam_token} = %q, wanted %q", got, test.wantTargetAuth)
 			}
 		})
 	}

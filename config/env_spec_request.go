@@ -56,7 +56,7 @@ const (
 	QueryNamespace             = "query"
 	PathNamespace              = "path"
 	HeaderNamespace            = "headers"
-	ContextNamespace           = "context"
+	InternalNamespace          = "_internal"
 	RequestPath                = "path"
 	RequestQuerystring         = "querystring"
 )
@@ -155,11 +155,11 @@ type jwtResult struct {
 func (e *EnvironmentSpecRequest) parseRequestVariables(pathTemplate *transform.Template, opPath, queryString string) *requestVariables {
 
 	vars := &requestVariables{
-		path:    pathTemplate.Extract(opPath),
-		headers: e.Request.Attributes.Request.Http.Headers,
-		request: map[string]string{},
-		query:   map[string]string{},
-		context: map[string]string{},
+		path:            pathTemplate.Extract(opPath),
+		headers:         e.Request.Attributes.Request.Http.Headers,
+		request:         map[string]string{},
+		query:           map[string]string{},
+		internalContext: map[string]string{},
 	}
 
 	vars.request[RequestPath] = opPath
@@ -184,7 +184,8 @@ type requestVariables struct {
 	request map[string]string
 	query   map[string]string
 	path    map[string]string
-	context map[string]string
+	// Not generated from the request content.
+	internalContext map[string]string
 }
 
 func (rv requestVariables) LookupValue(name string) (string, bool) {
@@ -201,8 +202,8 @@ func (rv requestVariables) LookupValue(name string) (string, bool) {
 			mapping = rv.path
 		case HeaderNamespace:
 			mapping = rv.headers
-		case ContextNamespace:
-			mapping = rv.context
+		case InternalNamespace:
+			mapping = rv.internalContext
 		}
 	}
 
@@ -229,7 +230,7 @@ func (e *EnvironmentSpecRequest) PrepareVariables() error {
 		if err != nil {
 			return err
 		}
-		e.variables.context[v.Name()] = val
+		e.variables.internalContext[v.Name()] = val
 	}
 	return nil
 }

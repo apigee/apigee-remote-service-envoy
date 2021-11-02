@@ -1098,7 +1098,7 @@ func TestPrepareContextVariable(t *testing.T) {
 				HTTPRequestTransforms: config.HTTPRequestTransforms{
 					HeaderTransforms: config.NameValueTransforms{
 						Add: []config.AddNameValue{
-							{Name: "authorization", Value: "{context.iam_token}"},
+							{Name: "authorization", Value: "{_internal.iam_token}"},
 							{Name: "x-forwarded-authorization", Value: "{headers.authorization}"},
 						},
 					},
@@ -1134,7 +1134,7 @@ func TestPrepareContextVariable(t *testing.T) {
 						HTTPRequestTransforms: config.HTTPRequestTransforms{
 							HeaderTransforms: config.NameValueTransforms{
 								Add: []config.AddNameValue{
-									{Name: "authorization", Value: "{context.iam_token}"},
+									{Name: "authorization", Value: "{_internal.iam_token}"},
 								},
 								// Remove should happen before add so this should not break anything.
 								Remove: []string{"authorization"},
