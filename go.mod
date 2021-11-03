@@ -2,7 +2,7 @@ module github.com/apigee/apigee-remote-service-envoy/v2
 
 go 1.17
 
-replace github.com/apigee/apigee-remote-service-golib/v2 => ../apigee-remote-service-golib
+// replace github.com/apigee/apigee-remote-service-golib/v2 => ../apigee-remote-service-golib
 
 // Viper pulls in github.com/hashicorp/hcl which has a MPL license.
 // We don't need or use this library, so replace it with a local shim.
