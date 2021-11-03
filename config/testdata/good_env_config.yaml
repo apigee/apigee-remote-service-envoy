@@ -34,6 +34,7 @@ apis:
         value: "{_internal.iam_token}"
   context_variables:
   - name: iam_token
+    namespace: _internal
     google_iam:
       service_account_email: foo@bar.iam.gserviceaccount.com
       id_token:

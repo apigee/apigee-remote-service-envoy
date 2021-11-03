@@ -857,7 +857,8 @@ func TestPrepareVariable(t *testing.T) {
 				ID:       "petstore", // required for the test to work
 				BasePath: "/v1",
 				ContextVariables: []ContextVariable{{
-					Name: "iam_token",
+					Name:      "iam_token",
+					Namespace: "_internal",
 					Value: GoogleIAMCredentials{
 						ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
 						Token: AccessToken{
@@ -878,7 +879,8 @@ func TestPrepareVariable(t *testing.T) {
 							PathTemplate: "/op-2",
 						}},
 						ContextVariables: []ContextVariable{{
-							Name: "iam_token",
+							Name:      "iam_token",
+							Namespace: "_internal",
 							Value: GoogleIAMCredentials{
 								ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
 								Token: IdentityToken{
@@ -893,7 +895,8 @@ func TestPrepareVariable(t *testing.T) {
 				ID:       "bookstore",
 				BasePath: "/v2",
 				ContextVariables: []ContextVariable{{
-					Name: "iam_token",
+					Name:      "iam_token",
+					Namespace: "_internal",
 					Value: GoogleIAMCredentials{
 						ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
 						Token: IdentityToken{
@@ -914,7 +917,8 @@ func TestPrepareVariable(t *testing.T) {
 							PathTemplate: "/op-2",
 						}},
 						ContextVariables: []ContextVariable{{
-							Name: "iam_token",
+							Name:      "iam_token",
+							Namespace: "_internal",
 							Value: GoogleIAMCredentials{
 								ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
 								Token: AccessToken{
@@ -982,7 +986,7 @@ func TestPrepareVariable(t *testing.T) {
 			if err != nil {
 				t.Fatalf("PrepareVariables() err = %v, wanted no error", err)
 			}
-			if got := req.variables.internalContext["iam_token"]; test.wantTargetAuth != got {
+			if got := req.variables.context["_internal"]["iam_token"]; test.wantTargetAuth != got {
 				t.Errorf("{_internal.iam_token} = %q, wanted %q", got, test.wantTargetAuth)
 			}
 		})

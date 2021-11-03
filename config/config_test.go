@@ -715,7 +715,8 @@ func TestLoadEnvironmentSpecs(t *testing.T) {
 						},
 						ContextVariables: []ContextVariable{
 							{
-								Name: "iam_token",
+								Name:      "iam_token",
+								Namespace: "_internal",
 								Value: GoogleIAMCredentials{
 									ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
 									Token: IdentityToken{

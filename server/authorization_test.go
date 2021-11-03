@@ -1087,7 +1087,8 @@ func TestPrepareContextVariable(t *testing.T) {
 				ID:       "petstore",
 				BasePath: "/v1",
 				ContextVariables: []config.ContextVariable{{
-					Name: "iam_token",
+					Name:      "iam_token",
+					Namespace: "_internal",
 					Value: config.GoogleIAMCredentials{
 						ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
 						Token: config.AccessToken{
@@ -1116,7 +1117,8 @@ func TestPrepareContextVariable(t *testing.T) {
 							PathTemplate: "/op-2",
 						}},
 						ContextVariables: []config.ContextVariable{{
-							Name: "iam_token",
+							Name:      "iam_token",
+							Namespace: "_internal",
 							Value: config.GoogleIAMCredentials{
 								ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
 								Token: config.IdentityToken{
@@ -1153,7 +1155,8 @@ func TestPrepareContextVariable(t *testing.T) {
 				ID:       "petstore",
 				BasePath: "/v1",
 				ContextVariables: []config.ContextVariable{{
-					Name: "iam_token",
+					Name:      "iam_token",
+					Namespace: "_internal",
 					Value: config.GoogleIAMCredentials{
 						ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
 						Token: config.AccessToken{
