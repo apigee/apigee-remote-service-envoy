@@ -664,6 +664,7 @@ type ContextVariable struct {
 	Value Value `yaml:"-" mapstructure:"-"`
 }
 
+// Value is the interface implemented by GoogleIAMCredentials.
 type Value interface {
 	value()
 }
@@ -728,6 +729,7 @@ type GoogleIAMCredentials struct {
 
 func (g GoogleIAMCredentials) value() {}
 
+// Token is the token interface implemented by AccessToken and IdentityToken.
 type Token interface {
 	token()
 }
