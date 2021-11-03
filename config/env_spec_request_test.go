@@ -170,7 +170,9 @@ func TestGetOperation(t *testing.T) {
 		{"noop", http.MethodPost, "/v3/bookshop/", nil, "/bookshop/", "/bookshop/", defaultOperation},
 		// The basepath for this one is "/v4/*" so expecting "/v4/do" to be trimmed.
 		{"empty", http.MethodPost, "/v4/do/whatever/", nil, "/whatever/", "/whatever/", empty},
+		// Empty operation should match the below two request paths represent zero and
 		{"empty", http.MethodPost, "/v4/do/what/ever", nil, "/what/ever", "/what/ever", empty},
+		{"empty", http.MethodPost, "/v4/do", nil, "/", "/", empty},
 		{"grpc with specified op", http.MethodPost, "/foo.petstore.PetstoreService/ListPets", map[string]string{"content-type": "application/grpc"}, "/ListPets", "/foo.petstore.PetstoreService/ListPets", grpcList},
 		{"grpc with unspecified op", http.MethodPost, "/foo.petstore.PetstoreService/GetPet", map[string]string{"content-type": "application/grpc"}, "/GetPet", "/foo.petstore.PetstoreService/GetPet", nil},
 	}
