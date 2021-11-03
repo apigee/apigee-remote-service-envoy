@@ -901,7 +901,6 @@ func TestImmediateAnalytics(t *testing.T) {
 		AccessToken:    "token",
 		Application:    "app",
 		APIProducts:    []string{"product1"},
-		Expires:        time.Now(),
 		DeveloperEmail: "email",
 		Scopes:         []string{"scope"},
 		APIKey:         "apikey",
