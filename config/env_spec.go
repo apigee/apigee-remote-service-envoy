@@ -654,20 +654,25 @@ func (c CorsPolicy) IsEmpty() bool {
 
 // ContextVariable defines a variable that will be generated and used in the request transform.
 type ContextVariable struct {
-	// Name is the variable identifier, i.e., {context.name}.
+	// Namespace is the prefix of the variable identifier, i.e., {namespace.name}.
+	Namespace string `yaml:"namespace" mapstructure:"namespace"`
+
+	// Name is the variable identifier, i.e., {namespace.name}.
 	Name string `yaml:"name" mapstructure:"name"`
 
 	// Value describes how the variable value is generated.
 	Value Value `yaml:"-" mapstructure:"-"`
 }
 
+// Value is the interface implemented by GoogleIAMCredentials.
 type Value interface {
 	value()
 }
 
 type contextVariableWrapper struct {
+	Namespace string                `yaml:"namespace" mapstructure:"namespace"`
 	Name      string                `yaml:"name" mapstructure:"name"`
-	GoogleIAM *GoogleIAMCredentials `yaml:"google_iam,omitempty" mapstructure:"google_iam,omitempty"`
+	GoogleIAM *GoogleIAMCredentials `yaml:"google_iam_creds,omitempty" mapstructure:"google_iam_creds,omitempty"`
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
@@ -691,7 +696,8 @@ func (c *ContextVariable) UnmarshalYAML(node *yaml.Node) error {
 // MarshalYAML implements the yaml.Marshaler interface.
 func (c ContextVariable) MarshalYAML() (interface{}, error) {
 	w := &contextVariableWrapper{
-		Name: c.Name,
+		Name:      c.Name,
+		Namespace: c.Namespace,
 	}
 
 	switch v := c.Value.(type) {
@@ -723,6 +729,7 @@ type GoogleIAMCredentials struct {
 
 func (g GoogleIAMCredentials) value() {}
 
+// Token is the token interface implemented by AccessToken and IdentityToken.
 type Token interface {
 	token()
 }

@@ -230,13 +230,13 @@ func generateVariableForGoogleIAM(cv *ContextVariable, iamsvc *google.IAMService
 			if err != nil {
 				return nil, err
 			}
-			return &accessTokenVariable{ts, cv.Name}, nil
+			return &accessTokenVariable{ts, cv.Name, cv.Namespace}, nil
 		case IdentityToken:
 			ts, err := iamsvc.IdentityTokenSource(v.ServiceAccountEmail, tk.Audience, tk.IncludeEmail, v.RefreshInterval)
 			if err != nil {
 				return nil, err
 			}
-			return &idTokenVariable{ts, cv.Name}, nil
+			return &idTokenVariable{ts, cv.Name, cv.Namespace}, nil
 		default:
 			return nil, fmt.Errorf("unrecognized token type for google IAM credentials")
 		}
@@ -246,23 +246,28 @@ func generateVariableForGoogleIAM(cv *ContextVariable, iamsvc *google.IAMService
 
 type Variable interface {
 	Name() string
+	Namespace() string
 	Value() (string, error)
 }
 
 type accessTokenVariable struct {
-	ts   *google.AccessTokenSource
-	name string
+	ts        *google.AccessTokenSource
+	name      string
+	namespace string
 }
 
 func (atv *accessTokenVariable) Name() string           { return atv.name }
+func (atv *accessTokenVariable) Namespace() string      { return atv.namespace }
 func (atv *accessTokenVariable) Value() (string, error) { return atv.ts.Value() }
 
 type idTokenVariable struct {
-	ts   *google.IdentityTokenSource
-	name string
+	ts        *google.IdentityTokenSource
+	name      string
+	namespace string
 }
 
 func (itv *idTokenVariable) Name() string           { return itv.name }
+func (itv *idTokenVariable) Namespace() string      { return itv.namespace }
 func (itv *idTokenVariable) Value() (string, error) { return itv.ts.Value() }
 
 type OpTemplateMatch struct {

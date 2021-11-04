@@ -56,7 +56,7 @@ const (
 	QueryNamespace             = "query"
 	PathNamespace              = "path"
 	HeaderNamespace            = "headers"
-	ContextNamespace           = "context"
+	InternalNamespace          = "_internal"
 	RequestPath                = "path"
 	RequestQuerystring         = "querystring"
 )
@@ -89,7 +89,7 @@ type EnvironmentSpecRequest struct {
 	apiSpec               *APISpec
 	operation             *APIOperation
 	consumerAuthorization *ConsumerAuthorization
-	variables             *requestVariables // for template reification
+	variables             requestVariables // for template reification
 }
 
 func (e *EnvironmentSpecRequest) parseRequest() {
@@ -152,58 +152,37 @@ type jwtResult struct {
 	err    error
 }
 
-func (e *EnvironmentSpecRequest) parseRequestVariables(pathTemplate *transform.Template, opPath, queryString string) *requestVariables {
+func (e *EnvironmentSpecRequest) parseRequestVariables(pathTemplate *transform.Template, opPath, queryString string) map[string]map[string]string {
+	vars := make(map[string]map[string]string)
+	vars[PathNamespace] = pathTemplate.Extract(opPath)
+	vars[HeaderNamespace] = e.Request.GetAttributes().GetRequest().GetHttp().GetHeaders()
+	vars[RequestNamespace] = make(map[string]string)
+	vars[QueryNamespace] = make(map[string]string)
 
-	vars := &requestVariables{
-		path:    pathTemplate.Extract(opPath),
-		headers: e.Request.Attributes.Request.Http.Headers,
-		request: map[string]string{},
-		query:   map[string]string{},
-		context: map[string]string{},
-	}
-
-	vars.request[RequestPath] = opPath
-	vars.request[RequestQuerystring] = queryString
+	vars[RequestNamespace][RequestPath] = opPath
+	vars[RequestNamespace][RequestQuerystring] = queryString
 
 	if queryString != "" {
-		vars.query = map[string]string{}
 		vals, err := url.ParseQuery(queryString)
 		if err != nil {
 			log.Warnf("error parsing querystring: %q, error: %v", queryString, err)
 		}
 		for k, vs := range vals {
-			vars.query[k] = strings.Join(vs, ",") // eliminate duplicated query names
+			vars[QueryNamespace][k] = strings.Join(vs, ",") // eliminate duplicated query names
 		}
 	}
 
 	return vars
 }
 
-type requestVariables struct {
-	headers map[string]string
-	request map[string]string
-	query   map[string]string
-	path    map[string]string
-	context map[string]string
-}
+type requestVariables map[string]map[string]string // namespace -> variables
 
 func (rv requestVariables) LookupValue(name string) (string, bool) {
 	splits := strings.SplitN(name, VariableNamespaceSeparator, 2)
 
 	var mapping map[string]string
 	if len(splits) > 1 {
-		switch splits[0] {
-		case RequestNamespace:
-			mapping = rv.request
-		case QueryNamespace:
-			mapping = rv.query
-		case PathNamespace:
-			mapping = rv.path
-		case HeaderNamespace:
-			mapping = rv.headers
-		case ContextNamespace:
-			mapping = rv.context
-		}
+		mapping = rv[splits[0]]
 	}
 
 	if mapping == nil {
@@ -229,7 +208,10 @@ func (e *EnvironmentSpecRequest) PrepareVariables() error {
 		if err != nil {
 			return err
 		}
-		e.variables.context[v.Name()] = val
+		if e.variables[v.Namespace()] == nil {
+			e.variables[v.Namespace()] = make(map[string]string)
+		}
+		e.variables[v.Namespace()][v.Name()] = val
 	}
 	return nil
 }
@@ -238,7 +220,7 @@ func (e *EnvironmentSpecRequest) PrepareVariables() error {
 func (e *EnvironmentSpecRequest) GetQueryParams() map[string]string {
 	copy := make(map[string]string)
 	if e != nil {
-		for k, v := range e.variables.query {
+		for k, v := range e.variables[QueryNamespace] {
 			copy[k] = v
 		}
 	}
@@ -280,7 +262,7 @@ func (e *EnvironmentSpecRequest) GetAPISpec() *APISpec {
 func (e *EnvironmentSpecRequest) isGRPCRequest() bool {
 	return e.apiSpec != nil &&
 		e.apiSpec.GrpcService != "" &&
-		e.variables.headers[ContentTypeHeader] == GRPCContentType &&
+		e.variables[HeaderNamespace][ContentTypeHeader] == GRPCContentType &&
 		e.Request.Attributes.Request.Http.Method == "POST"
 }
 
@@ -299,7 +281,7 @@ func (e *EnvironmentSpecRequest) GetOperationPath() string {
 	if e.GetOperation() == nil {
 		return ""
 	}
-	return e.variables.request[RequestPath]
+	return e.variables[RequestNamespace][RequestPath]
 }
 
 // GetOperation uses HttpMatch to return an APIOperation
@@ -329,7 +311,7 @@ func (e *EnvironmentSpecRequest) GetParamValue(param APIOperationParameter) stri
 		log.Debugf("param from header %q: %q", key, util.Truncate(value, TruncateDebugRequestValuesAt))
 	case Query:
 		key := string(m)
-		value = e.variables.query[key]
+		value = e.variables[QueryNamespace][key]
 		log.Debugf("param from query %q: %q", key, util.Truncate(value, TruncateDebugRequestValuesAt))
 	case JWTClaim:
 		value = e.getClaimValue(m)

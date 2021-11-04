@@ -983,7 +983,8 @@ func TestMarshalAndUnmarshalContextVariable(t *testing.T) {
 		{
 			desc: "a good context variable with google iam",
 			want: &ContextVariable{
-				Name: "iam_token",
+				Namespace: "_internal",
+				Name:      "iam_token",
 				Value: GoogleIAMCredentials{
 					ServiceAccountEmail: "foo@bar.com",
 					Token: IdentityToken{

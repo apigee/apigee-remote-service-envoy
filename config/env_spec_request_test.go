@@ -688,11 +688,11 @@ func TestVariables(t *testing.T) {
 		RequestPath:        opPath,
 		RequestQuerystring: reqQueryString,
 	}
-	if diff := cmp.Diff(wantRequestVars, vars.request); diff != "" {
+	if diff := cmp.Diff(wantRequestVars, vars[RequestNamespace]); diff != "" {
 		t.Errorf("diff (-want +got):\n%s", diff)
 	}
 
-	if diff := cmp.Diff(reqHeaders, vars.headers); diff != "" {
+	if diff := cmp.Diff(reqHeaders, vars[HeaderNamespace]); diff != "" {
 		t.Errorf("diff (-want +got):\n%s", diff)
 	}
 
@@ -707,7 +707,7 @@ func TestVariables(t *testing.T) {
 	wantPathVars := map[string]string{
 		"pathsegment": "value",
 	}
-	if diff := cmp.Diff(wantPathVars, vars.path); diff != "" {
+	if diff := cmp.Diff(wantPathVars, vars[PathNamespace]); diff != "" {
 		t.Errorf("diff (-want +got):\n%s", diff)
 	}
 
@@ -859,7 +859,8 @@ func TestPrepareVariable(t *testing.T) {
 				ID:       "petstore", // required for the test to work
 				BasePath: "/v1",
 				ContextVariables: []ContextVariable{{
-					Name: "iam_token",
+					Name:      "iam_token",
+					Namespace: "_internal",
 					Value: GoogleIAMCredentials{
 						ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
 						Token: AccessToken{
@@ -880,7 +881,8 @@ func TestPrepareVariable(t *testing.T) {
 							PathTemplate: "/op-2",
 						}},
 						ContextVariables: []ContextVariable{{
-							Name: "iam_token",
+							Name:      "iam_token",
+							Namespace: "_internal",
 							Value: GoogleIAMCredentials{
 								ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
 								Token: IdentityToken{
@@ -895,7 +897,8 @@ func TestPrepareVariable(t *testing.T) {
 				ID:       "bookstore",
 				BasePath: "/v2",
 				ContextVariables: []ContextVariable{{
-					Name: "iam_token",
+					Name:      "iam_token",
+					Namespace: "_internal",
 					Value: GoogleIAMCredentials{
 						ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
 						Token: IdentityToken{
@@ -916,7 +919,8 @@ func TestPrepareVariable(t *testing.T) {
 							PathTemplate: "/op-2",
 						}},
 						ContextVariables: []ContextVariable{{
-							Name: "iam_token",
+							Name:      "iam_token",
+							Namespace: "_internal",
 							Value: GoogleIAMCredentials{
 								ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
 								Token: AccessToken{
@@ -984,8 +988,8 @@ func TestPrepareVariable(t *testing.T) {
 			if err != nil {
 				t.Fatalf("PrepareVariables() err = %v, wanted no error", err)
 			}
-			if got := req.variables.context["iam_token"]; test.wantTargetAuth != got {
-				t.Errorf("{context.iam_token} = %q, wanted %q", got, test.wantTargetAuth)
+			if got := req.variables["_internal"]["iam_token"]; test.wantTargetAuth != got {
+				t.Errorf("{_internal.iam_token} = %q, wanted %q", got, test.wantTargetAuth)
 			}
 		})
 	}

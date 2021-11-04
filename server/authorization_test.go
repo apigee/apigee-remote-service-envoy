@@ -1086,7 +1086,8 @@ func TestPrepareContextVariable(t *testing.T) {
 				ID:       "petstore",
 				BasePath: "/v1",
 				ContextVariables: []config.ContextVariable{{
-					Name: "iam_token",
+					Name:      "iam_token",
+					Namespace: "_internal",
 					Value: config.GoogleIAMCredentials{
 						ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
 						Token: config.AccessToken{
@@ -1097,7 +1098,7 @@ func TestPrepareContextVariable(t *testing.T) {
 				HTTPRequestTransforms: config.HTTPRequestTransforms{
 					HeaderTransforms: config.NameValueTransforms{
 						Add: []config.AddNameValue{
-							{Name: "authorization", Value: "{context.iam_token}"},
+							{Name: "authorization", Value: "{_internal.iam_token}"},
 							{Name: "x-forwarded-authorization", Value: "{headers.authorization}"},
 						},
 					},
@@ -1115,7 +1116,8 @@ func TestPrepareContextVariable(t *testing.T) {
 							PathTemplate: "/op-2",
 						}},
 						ContextVariables: []config.ContextVariable{{
-							Name: "iam_token",
+							Name:      "iam_token",
+							Namespace: "_internal",
 							Value: config.GoogleIAMCredentials{
 								ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
 								Token: config.IdentityToken{
@@ -1133,7 +1135,7 @@ func TestPrepareContextVariable(t *testing.T) {
 						HTTPRequestTransforms: config.HTTPRequestTransforms{
 							HeaderTransforms: config.NameValueTransforms{
 								Add: []config.AddNameValue{
-									{Name: "authorization", Value: "{context.iam_token}"},
+									{Name: "authorization", Value: "{_internal.iam_token}"},
 								},
 								// Remove should happen before add so this should not break anything.
 								Remove: []string{"authorization"},
@@ -1152,7 +1154,8 @@ func TestPrepareContextVariable(t *testing.T) {
 				ID:       "petstore",
 				BasePath: "/v1",
 				ContextVariables: []config.ContextVariable{{
-					Name: "iam_token",
+					Name:      "iam_token",
+					Namespace: "_internal",
 					Value: config.GoogleIAMCredentials{
 						ServiceAccountEmail: "foo@bar.iam.gserviceaccount.com",
 						Token: config.AccessToken{
