@@ -672,7 +672,7 @@ type Value interface {
 type contextVariableWrapper struct {
 	Namespace string                `yaml:"namespace" mapstructure:"namespace"`
 	Name      string                `yaml:"name" mapstructure:"name"`
-	GoogleIAM *GoogleIAMCredentials `yaml:"google_iam,omitempty" mapstructure:"google_iam,omitempty"`
+	GoogleIAM *GoogleIAMCredentials `yaml:"google_iam_creds,omitempty" mapstructure:"google_iam_creds,omitempty"`
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.

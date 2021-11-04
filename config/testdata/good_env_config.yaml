@@ -35,7 +35,7 @@ apis:
   context_variables:
   - name: iam_token
     namespace: _internal
-    google_iam:
+    google_iam_creds:
       service_account_email: foo@bar.iam.gserviceaccount.com
       id_token:
         audience: mock
