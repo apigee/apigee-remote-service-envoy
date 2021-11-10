@@ -579,7 +579,7 @@ func (a *AuthorizationServer) createEnvoyDenied(req *authv3.CheckRequest, envReq
 	if envRequest != nil && envRequest.GetAPISpec() != nil {
 		basepath = envRequest.GetAPISpec().BasePath
 	}
-	dynamicDataHeaders := apigeeDynamicDataHeaders(a.handler.Organization(), a.handler.Environment(), api, basepath, true)
+	dynamicDataHeaders := apigeeDynamicDataHeaders(a.handler.Organization(), a.handler.Environment(), api, basepath, rpcCode == rpc.INTERNAL)
 
 	response := &authv3.CheckResponse{
 		Status: &status.Status{
