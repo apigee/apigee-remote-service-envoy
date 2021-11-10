@@ -944,9 +944,8 @@ func TestImmediateAnalytics(t *testing.T) {
 		t.Fatalf("got: %d, want: %d", len(testAnalyticsMan.records), 1)
 	}
 
-	// Check selected Apigee dynamic data header
-	if !hasHeaderAdd(resp.GetDeniedResponse().GetHeaders(), headerFaultFlag, "true", false) {
-		t.Errorf("expected response header add: %q", headerFaultFlag)
+	if hasHeaderAdd(resp.GetDeniedResponse().GetHeaders(), headerFaultFlag, "true", false) {
+		t.Errorf("unexpected response header add: %q", headerFaultFlag)
 	}
 
 	got := testAnalyticsMan.records[0]
@@ -992,6 +991,59 @@ func TestImmediateAnalytics(t *testing.T) {
 
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got: %#v, want: %#v", got, want)
+	}
+}
+
+func TestApigeFaultHeader(t *testing.T) {
+	headers := map[string]string{
+		headerAPI: "api",
+	}
+	req := testutil.NewEnvoyRequest(http.MethodGet, "/", headers, nil)
+
+	testAuthMan := &testAuthMan{}
+	testAuthMan.sendAuth(nil, auth.ErrInternalError)
+
+	testProductMan := &testProductMan{}
+	testQuotaMan := &testQuotaMan{}
+	testAnalyticsMan := &testAnalyticsMan{}
+	server := AuthorizationServer{
+		handler: &Handler{
+			orgName:               "org",
+			envName:               "env",
+			apiKeyClaim:           headerClientID,
+			apiHeader:             headerAPI,
+			apiKeyHeader:          "x-api-key",
+			authMan:               testAuthMan,
+			productMan:            testProductMan,
+			quotaMan:              testQuotaMan,
+			analyticsMan:          testAnalyticsMan,
+			jwtProviderKey:        "apigee",
+			appendMetadataHeaders: false,
+			ready:                 util.NewAtomicBool(true),
+		},
+		gatewaySource: managedGatewaySource,
+	}
+
+	var resp *authv3.CheckResponse
+	resp, err := server.Check(context.Background(), req)
+	if err != nil {
+		t.Errorf("should not get error. got: %s", err)
+	}
+	if resp.Status.Code != int32(rpc.INTERNAL) {
+		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.INTERNAL))
+	}
+
+	if !hasHeaderAdd(resp.GetDeniedResponse().GetHeaders(), headerFaultSource, "ARC", false) {
+		t.Errorf("expected response header add: %q", headerFaultFlag)
+	}
+	if !hasHeaderAdd(resp.GetDeniedResponse().GetHeaders(), headerFaultFlag, "true", false) {
+		t.Errorf("expected response header add: %q", headerFaultFlag)
+	}
+	if !hasHeaderAdd(resp.GetDeniedResponse().GetHeaders(), headerFaultCode, "fault", false) {
+		t.Errorf("expected response header add: %q", headerFaultFlag)
+	}
+	if !hasHeaderAdd(resp.GetDeniedResponse().GetHeaders(), headerFaultRevision, "1", false) {
+		t.Errorf("expected response header add: %q", headerFaultFlag)
 	}
 }
 
