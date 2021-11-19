@@ -16,9 +16,11 @@ package server
 
 import (
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 
+	"github.com/apigee/apigee-remote-service-envoy/v2/config"
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
 )
 
@@ -118,4 +120,116 @@ func TestMetadataHeadersExceptions(t *testing.T) {
 		t.Errorf("authContext should be nil")
 	}
 
+}
+
+func TestDynamicDataHeaders(t *testing.T) {
+	org := "disorg"
+	env := "tundra"
+	api := "DoTheThingAPI"
+	basePath := "/basepath"
+	revision := "27"
+	tests := []struct {
+		desc            string
+		org, env, api   string
+		apiSpec         *config.APISpec
+		isFault         bool
+		requiredHeaders map[string]interface{}
+		excludedHeaders []string
+	}{
+		{
+			desc: "non-fault headers with apispec",
+			org:  org,
+			env:  env,
+			api:  api,
+			apiSpec: &config.APISpec{
+				BasePath:   basePath,
+				RevisionID: revision,
+			},
+			requiredHeaders: map[string]interface{}{
+				headerOrganization:  org,
+				headerEnvironment:   env,
+				headerProxy:         api,
+				headerMessageID:     regexp.MustCompile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"),
+				headerProxyBasepath: basePath,
+			},
+			excludedHeaders: []string{headerFaultSource, headerFaultFlag, headerFaultRevision, headerFaultCode},
+		},
+		{
+			desc: "non-fault headers without apispec",
+			org:  org,
+			env:  env,
+			api:  api,
+			requiredHeaders: map[string]interface{}{
+				headerOrganization: org,
+				headerEnvironment:  env,
+				headerProxy:        api,
+				headerMessageID:    regexp.MustCompile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"),
+			},
+			excludedHeaders: []string{headerProxyBasepath, headerFaultSource, headerFaultFlag, headerFaultRevision, headerFaultCode},
+		},
+		{
+			desc: "fault headers with apispec",
+			org:  org,
+			env:  env,
+			api:  api,
+			apiSpec: &config.APISpec{
+				BasePath:   basePath,
+				RevisionID: revision,
+			},
+			isFault: true,
+			requiredHeaders: map[string]interface{}{
+				headerOrganization:  org,
+				headerEnvironment:   env,
+				headerProxy:         api,
+				headerMessageID:     regexp.MustCompile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"),
+				headerFaultSource:   "ARC",
+				headerFaultFlag:     "true",
+				headerFaultRevision: revision,
+				headerFaultCode:     "fault",
+			},
+		},
+		{
+			desc:    "fault headers with no apispec",
+			org:     org,
+			env:     env,
+			api:     api,
+			isFault: true,
+			requiredHeaders: map[string]interface{}{
+				headerOrganization: org,
+				headerEnvironment:  env,
+				headerProxy:        api,
+				headerMessageID:    regexp.MustCompile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"),
+				headerFaultSource:  "ARC",
+				headerFaultFlag:    "true",
+				headerFaultCode:    "fault",
+			},
+			excludedHeaders: []string{headerFaultRevision},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.desc, func(t *testing.T) {
+			hvOptions := apigeeDynamicDataHeaders(tc.org, tc.env, tc.api, tc.apiSpec, tc.isFault)
+			headers := make(map[string]string)
+			for _, h := range hvOptions {
+				headers[h.Header.Key] = h.Header.Value
+			}
+			for k, v := range tc.requiredHeaders {
+				switch val := v.(type) {
+				case string:
+					if headers[k] != val {
+						t.Errorf("invalid value for %q: (got: %q, want: %q)", k, headers[k], val)
+					}
+				case *regexp.Regexp:
+					if !val.MatchString(headers[k]) {
+						t.Errorf("invalid value for %q: (got: %q, want: %q", k, headers[k], val)
+					}
+				}
+			}
+			for _, name := range tc.excludedHeaders {
+				if _, ok := headers[name]; ok {
+					t.Errorf("unexpected header: %q", name)
+				}
+			}
+		})
+	}
 }

@@ -1179,8 +1179,9 @@ func createGoodEnvSpec() EnvironmentSpec {
 		ID: "good-env-config",
 		APIs: []APISpec{
 			{
-				ID:       "apispec1",
-				BasePath: "/v1",
+				ID:         "apispec1",
+				RevisionID: "5",
+				BasePath:   "/v1",
 				Authentication: AuthenticationRequirement{
 					Requirements: AnyAuthenticationRequirements{
 						AuthenticationRequirement{
@@ -1278,8 +1279,9 @@ func createGoodEnvSpec() EnvironmentSpec {
 				},
 			},
 			{
-				ID:       "apispec2",
-				BasePath: "/v2",
+				ID:         "apispec2",
+				RevisionID: "4",
+				BasePath:   "/v2",
 				Authentication: AuthenticationRequirement{
 					Requirements: JWTAuthentication{
 						Name:       "foo",
@@ -1355,6 +1357,7 @@ func createGoodEnvSpec() EnvironmentSpec {
 			},
 			{
 				ID:         "no-operations-api",
+				RevisionID: "3",
 				BasePath:   "/v3",
 				Operations: []APIOperation{},
 				Authentication: AuthenticationRequirement{
@@ -1373,8 +1376,9 @@ func createGoodEnvSpec() EnvironmentSpec {
 				},
 			},
 			{
-				ID:       "empty-operation",
-				BasePath: "/v4/*",
+				ID:         "empty-operation",
+				RevisionID: "2",
+				BasePath:   "/v4/*",
 				Operations: []APIOperation{
 					{
 						Name:        "empty",
@@ -1398,6 +1402,7 @@ func createGoodEnvSpec() EnvironmentSpec {
 			},
 			{
 				ID:          "grpcapispec",
+				RevisionID:  "1",
 				GrpcService: "foo.petstore.PetstoreService",
 				Authentication: AuthenticationRequirement{
 					Requirements: JWTAuthentication{

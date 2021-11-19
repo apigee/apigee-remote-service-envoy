@@ -225,6 +225,8 @@ type APISpec struct {
 	// ID of the API, used to match the api_source of API Product Operations.
 	ID string `yaml:"id" mapstructure:"id"`
 
+	RevisionID string `yaml:"revision_id" mapstructure:"revision_id,omitempty"`
+
 	// Name of the gRPC service provided by this API. Used to map native gRPC method calls.
 	GrpcService string `yaml:"grpc_service,omitempty" mapstructure:"grpc_service,omitempty"`
 
