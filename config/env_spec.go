@@ -226,7 +226,7 @@ type APISpec struct {
 	ID string `yaml:"id" mapstructure:"id"`
 
 	// RevisionID of the API, used to report the revision of the spec that generated errors.
-	RevisionID string `yaml:"revision_id" mapstructure:"revision_id,omitempty"`
+	RevisionID string `yaml:"revision_id" mapstructure:"revision_id"`
 
 	// Name of the gRPC service provided by this API. Used to map native gRPC method calls.
 	GrpcService string `yaml:"grpc_service,omitempty" mapstructure:"grpc_service,omitempty"`
