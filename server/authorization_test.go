@@ -994,11 +994,22 @@ func TestImmediateAnalytics(t *testing.T) {
 	}
 }
 
-func TestApigeFaultHeader(t *testing.T) {
+func TestApigeeFaultHeader(t *testing.T) {
 	headers := map[string]string{
 		headerAPI: "api",
 	}
-	req := testutil.NewEnvoyRequest(http.MethodGet, "/", headers, nil)
+	envSpec := createAuthEnvSpec()
+	envSpec.APIs[0].Authentication.Disabled = true
+	specExt, err := config.NewEnvironmentSpecExt(&envSpec)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	specExtID := "fineSpecBadRequest"
+
+	req := testutil.NewEnvoyRequest(http.MethodGet, "/v1/petstore", headers, nil)
+	req.Attributes.ContextExtensions = map[string]string{
+		envSpecContextKey: specExtID,
+	}
 
 	testAuthMan := &testAuthMan{}
 	testAuthMan.sendAuth(nil, auth.ErrInternalError)
@@ -1019,13 +1030,16 @@ func TestApigeFaultHeader(t *testing.T) {
 			analyticsMan:          testAnalyticsMan,
 			jwtProviderKey:        "apigee",
 			appendMetadataHeaders: false,
-			ready:                 util.NewAtomicBool(true),
+			envSpecsByID: map[string]*config.EnvironmentSpecExt{
+				specExtID: specExt,
+			},
+			ready: util.NewAtomicBool(true),
 		},
 		gatewaySource: managedGatewaySource,
 	}
 
 	var resp *authv3.CheckResponse
-	resp, err := server.Check(context.Background(), req)
+	resp, err = server.Check(context.Background(), req)
 	if err != nil {
 		t.Errorf("should not get error. got: %s", err)
 	}
@@ -1034,16 +1048,16 @@ func TestApigeFaultHeader(t *testing.T) {
 	}
 
 	if !hasHeaderAdd(resp.GetDeniedResponse().GetHeaders(), headerFaultSource, "ARC", false) {
-		t.Errorf("expected response header add: %q", headerFaultFlag)
+		t.Errorf("expected response header add: %q", headerFaultSource)
 	}
 	if !hasHeaderAdd(resp.GetDeniedResponse().GetHeaders(), headerFaultFlag, "true", false) {
 		t.Errorf("expected response header add: %q", headerFaultFlag)
 	}
 	if !hasHeaderAdd(resp.GetDeniedResponse().GetHeaders(), headerFaultCode, "fault", false) {
-		t.Errorf("expected response header add: %q", headerFaultFlag)
+		t.Errorf("expected response header add: %q", headerFaultCode)
 	}
-	if !hasHeaderAdd(resp.GetDeniedResponse().GetHeaders(), headerFaultRevision, "1", false) {
-		t.Errorf("expected response header add: %q", headerFaultFlag)
+	if !hasHeaderAdd(resp.GetDeniedResponse().GetHeaders(), headerFaultRevision, "47", false) {
+		t.Errorf("expected response header add: %q", headerFaultRevision)
 	}
 }
 
@@ -1491,8 +1505,9 @@ func createAuthEnvSpec() config.EnvironmentSpec {
 		ID: "good-env-config",
 		APIs: []config.APISpec{
 			{
-				ID:       "api",
-				BasePath: "/v1",
+				ID:         "api",
+				RevisionID: "47",
+				BasePath:   "/v1",
 				Authentication: config.AuthenticationRequirement{
 					Requirements: config.JWTAuthentication{
 						Name:                 "jwt",

@@ -307,14 +307,15 @@ func (a *AuthorizationServer) createEnvoyForwarded(
 	okResponse.ResponseHeadersToAdd = append(okResponse.ResponseHeadersToAdd, corsResponseHeaders(envRequest)...)
 
 	// apigee dynamic data response headers
-	var basepath string
 	var dynamicDataHeaders []*corev3.HeaderValueOption
 	if envRequest != nil {
-		if envRequest.GetAPISpec() != nil {
-			basepath = envRequest.GetAPISpec().BasePath
+		var apiSpec *config.APISpec
+		if spec := envRequest.GetAPISpec(); spec != nil {
+			apiSpec = spec
 		}
-		dynamicDataHeaders = apigeeDynamicDataHeaders(a.handler.Organization(), a.handler.Environment(), api, basepath, false)
+		dynamicDataHeaders = apigeeDynamicDataHeaders(a.handler.Organization(), a.handler.Environment(), api, apiSpec, false)
 	}
+
 	okResponse.ResponseHeadersToAdd = append(okResponse.ResponseHeadersToAdd, dynamicDataHeaders...)
 
 	if log.DebugEnabled() {
@@ -575,11 +576,11 @@ func (a *AuthorizationServer) createEnvoyDenied(req *authv3.CheckRequest, envReq
 	}
 
 	// apigee dynamic data response headers
-	var basepath string
+	var apiSpec *config.APISpec
 	if envRequest != nil && envRequest.GetAPISpec() != nil {
-		basepath = envRequest.GetAPISpec().BasePath
+		apiSpec = envRequest.GetAPISpec()
 	}
-	dynamicDataHeaders := apigeeDynamicDataHeaders(a.handler.Organization(), a.handler.Environment(), api, basepath, rpcCode == rpc.INTERNAL)
+	dynamicDataHeaders := apigeeDynamicDataHeaders(a.handler.Organization(), a.handler.Environment(), api, apiSpec, rpcCode == rpc.INTERNAL)
 
 	response := &authv3.CheckResponse{
 		Status: &status.Status{

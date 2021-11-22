@@ -18,6 +18,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/apigee/apigee-remote-service-envoy/v2/config"
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
 	"github.com/apigee/apigee-remote-service-golib/v2/context"
 	"github.com/apigee/apigee-remote-service-golib/v2/log"
@@ -89,24 +90,29 @@ func (h *Handler) decodeMetadataHeaders(headers map[string]string) (string, *aut
 
 // This returns HeaderValueOptions that have used to populate Apigee Dynamic Data access logs
 // in Apigee X/Hybrid.
-func apigeeDynamicDataHeaders(org, env, api, basepath string, fault bool) (headers []*corev3.HeaderValueOption) {
+func apigeeDynamicDataHeaders(org, env, api string, apiSpec *config.APISpec, fault bool) (headers []*corev3.HeaderValueOption) {
 	headers = append(headers, createHeaderValueOption(headerOrganization, org, false))
 	headers = append(headers, createHeaderValueOption(headerEnvironment, env, false))
 	headers = append(headers, createHeaderValueOption(headerProxy, api, false))
-	headers = append(headers, createHeaderValueOption(headerProxyBasepath, basepath, false))
 	headers = append(headers, createHeaderValueOption(headerDPColor, os.Getenv("APIGEE_DPCOLOR"), false))
 	headers = append(headers, createHeaderValueOption(headerRegion, os.Getenv("APIGEE_REGION"), false))
 	headers = append(headers, createHeaderValueOption(headerMessageID, uuid.NewString(), false))
+	headers = append(headers, createHeaderValueOption("verboseerrors", "false", false))
+
+	if apiSpec != nil {
+		headers = append(headers, createHeaderValueOption(headerProxyBasepath, apiSpec.BasePath, false))
+	}
 
 	// Include fault related headers.
 	if fault {
 		headers = append(headers, createHeaderValueOption(headerFaultSource, "ARC", false))
 		headers = append(headers, createHeaderValueOption(headerFaultFlag, "true", false))
+		if apiSpec != nil {
+			headers = append(headers, createHeaderValueOption(headerFaultRevision, apiSpec.RevisionID, false))
+		}
+
 		// A placeholder fault code value.
 		headers = append(headers, createHeaderValueOption(headerFaultCode, "fault", false))
-		// TODO: This will always be "1" for ARCHIVE deployment.
-		//       But it needs to be supplied once the PROXY mode is supported.
-		headers = append(headers, createHeaderValueOption(headerFaultRevision, "1", false))
 	}
 
 	return
