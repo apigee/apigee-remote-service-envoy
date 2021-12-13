@@ -16,6 +16,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"strings"
 	"time"
@@ -24,6 +25,7 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
 	"github.com/apigee/apigee-remote-service-golib/v2/log"
 	"github.com/apigee/apigee-remote-service-golib/v2/product"
+	v3 "github.com/envoyproxy/go-control-plane/envoy/data/accesslog/v3"
 	als "github.com/envoyproxy/go-control-plane/envoy/service/accesslog/v3"
 	"github.com/golang/protobuf/ptypes/duration"
 	"github.com/golang/protobuf/ptypes/timestamp"
@@ -100,8 +102,11 @@ func (a *AccessLogServer) StreamAccessLogs(srv als.AccessLogService_StreamAccess
 
 func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLogs) error {
 
-	for _, v := range msg.HttpLogs.LogEntry {
-		req := v.Request
+	for _, v := range msg.HttpLogs.GetLogEntry() {
+		// Send prometheus
+		prometheusProxyRecord(v)
+
+		req := v.GetRequest()
 
 		getMetadata := func(namespace string) *structpb.Struct {
 			props := v.GetCommonProperties()
@@ -129,7 +134,7 @@ func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLo
 			log.Debugf("No dynamic metadata for ext_authz filter, falling back to headers")
 			api, authContext = a.handler.decodeMetadataHeaders(req.GetRequestHeaders())
 		} else {
-			log.Debugf("No dynamic metadata for ext_authz filter, skipped accesslog: %#v", v.Request)
+			log.Debugf("No dynamic metadata for ext_authz filter, skipped accesslog: %#v", req)
 			continue
 		}
 
@@ -140,7 +145,7 @@ func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLo
 
 		var attributes []analytics.Attribute
 		attributesMetadata := getMetadata(datacaptureNamespace)
-		if attributesMetadata != nil && len(attributesMetadata.Fields) > 0 {
+		if len(attributesMetadata.GetFields()) > 0 {
 			for k, v := range attributesMetadata.Fields {
 				attr := analytics.Attribute{
 					Name: k,
@@ -165,26 +170,27 @@ func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLo
 		}
 
 		var responseCode int
-		if v.Response.ResponseCode != nil {
-			responseCode = int(v.Response.ResponseCode.Value)
+		if c := v.GetResponse().GetResponseCode(); c != nil {
+			responseCode = int(c.GetValue())
 		}
 
-		cp := v.CommonProperties
+		cp := v.GetCommonProperties()
 		requestPath := strings.SplitN(req.Path, "?", 2)[0] // Apigee doesn't want query params in requestPath
+		st := cp.GetStartTime()
 		record := analytics.Record{
-			ClientReceivedStartTimestamp: pbTimestampToApigee(cp.StartTime),
-			ClientReceivedEndTimestamp:   pbTimestampAddDurationApigee(cp.StartTime, cp.TimeToLastRxByte),
-			TargetSentStartTimestamp:     pbTimestampAddDurationApigee(cp.StartTime, cp.TimeToFirstUpstreamTxByte),
-			TargetSentEndTimestamp:       pbTimestampAddDurationApigee(cp.StartTime, cp.TimeToLastUpstreamTxByte),
-			TargetReceivedStartTimestamp: pbTimestampAddDurationApigee(cp.StartTime, cp.TimeToFirstUpstreamRxByte),
-			TargetReceivedEndTimestamp:   pbTimestampAddDurationApigee(cp.StartTime, cp.TimeToLastUpstreamRxByte),
-			ClientSentStartTimestamp:     pbTimestampAddDurationApigee(cp.StartTime, cp.TimeToFirstDownstreamTxByte),
-			ClientSentEndTimestamp:       pbTimestampAddDurationApigee(cp.StartTime, cp.TimeToLastDownstreamTxByte),
+			ClientReceivedStartTimestamp: pbTimestampToApigee(st),
+			ClientReceivedEndTimestamp:   pbTimestampAddDurationApigee(st, cp.GetTimeToLastRxByte()),
+			TargetSentStartTimestamp:     pbTimestampAddDurationApigee(st, cp.GetTimeToFirstUpstreamTxByte()),
+			TargetSentEndTimestamp:       pbTimestampAddDurationApigee(st, cp.GetTimeToLastUpstreamTxByte()),
+			TargetReceivedStartTimestamp: pbTimestampAddDurationApigee(st, cp.GetTimeToFirstUpstreamRxByte()),
+			TargetReceivedEndTimestamp:   pbTimestampAddDurationApigee(st, cp.GetTimeToLastUpstreamRxByte()),
+			ClientSentStartTimestamp:     pbTimestampAddDurationApigee(st, cp.GetTimeToFirstDownstreamTxByte()),
+			ClientSentEndTimestamp:       pbTimestampAddDurationApigee(st, cp.GetTimeToLastDownstreamTxByte()),
 			APIProxy:                     api,
-			RequestURI:                   req.Path,
+			RequestURI:                   req.GetPath(),
 			RequestPath:                  requestPath,
-			RequestVerb:                  req.RequestMethod.String(),
-			UserAgent:                    req.UserAgent,
+			RequestVerb:                  req.GetRequestMethod().String(),
+			UserAgent:                    req.GetUserAgent(),
 			ResponseStatusCode:           responseCode,
 			GatewaySource:                a.gatewaySource,
 			ClientIP:                     req.GetForwardedFor(),
@@ -238,3 +244,43 @@ var (
 func timeToApigeeInt(t time.Time) int64 {
 	return t.UnixNano() / (int64(time.Millisecond) / int64(time.Nanosecond))
 }
+
+func prometheusProxyRecord(logEntry *v3.HTTPAccessLogEntry) {
+	req := logEntry.GetRequest()
+	resp := logEntry.GetResponse()
+	method := req.GetRequestMethod().String()
+
+	// increment request counter
+	prometheusProxyRequestCount.WithLabelValues(method).Inc()
+
+	// increment response counter
+	responseCode := fmt.Sprintf("%d", resp.GetResponseCode().GetValue())
+	faultCode := resp.ResponseHeaders[headerFaultCode]
+	faultSource := resp.ResponseHeaders[headerFaultSource]
+	prometheusProxyResponseCount.WithLabelValues(method, responseCode, faultCode, faultSource).Inc()
+
+	// record latency
+	responseTime := logEntry.GetCommonProperties().TimeToLastUpstreamTxByte.AsDuration().Milliseconds()
+	prometheusProxyLatencies.WithLabelValues(method).Observe(float64(responseTime))
+}
+
+// prometheus metrics for proxies and targets
+var (
+	prometheusProxyRequestCount = promauto.NewCounterVec(prometheus.CounterOpts{
+		Subsystem: "proxy",
+		Name:      "request_count",
+		Help:      "Total number of requests received",
+	}, []string{"method"})
+	prometheusProxyResponseCount = promauto.NewCounterVec(prometheus.CounterOpts{
+		Subsystem: "proxy",
+		Name:      "response_count",
+		Help:      "Total number of responses sent",
+	}, []string{"method", "response_code", "fault_code", "fault_src"})
+	prometheusProxyLatencies = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Subsystem: "proxy",
+		Name:      "latencies",
+		Help:      "Request and response latencies in milliseconds, including proxy overhead and target service time",
+		// follows Apigee's convention of buckets for latencies
+		Buckets: []float64{1, 2, 5, 10, 25, 50, 75, 100, 250, 500, 750, 1000, 2500, 5000, 7500, 10000},
+	}, []string{"method"})
+)
