@@ -103,7 +103,7 @@ func (a *AccessLogServer) StreamAccessLogs(srv als.AccessLogService_StreamAccess
 func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLogs) error {
 
 	for _, v := range msg.HttpLogs.GetLogEntry() {
-		// Send prometheus
+		// record for prometheus metrics
 		prometheusProxyRecord(v)
 
 		req := v.GetRequest()
