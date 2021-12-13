@@ -21,7 +21,9 @@ import (
 	"testing"
 
 	"github.com/apigee/apigee-remote-service-envoy/v2/config"
+	"github.com/apigee/apigee-remote-service-envoy/v2/fault"
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
+	"github.com/gogo/googleapis/google/rpc"
 )
 
 func TestMetadataHeaders(t *testing.T) {
@@ -132,7 +134,7 @@ func TestDynamicDataHeaders(t *testing.T) {
 		desc            string
 		org, env, api   string
 		apiSpec         *config.APISpec
-		isFault         bool
+		fault           *fault.AdapterFault
 		requiredHeaders map[string]interface{}
 		excludedHeaders []string
 	}{
@@ -145,6 +147,7 @@ func TestDynamicDataHeaders(t *testing.T) {
 				BasePath:   basePath,
 				RevisionID: revision,
 			},
+			fault: fault.CreateAdapterFault("", rpc.OK, 0),
 			requiredHeaders: map[string]interface{}{
 				headerOrganization:  org,
 				headerEnvironment:   env,
@@ -155,10 +158,11 @@ func TestDynamicDataHeaders(t *testing.T) {
 			excludedHeaders: []string{headerFaultSource, headerFaultFlag, headerFaultRevision, headerFaultCode},
 		},
 		{
-			desc: "non-fault headers without apispec",
-			org:  org,
-			env:  env,
-			api:  api,
+			desc:  "non-fault headers without apispec",
+			org:   org,
+			env:   env,
+			api:   api,
+			fault: fault.CreateAdapterFault("", rpc.OK, 0),
 			requiredHeaders: map[string]interface{}{
 				headerOrganization: org,
 				headerEnvironment:  env,
@@ -176,7 +180,7 @@ func TestDynamicDataHeaders(t *testing.T) {
 				BasePath:   basePath,
 				RevisionID: revision,
 			},
-			isFault: true,
+			fault: fault.CreateAdapterFault("", rpc.INTERNAL, 0),
 			requiredHeaders: map[string]interface{}{
 				headerOrganization:  org,
 				headerEnvironment:   env,
@@ -189,11 +193,11 @@ func TestDynamicDataHeaders(t *testing.T) {
 			},
 		},
 		{
-			desc:    "fault headers with no apispec",
-			org:     org,
-			env:     env,
-			api:     api,
-			isFault: true,
+			desc:  "fault headers with no apispec",
+			org:   org,
+			env:   env,
+			api:   api,
+			fault: fault.CreateAdapterFault("x-apigee-test", rpc.INTERNAL, 0),
 			requiredHeaders: map[string]interface{}{
 				headerOrganization: org,
 				headerEnvironment:  env,
@@ -201,14 +205,14 @@ func TestDynamicDataHeaders(t *testing.T) {
 				headerMessageID:    regexp.MustCompile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"),
 				headerFaultSource:  "ARC",
 				headerFaultFlag:    "true",
-				headerFaultCode:    "fault",
+				headerFaultCode:    "x-apigee-test",
 			},
 			excludedHeaders: []string{headerFaultRevision},
 		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.desc, func(t *testing.T) {
-			hvOptions := apigeeDynamicDataHeaders(tc.org, tc.env, tc.api, tc.apiSpec, tc.isFault)
+			hvOptions := apigeeDynamicDataHeaders(tc.org, tc.env, tc.api, tc.apiSpec, tc.fault)
 			headers := make(map[string]string)
 			for _, h := range hvOptions {
 				headers[h.Header.Key] = h.Header.Value

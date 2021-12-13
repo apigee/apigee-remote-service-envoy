@@ -22,12 +22,14 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/apigee/apigee-remote-service-envoy/v2/fault"
 	"github.com/apigee/apigee-remote-service-envoy/v2/transform"
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
 	"github.com/apigee/apigee-remote-service-golib/v2/auth/jwt"
 	"github.com/apigee/apigee-remote-service-golib/v2/log"
 	"github.com/apigee/apigee-remote-service-golib/v2/util"
 	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
+	"github.com/gogo/googleapis/google/rpc"
 )
 
 const TruncateDebugRequestValuesAt = 5
@@ -350,11 +352,11 @@ func (e *EnvironmentSpecRequest) JWTAuthentications() []*JWTAuthentication {
 }
 
 // looks up the JWTAuthentication by name and runs verification
-// returns true if found and verified
+// returns nil if found and verified
 // any error can be in e.jwtResults[name]
-func (e *EnvironmentSpecRequest) verifyJWTAuthentication(name string) bool {
+func (e *EnvironmentSpecRequest) verifyJWTAuthentication(name string) error {
 	if e == nil {
-		return false
+		return fault.CreateAdapterFault("", rpc.UNAUTHENTICATED, 0)
 	}
 	var jwtReq *JWTAuthentication
 	if len(e.GetOperation().jwtAuthentications) > 0 {
@@ -364,10 +366,14 @@ func (e *EnvironmentSpecRequest) verifyJWTAuthentication(name string) bool {
 	}
 	if jwtReq == nil {
 		log.Debugf("JWTAuthentication %q not found", name)
-		return false
+		return fault.CreateAdapterFault("", rpc.UNAUTHENTICATED, 0)
 	}
 	if result := e.jwtResults[name]; result != nil { // return from cache
-		return result.err == nil
+		if result.err == nil {
+			return nil
+		} else {
+			fault.CreateAdapterFault("", rpc.UNAUTHENTICATED, 0)
+		}
 	}
 
 	// uncached, parse it
@@ -413,11 +419,11 @@ func (e *EnvironmentSpecRequest) verifyJWTAuthentication(name string) bool {
 		setResult(claims, err)
 		// First match wins
 		if err == nil {
-			return true
+			return nil
 		}
 	}
 
-	return false
+	return fault.CreateAdapterFault("", rpc.UNAUTHENTICATED, 0)
 }
 
 // returns error if passed value is not in claim as string or []string
@@ -440,9 +446,9 @@ func mustBeInClaim(value, name string, claims map[string]interface{}) error {
 	return fmt.Errorf("%q not in claim %q", value, name)
 }
 
-// IsAuthenticated returns true if AuthenticatationRequirements are met for the request
-// Returns true if AuthenticatationRequirements are empty or disabled.
-func (e *EnvironmentSpecRequest) IsAuthenticated() bool {
+// IsAuthenticated returns nil if AuthenticatationRequirements are met for the request
+// Returns nil if AuthenticatationRequirements are empty or disabled.
+func (e *EnvironmentSpecRequest) IsAuthenticated() error {
 	return e.meetsAuthenticatationRequirements(e.getAuthenticationRequirement())
 }
 
@@ -479,33 +485,33 @@ func (e *EnvironmentSpecRequest) GetHTTPRequestTransforms() (transforms HTTPRequ
 	return transforms
 }
 
-// returns true if auth is empty or disabled
-func (e *EnvironmentSpecRequest) meetsAuthenticatationRequirements(auth AuthenticationRequirement) bool {
+// returns nil if auth is empty or disabled
+func (e *EnvironmentSpecRequest) meetsAuthenticatationRequirements(auth AuthenticationRequirement) error {
 	if e == nil {
-		return false
+		return fault.CreateAdapterFault("", rpc.UNAUTHENTICATED, 0)
 	}
 	if auth.Requirements == nil || auth.Disabled {
-		return true
+		return nil
 	}
 	switch a := auth.Requirements.(type) {
 	case JWTAuthentication:
 		return e.verifyJWTAuthentication(a.Name)
 	case AnyAuthenticationRequirements:
 		for _, r := range []AuthenticationRequirement(a) {
-			if e.meetsAuthenticatationRequirements(r) {
-				return true
+			if e.meetsAuthenticatationRequirements(r) == nil {
+				return nil
 			}
 		}
-		return false
+		return fault.CreateAdapterFault("", rpc.UNAUTHENTICATED, 0)
 	case AllAuthenticationRequirements:
 		for _, r := range []AuthenticationRequirement(a) {
-			if !e.meetsAuthenticatationRequirements(r) {
-				return false
+			if e.meetsAuthenticatationRequirements(r) != nil {
+				return fault.CreateAdapterFault("", rpc.UNAUTHENTICATED, 0)
 			}
 		}
-		return true
+		return nil
 	default:
-		return false
+		return fault.CreateAdapterFault("", rpc.UNAUTHENTICATED, 0)
 	}
 }
 

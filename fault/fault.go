@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2021 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,15 +14,32 @@
 
 package fault
 
-import "github.com/gogo/googleapis/google/rpc"
+import (
+	"fmt"
 
+	typev3 "github.com/envoyproxy/go-control-plane/envoy/type/v3"
+	"github.com/gogo/googleapis/google/rpc"
+)
+
+// AdapterFault is blah
 type AdapterFault struct {
-	FaultCode  string   // Fault code for monitoring
-	StatusCode int32    // http status code for user-facing response
-	RpcCode    rpc.Code // RPC status for the ext_authz response
+	// FaultCode is for monitoring
+	FaultCode string
+	// RpcCode
+	RpcCode rpc.Code
+	// StatusCode http status code for user-facing response
+	StatusCode typev3.StatusCode
 }
 
+// Error() is ...
 func (f *AdapterFault) Error() string {
-	// TODO: return full errortext with code.
-	return ""
+	return fmt.Sprintf(`{ "faultCode:" %v, "RpcCode:" %v", "StatusCode:" %v,}`, f.FaultCode, f.RpcCode.String(), f.StatusCode.String())
+}
+
+func CreateAdapterFault(faultCode string, rpcCode rpc.Code, statusCode typev3.StatusCode) *AdapterFault {
+	fault := new(AdapterFault)
+	fault.FaultCode = faultCode
+	fault.RpcCode = rpcCode
+	fault.StatusCode = statusCode
+	return fault
 }

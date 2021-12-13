@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/apigee/apigee-remote-service-envoy/v2/config"
+	"github.com/apigee/apigee-remote-service-envoy/v2/fault"
 	"github.com/apigee/apigee-remote-service-envoy/v2/util"
 	"github.com/apigee/apigee-remote-service-golib/v2/analytics"
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
@@ -74,7 +75,7 @@ func (a *AuthorizationServer) Register(s *grpc.Server, handler *Handler) {
 // Check does check
 func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequest) (*authv3.CheckResponse, error) {
 	if !a.handler.Ready() {
-		return a.unavailable(req), nil
+		return a.handleFault(req, nil, nil, "", nil, fault.CreateAdapterFault("", rpc.UNAVAILABLE, 0)), nil
 	}
 
 	var rootContext context.Context = a.handler
@@ -97,7 +98,8 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 	defer tracker.record()
 
 	if err != nil {
-		return a.internalError(req, nil, tracker, err), nil
+		log.Errorf("encountered internal error: %v", err)
+		return a.handleFault(req, nil, tracker, "", nil, fault.CreateAdapterFault("", rpc.INTERNAL, 0)), nil
 	}
 
 	var envSpec *config.EnvironmentSpecExt
@@ -120,7 +122,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 		apiSpec := envRequest.GetAPISpec()
 		if apiSpec == nil {
 			log.Debugf("api not found for environment spec %s", envSpec.ID)
-			return a.notFound(req, envRequest, tracker, api), nil
+			return a.handleFault(req, envRequest, tracker, api, nil, fault.CreateAdapterFault("", rpc.NOT_FOUND, 0)), nil
 		}
 		api = apiSpec.ID
 		log.Debugf("api: %s", apiSpec.ID)
@@ -133,20 +135,20 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 		operation = envRequest.GetOperation()
 		if operation == nil {
 			log.Debugf("no valid operation found for api %s", apiSpec.ID)
-			return a.notFound(req, envRequest, tracker, api), nil
+			return a.handleFault(req, envRequest, tracker, api, nil, fault.CreateAdapterFault("", rpc.NOT_FOUND, 0)), nil
 		}
 		log.Debugf("operation: %s", operation.Name)
 
-		if !envRequest.IsAuthenticated() {
+		if authnErr := envRequest.IsAuthenticated(); authnErr != nil {
 			log.Debugf("authentication requirements not met")
-			return a.unauthenticated(req, envRequest, tracker, api), nil
+			return a.handleFault(req, envRequest, tracker, api, nil, authnErr), nil
 		}
 
 		if !envRequest.IsAuthorizationRequired() {
 			log.Debugf("no authorization requirements")
 			if err := envRequest.PrepareVariables(); err != nil {
 				log.Errorf("failed to populate context variable: %v", err)
-				return a.denied(req, envRequest, tracker, &auth.Context{Context: rootContext}, api), nil
+				return a.handleFault(req, envRequest, tracker, api, &auth.Context{Context: rootContext}, fault.CreateAdapterFault("", rpc.PERMISSION_DENIED, 0)), nil
 			}
 			// Send the root context for limited dynamic metadata.
 			return a.authOK(req, tracker, &auth.Context{Context: rootContext}, api, envRequest), nil
@@ -174,7 +176,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 			api, ok = req.Attributes.Request.Http.Headers[a.handler.apiHeader]
 			if !ok {
 				log.Debugf("missing api header %s", a.handler.apiHeader)
-				return a.unauthenticated(req, envRequest, tracker, api), nil
+				return a.handleFault(req, envRequest, tracker, api, nil, fault.CreateAdapterFault("", rpc.UNAUTHENTICATED, 0)), nil
 			}
 			log.Debugf("api from header: %s", api)
 		}
@@ -214,47 +216,50 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 	authContext, err := a.handler.authMan.Authenticate(rootContext, apiKey, claims, a.handler.apiKeyClaim)
 	switch err {
 	case auth.ErrNoAuth:
-		return a.unauthenticated(req, envRequest, tracker, api), nil
+		return a.handleFault(req, envRequest, tracker, api, nil, fault.CreateAdapterFault("", rpc.UNAUTHENTICATED, 0)), nil
 	case auth.ErrBadAuth:
-		return a.denied(req, envRequest, tracker, authContext, api), nil
+		return a.handleFault(req, envRequest, tracker, api, authContext, fault.CreateAdapterFault("", rpc.PERMISSION_DENIED, 0)), nil
 	case auth.ErrInternalError:
-		return a.internalError(req, envRequest, tracker, err), nil
+		log.Errorf("encountered internal error: %v", err)
+		return a.handleFault(req, envRequest, tracker, "", nil, fault.CreateAdapterFault("", rpc.INTERNAL, 0)), nil
 	case auth.ErrNetworkError:
 		if envRequest != nil && envRequest.GetConsumerAuthorization().FailOpen {
 			log.Debugf("FailOpen on operation: %v", envRequest.GetOperation().Name)
 			if err := envRequest.PrepareVariables(); err != nil {
 				log.Errorf("failed to populate context variable: %v", err)
-				return a.denied(req, envRequest, tracker, authContext, api), nil
+				return a.handleFault(req, envRequest, tracker, api, authContext, fault.CreateAdapterFault("", rpc.PERMISSION_DENIED, 0)), nil
 			}
 			return a.authOK(req, tracker, authContext, api, envRequest), nil
 		} else {
-			return a.internalError(req, envRequest, tracker, err), nil
+
+			return a.handleFault(req, envRequest, tracker, "", nil, fault.CreateAdapterFault("", rpc.INTERNAL, 0)), nil
 		}
 	}
 
 	if len(authContext.APIProducts) == 0 {
-		return a.denied(req, envRequest, tracker, authContext, api), nil
+		return a.handleFault(req, envRequest, tracker, api, authContext, fault.CreateAdapterFault("", rpc.PERMISSION_DENIED, 0)), nil
 	}
 
 	// authorize against products
 	method := req.Attributes.Request.Http.Method
 	authorizedOps := a.handler.productMan.Authorize(authContext, api, path, method)
 	if len(authorizedOps) == 0 {
-		return a.denied(req, envRequest, tracker, authContext, api), nil
+		return a.handleFault(req, envRequest, tracker, api, authContext, fault.CreateAdapterFault("", rpc.PERMISSION_DENIED, 0)), nil
 	}
 
 	// apply quotas to matched operations
 	exceeded, quotaError := a.applyQuotas(authorizedOps, authContext)
 	if quotaError != nil {
-		return a.internalError(req, envRequest, tracker, quotaError), nil
+		log.Errorf("encountered internal error: %v", quotaError)
+		return a.handleFault(req, envRequest, tracker, "", nil, fault.CreateAdapterFault("", rpc.INTERNAL, 0)), nil
 	}
 	if exceeded {
-		return a.quotaExceeded(req, envRequest, tracker, authContext, api), nil
+		return a.handleFault(req, envRequest, tracker, api, authContext, fault.CreateAdapterFault("", rpc.RESOURCE_EXHAUSTED, 0)), nil
 	}
 
 	if err := envRequest.PrepareVariables(); err != nil {
 		log.Errorf("failed to populate context variable: %v", err)
-		return a.denied(req, envRequest, tracker, authContext, api), nil
+		return a.handleFault(req, envRequest, tracker, api, authContext, fault.CreateAdapterFault("", rpc.PERMISSION_DENIED, 0)), nil
 	}
 	return a.authOK(req, tracker, authContext, api, envRequest), nil
 }
@@ -313,7 +318,7 @@ func (a *AuthorizationServer) createEnvoyForwarded(
 		if spec := envRequest.GetAPISpec(); spec != nil {
 			apiSpec = spec
 		}
-		dynamicDataHeaders = apigeeDynamicDataHeaders(a.handler.Organization(), a.handler.Environment(), api, apiSpec, false)
+		dynamicDataHeaders = apigeeDynamicDataHeaders(a.handler.Organization(), a.handler.Environment(), api, apiSpec, nil)
 	}
 
 	okResponse.ResponseHeadersToAdd = append(okResponse.ResponseHeadersToAdd, dynamicDataHeaders...)
@@ -495,38 +500,18 @@ func (a *AuthorizationServer) corsPreflightResponse(
 	api string) *authv3.CheckResponse {
 
 	log.Debugf("sending cors preflight for api: %v", envRequest.GetAPISpec().ID)
-	return a.createEnvoyDenied(envRequest.Request, envRequest, tracker, authContext, api, rpc.CANCELLED, typev3.StatusCode_NoContent)
+	return a.createEnvoyDenied(envRequest.Request, envRequest, tracker, authContext, api, fault.CreateAdapterFault("", rpc.CANCELLED, typev3.StatusCode_NoContent))
 }
 
-func (a *AuthorizationServer) notFound(req *authv3.CheckRequest, envRequest *config.EnvironmentSpecRequest,
-	tracker *prometheusRequestMetricTracker, api string) *authv3.CheckResponse {
-	return a.createConditionalEnvoyDenied(req, envRequest, tracker, nil, api, rpc.NOT_FOUND)
-}
-
-func (a *AuthorizationServer) unauthenticated(req *authv3.CheckRequest, envRequest *config.EnvironmentSpecRequest,
-	tracker *prometheusRequestMetricTracker, api string) *authv3.CheckResponse {
-	return a.createConditionalEnvoyDenied(req, envRequest, tracker, nil, api, rpc.UNAUTHENTICATED)
-}
-
-func (a *AuthorizationServer) unavailable(req *authv3.CheckRequest) *authv3.CheckResponse {
-	log.Errorf("sending service unavailable")
-	return a.createConditionalEnvoyDenied(req, nil, nil, nil, "", rpc.UNAVAILABLE)
-}
-
-func (a *AuthorizationServer) internalError(req *authv3.CheckRequest, envRequest *config.EnvironmentSpecRequest,
-	tracker *prometheusRequestMetricTracker, err error) *authv3.CheckResponse {
-	log.Errorf("sending internal error: %v", err)
-	return a.createConditionalEnvoyDenied(req, envRequest, tracker, nil, "", rpc.INTERNAL)
-}
-
-func (a *AuthorizationServer) denied(req *authv3.CheckRequest, envRequest *config.EnvironmentSpecRequest,
-	tracker *prometheusRequestMetricTracker, authContext *auth.Context, api string) *authv3.CheckResponse {
-	return a.createConditionalEnvoyDenied(req, envRequest, tracker, authContext, api, rpc.PERMISSION_DENIED)
-}
-
-func (a *AuthorizationServer) quotaExceeded(req *authv3.CheckRequest, envRequest *config.EnvironmentSpecRequest,
-	tracker *prometheusRequestMetricTracker, authContext *auth.Context, api string) *authv3.CheckResponse {
-	return a.createConditionalEnvoyDenied(req, envRequest, tracker, authContext, api, rpc.RESOURCE_EXHAUSTED)
+func (a *AuthorizationServer) handleFault(req *authv3.CheckRequest, envRequest *config.EnvironmentSpecRequest,
+	tracker *prometheusRequestMetricTracker, api string, authContext *auth.Context, err error) *authv3.CheckResponse {
+	adapterFault, ok := err.(*fault.AdapterFault)
+	if !ok {
+		log.Errorf("Could not cast err %v into type AdapterFault.", err)
+		return a.createConditionalEnvoyDenied(req, envRequest, tracker, authContext, api, fault.CreateAdapterFault("", rpc.INTERNAL, 0))
+	}
+	log.Errorf("Sending fault %v", adapterFault.Error())
+	return a.createConditionalEnvoyDenied(req, envRequest, tracker, authContext, api, adapterFault)
 }
 
 // creates a deny (direct) response if authorization has failed unless
@@ -535,10 +520,10 @@ func (a *AuthorizationServer) quotaExceeded(req *authv3.CheckRequest, envRequest
 func (a *AuthorizationServer) createConditionalEnvoyDenied(
 	req *authv3.CheckRequest, envRequest *config.EnvironmentSpecRequest,
 	tracker *prometheusRequestMetricTracker, authContext *auth.Context,
-	api string, code rpc.Code) *authv3.CheckResponse {
+	api string, adapterFault *fault.AdapterFault) *authv3.CheckResponse {
 
 	statusCode := typev3.StatusCode_Forbidden
-	switch code {
+	switch adapterFault.RpcCode {
 	case rpc.NOT_FOUND:
 		statusCode = typev3.StatusCode_NotFound
 	case rpc.UNAUTHENTICATED:
@@ -550,29 +535,30 @@ func (a *AuthorizationServer) createConditionalEnvoyDenied(
 	case rpc.UNAVAILABLE:
 		statusCode = typev3.StatusCode_ServiceUnavailable
 	}
+	adapterFault.StatusCode = statusCode
 
 	if authContext != nil && a.handler.allowUnauthorized {
 		if err := envRequest.PrepareVariables(); err != nil {
 			log.Errorf("failed to populate context variable: %v", err)
-			return a.createEnvoyDenied(req, envRequest, tracker, authContext, api, rpc.PERMISSION_DENIED, typev3.StatusCode_Forbidden)
+			return a.createEnvoyDenied(req, envRequest, tracker, authContext, api, fault.CreateAdapterFault("", rpc.PERMISSION_DENIED, typev3.StatusCode_Forbidden))
 		}
-		log.Debugf("sending ok (actual: %s)", code.String())
+		log.Debugf("sending ok (actual: %s)", adapterFault.RpcCode.String())
 		return a.createEnvoyForwarded(req, tracker, authContext, api, envRequest)
 	}
 
-	return a.createEnvoyDenied(req, envRequest, tracker, authContext, api, code, statusCode)
+	return a.createEnvoyDenied(req, envRequest, tracker, authContext, api, adapterFault)
 }
 
 // creates a response that will be sent directly to client
 // also queues an analytics record
 func (a *AuthorizationServer) createEnvoyDenied(req *authv3.CheckRequest, envRequest *config.EnvironmentSpecRequest,
-	tracker *prometheusRequestMetricTracker, authContext *auth.Context, api string, rpcCode rpc.Code, statusCode typev3.StatusCode) *authv3.CheckResponse {
+	tracker *prometheusRequestMetricTracker, authContext *auth.Context, api string, adapterFault *fault.AdapterFault) *authv3.CheckResponse {
 
 	// send reject to client
-	log.Debugf("sending downstream: %s", rpcCode.String())
+	log.Debugf("sending downstream: %s", adapterFault.RpcCode.String())
 
 	if tracker != nil {
-		tracker.statusCode = statusCode
+		tracker.statusCode = adapterFault.StatusCode
 	}
 
 	// apigee dynamic data response headers
@@ -580,16 +566,16 @@ func (a *AuthorizationServer) createEnvoyDenied(req *authv3.CheckRequest, envReq
 	if envRequest != nil && envRequest.GetAPISpec() != nil {
 		apiSpec = envRequest.GetAPISpec()
 	}
-	dynamicDataHeaders := apigeeDynamicDataHeaders(a.handler.Organization(), a.handler.Environment(), api, apiSpec, rpcCode == rpc.INTERNAL)
+	dynamicDataHeaders := apigeeDynamicDataHeaders(a.handler.Organization(), a.handler.Environment(), api, apiSpec, adapterFault)
 
 	response := &authv3.CheckResponse{
 		Status: &status.Status{
-			Code: int32(rpcCode),
+			Code: int32(adapterFault.RpcCode),
 		},
 		HttpResponse: &authv3.CheckResponse_DeniedResponse{
 			DeniedResponse: &authv3.DeniedHttpResponse{
 				Status: &typev3.HttpStatus{
-					Code: statusCode,
+					Code: adapterFault.StatusCode,
 				},
 				Headers: append(corsResponseHeaders(envRequest), dynamicDataHeaders...),
 			},
@@ -622,7 +608,7 @@ func (a *AuthorizationServer) createEnvoyDenied(req *authv3.CheckRequest, envReq
 			RequestPath:                  requestPath,
 			RequestVerb:                  req.Attributes.Request.Http.Method,
 			UserAgent:                    req.Attributes.Request.Http.Headers["User-Agent"],
-			ResponseStatusCode:           int(statusCode),
+			ResponseStatusCode:           int(adapterFault.StatusCode),
 			GatewaySource:                a.gatewaySource,
 			ClientIP:                     req.Attributes.Request.Http.Headers["X-Forwarded-For"],
 		}
