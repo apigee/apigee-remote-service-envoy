@@ -246,22 +246,31 @@ func timeToApigeeInt(t time.Time) int64 {
 }
 
 func prometheusProxyRecord(logEntry *v3.HTTPAccessLogEntry) {
+	if logEntry == nil {
+		return
+	}
 	req := logEntry.GetRequest()
-	resp := logEntry.GetResponse()
 	method := req.GetRequestMethod().String()
 
 	// increment request counter
 	prometheusProxyRequestCount.WithLabelValues(method).Inc()
 
 	// increment response counter
+	resp := logEntry.GetResponse()
+	if resp == nil {
+		return
+	}
 	responseCode := fmt.Sprintf("%d", resp.GetResponseCode().GetValue())
 	faultCode := resp.ResponseHeaders[headerFaultCode]
 	faultSource := resp.ResponseHeaders[headerFaultSource]
 	prometheusProxyResponseCount.WithLabelValues(method, responseCode, faultCode, faultSource).Inc()
 
 	// record latency
-	responseTime := logEntry.GetCommonProperties().TimeToLastUpstreamTxByte.AsDuration().Milliseconds()
-	prometheusProxyLatencies.WithLabelValues(method).Observe(float64(responseTime))
+	cp := logEntry.GetCommonProperties()
+	if cp != nil && cp.TimeToLastUpstreamTxByte != nil {
+		responseTime := float64(cp.TimeToLastUpstreamTxByte.AsDuration().Milliseconds())
+		prometheusProxyLatencies.WithLabelValues(method).Observe(responseTime)
+	}
 }
 
 // prometheus metrics for proxies and targets
