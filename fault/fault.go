@@ -21,21 +21,22 @@ import (
 	"github.com/gogo/googleapis/google/rpc"
 )
 
-// AdapterFault is blah
+// AdapterFault encapsulates the fault information within ARC.
 type AdapterFault struct {
-	// FaultCode is for monitoring
+	// FaultCode is the apigee fault code. Refer: https://docs.apigee.com/api-monitoring/fault-codes for more information.
 	FaultCode string
-	// RpcCode
+	// RpcCode is the RPC status for the ext_authz response.
 	RpcCode rpc.Code
-	// StatusCode http status code for user-facing response
+	// StatusCode is the http status code for user-facing response.
 	StatusCode typev3.StatusCode
 }
 
-// Error() is ...
+// Error() returns the human-readable json-encoded string representation of the AdapterFault.
 func (f *AdapterFault) Error() string {
 	return fmt.Sprintf(`{ "faultCode:" %v, "RpcCode:" %v", "StatusCode:" %v,}`, f.FaultCode, f.RpcCode.String(), f.StatusCode.String())
 }
 
+// CreateAdapterFault() creates and returns a new AdapterFault with the provided input arguments.
 func CreateAdapterFault(faultCode string, rpcCode rpc.Code, statusCode typev3.StatusCode) *AdapterFault {
 	fault := new(AdapterFault)
 	fault.FaultCode = faultCode
