@@ -23,7 +23,8 @@ import (
 
 // AdapterFault encapsulates the fault information within ARC.
 type AdapterFault struct {
-	// FaultCode is the apigee fault code. Refer: https://docs.apigee.com/api-monitoring/fault-codes for more information.
+	// FaultCode is the apigee fault code.
+	// Refer: https://docs.apigee.com/api-monitoring/fault-codes for more information.
 	FaultCode string
 	// RpcCode is the RPC status for the ext_authz response.
 	RpcCode rpc.Code
@@ -31,9 +32,12 @@ type AdapterFault struct {
 	StatusCode typev3.StatusCode
 }
 
-// Error() returns the human-readable json-encoded string representation of the AdapterFault.
+// Error() returns the human-readable string representation of the AdapterFault.
 func (f *AdapterFault) Error() string {
-	return fmt.Sprintf(`{ "faultCode:" %v, "RpcCode:" %v", "StatusCode:" %v,}`, f.FaultCode, f.RpcCode.String(), f.StatusCode.String())
+	if f == nil {
+		return fmt.Sprintf("AdapterFault: Error() called on a nil object")
+	}
+	return fmt.Sprintf("FaultCode:%v, RpcCode:%v, StatusCode:%v", f.FaultCode, f.RpcCode.String(), f.StatusCode.String())
 }
 
 // CreateAdapterFault() creates and returns a new AdapterFault with the provided input arguments.
