@@ -35,7 +35,7 @@ type AdapterFault struct {
 // Error() returns the human-readable string representation of the AdapterFault.
 func (f *AdapterFault) Error() string {
 	if f == nil {
-		return fmt.Sprintf("AdapterFault: Error() called on a nil object")
+		return fmt.Sprint("AdapterFault: Error() called on a nil object")
 	}
 	return fmt.Sprintf("FaultCode:%v, RpcCode:%v, StatusCode:%v", f.FaultCode, f.RpcCode.String(), f.StatusCode.String())
 }

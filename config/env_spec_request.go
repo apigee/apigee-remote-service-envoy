@@ -372,7 +372,7 @@ func (e *EnvironmentSpecRequest) verifyJWTAuthentication(name string) error {
 		if result.err == nil {
 			return nil
 		} else {
-			fault.CreateAdapterFault("", rpc.UNAUTHENTICATED, 0)
+			return fault.CreateAdapterFault("", rpc.UNAUTHENTICATED, 0)
 		}
 	}
 
