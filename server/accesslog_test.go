@@ -26,11 +26,14 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/v2/analytics"
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
 	"github.com/apigee/apigee-remote-service-golib/v2/product"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	v3 "github.com/envoyproxy/go-control-plane/envoy/data/accesslog/v3"
@@ -330,6 +333,70 @@ func TestStreamAccessLogs(t *testing.T) {
 	}
 }
 
+func TestPrometheusProxyRecord(t *testing.T) {
+	const bufferSize = 1024 * 1024
+
+	tals := &testAccessLogService{
+		listener: bufconn.Listen(bufferSize),
+	}
+	srv := tals.startAccessLogServer(t)
+	ctx := context.Background()
+
+	defer time.Sleep(5 * time.Millisecond)
+	defer srv.GracefulStop()
+	conn, err := grpc.DialContext(ctx, "", grpc.WithContextDialer(tals.getBufDialer()), grpc.WithInsecure())
+	if err != nil {
+		t.Fatalf("failed to dial: %v", err)
+	}
+	defer conn.Close()
+
+	client := als.NewAccessLogServiceClient(conn)
+	stream, err := client.StreamAccessLogs(ctx)
+	if err != nil {
+		t.Fatalf("failed to open client stream: %v", err)
+	}
+
+	tests := []struct {
+		desc      string
+		counter   *prometheus.CounterVec
+		wantCount int
+		labels    []string
+	}{
+		{
+			desc:    "proxy request count",
+			counter: prometheusProxyRequestCount,
+			labels:  []string{"GET"},
+		},
+		{
+			desc:    "proxy response count",
+			counter: prometheusProxyResponseCount,
+			labels:  []string{"GET", "500", "fault-code", "fault-src"},
+		},
+	}
+
+	// derive wanted counts from current ones before sending a log entry
+	for i := range tests {
+		tests[i].wantCount = int(testutil.ToFloat64(tests[i].counter.WithLabelValues(tests[i].labels...))) + 1
+	}
+
+	if err := stream.Send(makeValidHTTPLog()); err != nil {
+		t.Error(err)
+	}
+
+	if _, err := stream.CloseAndRecv(); err != nil && err != io.EOF {
+		t.Error(err)
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			count := int(testutil.ToFloat64(test.counter.WithLabelValues(test.labels...)))
+			if count != test.wantCount {
+				t.Errorf("want prometheus metric with labels %v count %d, got %d", test.labels, test.wantCount, count)
+			}
+		})
+	}
+}
+
 type testAccessLogService struct {
 	listener *bufconn.Listener
 }
@@ -374,8 +441,17 @@ func makeValidHTTPLog() *als.StreamAccessLogsMessage {
 							RequestHeaders: map[string]string{
 								":authority": "api",
 							},
+							RequestMethod: core.RequestMethod_GET,
 						},
-						Response: &v3.HTTPResponseProperties{},
+						Response: &v3.HTTPResponseProperties{
+							ResponseCode: &wrapperspb.UInt32Value{
+								Value: 500,
+							},
+							ResponseHeaders: map[string]string{
+								headerFaultCode:   "fault-code",
+								headerFaultSource: "fault-src",
+							},
+						},
 						CommonProperties: &v3.AccessLogCommon{
 							Metadata: &core.Metadata{
 								FilterMetadata: map[string]*structpb.Struct{
@@ -384,6 +460,7 @@ func makeValidHTTPLog() *als.StreamAccessLogsMessage {
 									},
 								},
 							},
+							TimeToLastUpstreamTxByte: durationpb.New(time.Millisecond),
 						},
 					},
 				},
