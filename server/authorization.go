@@ -607,7 +607,7 @@ func (a *AuthorizationServer) corsPreflightResponse(
 
 func (a *AuthorizationServer) handleFault(req *authv3.CheckRequest, envRequest *config.EnvironmentSpecRequest,
 	tracker *prometheusRequestMetricTracker, api string, authContext *auth.Context, err error) *authv3.CheckResponse {
-	log.Errorf("Sending fault %v", err.Error())
+	log.Errorf("Sending fault %v", err)
 	return a.createConditionalEnvoyDenied(req, envRequest, tracker, authContext, api, err)
 }
 
