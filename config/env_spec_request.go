@@ -449,7 +449,7 @@ func mustBeInClaim(value, name string, claims map[string]interface{}) error {
 // Authenticate returns nil if AuthenticatationRequirements are met for the request
 // Returns nil if AuthenticatationRequirements are empty or disabled.
 func (e *EnvironmentSpecRequest) Authenticate() error {
-	return e.meetsAuthenticatationRequirements(e.getAuthenticationRequirement())
+	return e.verifyAuthenticatationRequirements(e.getAuthenticationRequirement())
 }
 
 func (e *EnvironmentSpecRequest) getAuthenticationRequirement() (auth AuthenticationRequirement) {
@@ -486,7 +486,7 @@ func (e *EnvironmentSpecRequest) GetHTTPRequestTransforms() (transforms HTTPRequ
 }
 
 // returns nil if auth is empty or disabled
-func (e *EnvironmentSpecRequest) meetsAuthenticatationRequirements(auth AuthenticationRequirement) error {
+func (e *EnvironmentSpecRequest) verifyAuthenticatationRequirements(auth AuthenticationRequirement) error {
 	if e == nil {
 		return fault.CreateAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)
 	}
@@ -498,14 +498,14 @@ func (e *EnvironmentSpecRequest) meetsAuthenticatationRequirements(auth Authenti
 		return e.verifyJWTAuthentication(a.Name)
 	case AnyAuthenticationRequirements:
 		for _, r := range []AuthenticationRequirement(a) {
-			if e.meetsAuthenticatationRequirements(r) == nil {
+			if e.verifyAuthenticatationRequirements(r) == nil {
 				return nil
 			}
 		}
 		return fault.CreateAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)
 	case AllAuthenticationRequirements:
 		for _, r := range []AuthenticationRequirement(a) {
-			if e.meetsAuthenticatationRequirements(r) != nil {
+			if e.verifyAuthenticatationRequirements(r) != nil {
 				return fault.CreateAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)
 			}
 		}

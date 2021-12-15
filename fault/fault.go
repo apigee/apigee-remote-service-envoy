@@ -35,7 +35,7 @@ type AdapterFault struct {
 	StatusCode typev3.StatusCode
 }
 
-// Error() returns the human-readable string representation of the AdapterFault.
+// Error returns the human-readable string representation of the AdapterFault.
 func (f *AdapterFault) Error() string {
 	if f == nil {
 		return "AdapterFault: Error() called on a nil object"
@@ -43,7 +43,7 @@ func (f *AdapterFault) Error() string {
 	return fmt.Sprintf("FaultCode:%v, RpcCode:%v, StatusCode:%v", f.FaultCode, f.RpcCode.String(), f.StatusCode.String())
 }
 
-// CreateAdapterFaultWithRpcCode() creates and returns a new AdapterFault with the provided input RpcCode.
+// CreateAdapterFaultWithRpcCode creates and returns a new AdapterFault with the provided input RpcCode.
 func CreateAdapterFaultWithRpcCode(rpcCode rpc.Code) *AdapterFault {
 	fault := new(AdapterFault)
 	fault.FaultCode = ""
@@ -52,7 +52,7 @@ func CreateAdapterFaultWithRpcCode(rpcCode rpc.Code) *AdapterFault {
 	return fault
 }
 
-// CreateAdapterFault() creates and returns a new AdapterFault with the provided input arguments.
+// CreateAdapterFault creates and returns a new AdapterFault with the provided input arguments.
 func CreateAdapterFault(faultCode string, rpcCode rpc.Code, statusCode typev3.StatusCode) *AdapterFault {
 	fault := new(AdapterFault)
 	fault.FaultCode = faultCode

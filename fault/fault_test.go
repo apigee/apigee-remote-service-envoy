@@ -28,28 +28,29 @@ func TestErrorMessage(t *testing.T) {
 		expectedErrorMessage string
 	}{
 		{
-			desc:                 "test0",
+			desc:                 "test valid input arguments",
 			fault:                CreateAdapterFault("test-code", rpc.DEADLINE_EXCEEDED, typev3.StatusCode_Forbidden),
 			expectedErrorMessage: "FaultCode:test-code, RpcCode:DEADLINE_EXCEEDED, StatusCode:Forbidden",
 		},
 		{
-			desc:                 "test1",
+			desc:                 "test valid default input arguments",
 			fault:                CreateAdapterFault("", 1, 0),
 			expectedErrorMessage: "FaultCode:, RpcCode:CANCELLED, StatusCode:Empty",
 		},
 		{
-			desc:                 "test2",
+			desc:                 "test invalid input arguments",
 			fault:                nil,
 			expectedErrorMessage: "AdapterFault: Error() called on a nil object",
 		},
 	}
 
 	for _, test := range tests {
-		t.Logf("Running test %v", test.desc)
-		got := test.fault.Error()
-		if got != test.expectedErrorMessage {
-			t.Fatalf("want: %v\n, got: %v\v", test.expectedErrorMessage, got)
-		}
+		t.Run(test.desc, func(t *testing.T) {
+			got := test.fault.Error()
+			if got != test.expectedErrorMessage {
+				t.Fatalf("want: %v\n, got: %v\v", test.expectedErrorMessage, got)
+			}
+		})
 	}
 }
 
@@ -62,14 +63,14 @@ func TestCreateAdapterFault(t *testing.T) {
 		expectedStatusCode typev3.StatusCode
 	}{
 		{
-			desc:               "test0",
+			desc:               "test valid input arguments",
 			fault:              CreateAdapterFault("test-code", rpc.DEADLINE_EXCEEDED, typev3.StatusCode_Forbidden),
 			expectedFaultCode:  "test-code",
 			expectedRpcCode:    rpc.DEADLINE_EXCEEDED,
 			expectedStatusCode: typev3.StatusCode_Forbidden,
 		},
 		{
-			desc:               "test1",
+			desc:               "test valid default input arguments",
 			fault:              CreateAdapterFault("", 1, 0),
 			expectedFaultCode:  "",
 			expectedRpcCode:    1,
@@ -78,16 +79,17 @@ func TestCreateAdapterFault(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Logf("Running test %v", test.desc)
-		if test.fault.FaultCode != test.expectedFaultCode {
-			t.Fatalf("want: %v\n, got: %v\v", test.expectedFaultCode, test.fault.FaultCode)
-		}
-		if test.fault.RpcCode != test.expectedRpcCode {
-			t.Fatalf("want: %v\n, got: %v\v", test.expectedRpcCode, test.fault.RpcCode)
-		}
-		if test.fault.StatusCode != test.expectedStatusCode {
-			t.Fatalf("want: %v\n, got: %v\v", test.expectedStatusCode, test.fault.StatusCode)
-		}
+		t.Run(test.desc, func(t *testing.T) {
+			if test.fault.FaultCode != test.expectedFaultCode {
+				t.Fatalf("want: %v\n, got: %v\v", test.expectedFaultCode, test.fault.FaultCode)
+			}
+			if test.fault.RpcCode != test.expectedRpcCode {
+				t.Fatalf("want: %v\n, got: %v\v", test.expectedRpcCode, test.fault.RpcCode)
+			}
+			if test.fault.StatusCode != test.expectedStatusCode {
+				t.Fatalf("want: %v\n, got: %v\v", test.expectedStatusCode, test.fault.StatusCode)
+			}
+		})
 	}
 }
 
