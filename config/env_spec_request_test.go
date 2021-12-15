@@ -44,9 +44,9 @@ func TestNilReceivers(t *testing.T) {
 	s.GetOperation()
 	s.GetParamValue(APIOperationParameter{})
 	_ = s.Authenticate()
-	s.verifyJWTAuthentication("")
+	_ = s.verifyJWTAuthentication("")
 	s.getAuthenticationRequirement()
-	s.verifyAuthenticatationRequirements(AuthenticationRequirement{})
+	_ = s.verifyAuthenticatationRequirements(AuthenticationRequirement{})
 	s.GetConsumerAuthorization()
 }
 
