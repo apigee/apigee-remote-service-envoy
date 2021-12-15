@@ -90,3 +90,16 @@ func TestCreateAdapterFault(t *testing.T) {
 		}
 	}
 }
+
+func TestCreateAdapterFaultWithRpcCode(t *testing.T) {
+	actualFault := CreateAdapterFaultWithRpcCode(rpc.ALREADY_EXISTS)
+	if actualFault.FaultCode != "" {
+		t.Fatalf("want: %v\n, got: %v\v", "", actualFault.FaultCode)
+	}
+	if actualFault.RpcCode != rpc.ALREADY_EXISTS {
+		t.Fatalf("want: %v\n, got: %v\v", rpc.ALREADY_EXISTS, actualFault.RpcCode)
+	}
+	if actualFault.StatusCode != 0 {
+		t.Fatalf("want: %v\n, got: %v\v", 0, actualFault.StatusCode)
+	}
+}

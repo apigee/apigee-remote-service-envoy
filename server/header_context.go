@@ -106,19 +106,17 @@ func apigeeDynamicDataHeaders(org, env, api string, apiSpec *config.APISpec, ada
 	}
 
 	// Include fault related headers.
-	if adapterFault != nil {
-		if adapterFault.RpcCode == rpc.INTERNAL {
-			headers = append(headers, createHeaderValueOption(headerFaultSource, "ARC", false))
-			headers = append(headers, createHeaderValueOption(headerFaultFlag, "true", false))
-			if apiSpec != nil {
-				headers = append(headers, createHeaderValueOption(headerFaultRevision, apiSpec.RevisionID, false))
-			}
+	if adapterFault != nil && adapterFault.RpcCode == rpc.INTERNAL {
+		headers = append(headers, createHeaderValueOption(headerFaultSource, "ARC", false))
+		headers = append(headers, createHeaderValueOption(headerFaultFlag, "true", false))
+		if apiSpec != nil {
+			headers = append(headers, createHeaderValueOption(headerFaultRevision, apiSpec.RevisionID, false))
+		}
 
-			if adapterFault.FaultCode == "" {
-				// A placeholder fault code value.
-				adapterFault.FaultCode = "fault"
-			}
-
+		if adapterFault.FaultCode == "" {
+			// A placeholder fault code value.
+			headers = append(headers, createHeaderValueOption(headerFaultCode, "fault", false))
+		} else {
 			headers = append(headers, createHeaderValueOption(headerFaultCode, adapterFault.FaultCode, false))
 		}
 	}
