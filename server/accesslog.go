@@ -250,27 +250,31 @@ func prometheusProxyRecord(logEntry *v3.HTTPAccessLogEntry) {
 		return
 	}
 	req := logEntry.GetRequest()
+	resp := logEntry.GetResponse()
 	method := req.GetRequestMethod().String()
+	var proxyName string
+	if headers := resp.GetResponseHeaders(); headers != nil {
+		proxyName = headers[headerProxy]
+	}
 
 	// increment request counter
-	prometheusProxyRequestCount.WithLabelValues(method).Inc()
+	prometheusProxyRequestCount.WithLabelValues(proxyName, method).Inc()
+
+	// record latency
+	cp := logEntry.GetCommonProperties()
+	if cp != nil && cp.TimeToLastUpstreamTxByte != nil {
+		responseTime := float64(cp.TimeToLastUpstreamTxByte.AsDuration().Milliseconds())
+		prometheusProxyLatencies.WithLabelValues(proxyName, method).Observe(responseTime)
+	}
 
 	// increment response counter
-	resp := logEntry.GetResponse()
 	if resp == nil {
 		return
 	}
 	responseCode := fmt.Sprintf("%d", resp.GetResponseCode().GetValue())
 	faultCode := resp.ResponseHeaders[headerFaultCode]
 	faultSource := resp.ResponseHeaders[headerFaultSource]
-	prometheusProxyResponseCount.WithLabelValues(method, responseCode, faultCode, faultSource).Inc()
-
-	// record latency
-	cp := logEntry.GetCommonProperties()
-	if cp != nil && cp.TimeToLastUpstreamTxByte != nil {
-		responseTime := float64(cp.TimeToLastUpstreamTxByte.AsDuration().Milliseconds())
-		prometheusProxyLatencies.WithLabelValues(method).Observe(responseTime)
-	}
+	prometheusProxyResponseCount.WithLabelValues(proxyName, method, responseCode, faultCode, faultSource).Inc()
 }
 
 // prometheus metrics for proxies and targets
@@ -279,17 +283,17 @@ var (
 		Subsystem: "proxy",
 		Name:      "request_count",
 		Help:      "Total number of requests received",
-	}, []string{"method"})
+	}, []string{"proxy_name", "method"})
 	prometheusProxyResponseCount = promauto.NewCounterVec(prometheus.CounterOpts{
 		Subsystem: "proxy",
 		Name:      "response_count",
 		Help:      "Total number of responses sent",
-	}, []string{"method", "response_code", "fault_code", "fault_src"})
+	}, []string{"proxy_name", "method", "response_code", "fault_code", "fault_src"})
 	prometheusProxyLatencies = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Subsystem: "proxy",
 		Name:      "latencies",
 		Help:      "Request and response latencies in milliseconds, including proxy overhead and target service time",
 		// follows Apigee's convention of buckets for latencies
 		Buckets: []float64{1, 2, 5, 10, 25, 50, 75, 100, 250, 500, 750, 1000, 2500, 5000, 7500, 10000},
-	}, []string{"method"})
+	}, []string{"proxy_name", "method"})
 )
