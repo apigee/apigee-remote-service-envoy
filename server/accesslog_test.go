@@ -365,12 +365,12 @@ func TestPrometheusProxyRecord(t *testing.T) {
 		{
 			desc:    "proxy request count",
 			counter: prometheusProxyRequestCount,
-			labels:  []string{"GET"},
+			labels:  []string{"proxy", "GET"},
 		},
 		{
 			desc:    "proxy response count",
 			counter: prometheusProxyResponseCount,
-			labels:  []string{"GET", "500", "fault-code", "fault-src"},
+			labels:  []string{"proxy", "GET", "500", "fault-code", "fault-src"},
 		},
 	}
 
@@ -448,6 +448,7 @@ func makeValidHTTPLog() *als.StreamAccessLogsMessage {
 								Value: 500,
 							},
 							ResponseHeaders: map[string]string{
+								headerProxy:       "proxy",
 								headerFaultCode:   "fault-code",
 								headerFaultSource: "fault-src",
 							},
