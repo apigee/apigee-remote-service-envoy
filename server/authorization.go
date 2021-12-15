@@ -164,7 +164,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 		}
 		log.Debugf("operation: %s", operation.Name)
 
-		if authnFault := envRequest.IsAuthenticated(); authnFault != nil {
+		if authnErr := envRequest.Authenticate(); authnErr != nil {
 			log.Debugf("authentication requirements not met")
 			return a.handleFault(
 				req,
@@ -172,7 +172,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 				tracker,
 				api,
 				/* authContext= */ nil,
-				authnFault), nil
+				authnErr), nil
 		}
 
 		if !envRequest.IsAuthorizationRequired() {
@@ -606,9 +606,9 @@ func (a *AuthorizationServer) corsPreflightResponse(
 }
 
 func (a *AuthorizationServer) handleFault(req *authv3.CheckRequest, envRequest *config.EnvironmentSpecRequest,
-	tracker *prometheusRequestMetricTracker, api string, authContext *auth.Context, adapterFault *fault.AdapterFault) *authv3.CheckResponse {
-	log.Errorf("Sending fault %v", adapterFault.Error())
-	return a.createConditionalEnvoyDenied(req, envRequest, tracker, authContext, api, adapterFault)
+	tracker *prometheusRequestMetricTracker, api string, authContext *auth.Context, err error) *authv3.CheckResponse {
+	log.Errorf("Sending fault %v", err.Error())
+	return a.createConditionalEnvoyDenied(req, envRequest, tracker, authContext, api, err)
 }
 
 // creates a deny (direct) response if authorization has failed unless
@@ -617,7 +617,13 @@ func (a *AuthorizationServer) handleFault(req *authv3.CheckRequest, envRequest *
 func (a *AuthorizationServer) createConditionalEnvoyDenied(
 	req *authv3.CheckRequest, envRequest *config.EnvironmentSpecRequest,
 	tracker *prometheusRequestMetricTracker, authContext *auth.Context,
-	api string, adapterFault *fault.AdapterFault) *authv3.CheckResponse {
+	api string, err error) *authv3.CheckResponse {
+
+	adapterFault, ok := err.(*fault.AdapterFault)
+	if !ok {
+		log.Errorf("Could not cast err %v into AdapterFault.", err)
+		a.createEnvoyDenied(req, envRequest, tracker, authContext, api, fault.CreateAdapterFaultWithRpcCode(rpc.INTERNAL))
+	}
 
 	statusCode := typev3.StatusCode_Forbidden
 	switch adapterFault.RpcCode {

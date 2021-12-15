@@ -354,7 +354,7 @@ func (e *EnvironmentSpecRequest) JWTAuthentications() []*JWTAuthentication {
 // looks up the JWTAuthentication by name and runs verification
 // returns nil if found and verified
 // any error can be in e.jwtResults[name]
-func (e *EnvironmentSpecRequest) verifyJWTAuthentication(name string) *fault.AdapterFault {
+func (e *EnvironmentSpecRequest) verifyJWTAuthentication(name string) error {
 	if e == nil {
 		return fault.CreateAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)
 	}
@@ -446,9 +446,9 @@ func mustBeInClaim(value, name string, claims map[string]interface{}) error {
 	return fmt.Errorf("%q not in claim %q", value, name)
 }
 
-// IsAuthenticated returns nil if AuthenticatationRequirements are met for the request
+// Authenticate returns nil if AuthenticatationRequirements are met for the request
 // Returns nil if AuthenticatationRequirements are empty or disabled.
-func (e *EnvironmentSpecRequest) IsAuthenticated() *fault.AdapterFault {
+func (e *EnvironmentSpecRequest) Authenticate() error {
 	return e.meetsAuthenticatationRequirements(e.getAuthenticationRequirement())
 }
 
@@ -486,7 +486,7 @@ func (e *EnvironmentSpecRequest) GetHTTPRequestTransforms() (transforms HTTPRequ
 }
 
 // returns nil if auth is empty or disabled
-func (e *EnvironmentSpecRequest) meetsAuthenticatationRequirements(auth AuthenticationRequirement) *fault.AdapterFault {
+func (e *EnvironmentSpecRequest) meetsAuthenticatationRequirements(auth AuthenticationRequirement) error {
 	if e == nil {
 		return fault.CreateAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)
 	}
