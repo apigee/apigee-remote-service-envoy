@@ -164,7 +164,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 		}
 		log.Debugf("operation: %s", operation.Name)
 
-		if authnErr := envRequest.Authenticate(); authnErr != nil {
+		if err := envRequest.Authenticate(); err != nil {
 			log.Debugf("authentication requirements not met")
 			return a.handleFault(
 				req,
@@ -172,7 +172,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 				tracker,
 				api,
 				/* authContext= */ nil,
-				authnErr), nil
+				err), nil
 		}
 
 		if !envRequest.IsAuthorizationRequired() {
