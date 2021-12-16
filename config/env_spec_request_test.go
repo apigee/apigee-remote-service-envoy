@@ -46,7 +46,7 @@ func TestNilReceivers(t *testing.T) {
 	_ = s.Authenticate()
 	_ = s.verifyJWTAuthentication("")
 	s.getAuthenticationRequirement()
-	_ = s.verifyAuthenticatationRequirements(AuthenticationRequirement{})
+	_ = s.verifyAuthenticationRequirements(AuthenticationRequirement{})
 	s.GetConsumerAuthorization()
 }
 
@@ -55,7 +55,7 @@ func TestUnknownAuthenticationRequirementType(t *testing.T) {
 		Requirements: unknownAR{},
 	}
 	req := EnvironmentSpecRequest{}
-	if req.verifyAuthenticatationRequirements(authReqs) == nil {
+	if req.verifyAuthenticationRequirements(authReqs) == nil {
 		t.Errorf("should return error")
 	}
 }
