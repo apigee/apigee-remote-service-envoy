@@ -147,7 +147,7 @@ func TestDynamicDataHeaders(t *testing.T) {
 				BasePath:   basePath,
 				RevisionID: revision,
 			},
-			fault: fault.CreateAdapterFault("", rpc.OK, 0),
+			fault: fault.NewAdapterFault("", rpc.OK, 0),
 			requiredHeaders: map[string]interface{}{
 				headerOrganization:  org,
 				headerEnvironment:   env,
@@ -162,7 +162,7 @@ func TestDynamicDataHeaders(t *testing.T) {
 			org:   org,
 			env:   env,
 			api:   api,
-			fault: fault.CreateAdapterFault("", rpc.OK, 0),
+			fault: fault.NewAdapterFault("", rpc.OK, 0),
 			requiredHeaders: map[string]interface{}{
 				headerOrganization: org,
 				headerEnvironment:  env,
@@ -180,7 +180,7 @@ func TestDynamicDataHeaders(t *testing.T) {
 				BasePath:   basePath,
 				RevisionID: revision,
 			},
-			fault: fault.CreateAdapterFault("", rpc.INTERNAL, 0),
+			fault: fault.NewAdapterFault("", rpc.INTERNAL, 0),
 			requiredHeaders: map[string]interface{}{
 				headerOrganization:  org,
 				headerEnvironment:   env,
@@ -197,7 +197,7 @@ func TestDynamicDataHeaders(t *testing.T) {
 			org:   org,
 			env:   env,
 			api:   api,
-			fault: fault.CreateAdapterFault("x-apigee-test", rpc.INTERNAL, 0),
+			fault: fault.NewAdapterFault("x-apigee-test", rpc.INTERNAL, 0),
 			requiredHeaders: map[string]interface{}{
 				headerOrganization: org,
 				headerEnvironment:  env,

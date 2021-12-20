@@ -43,8 +43,8 @@ func (f *AdapterFault) Error() string {
 	return fmt.Sprintf("FaultCode:%v, RpcCode:%v, StatusCode:%v", f.FaultCode, f.RpcCode.String(), f.StatusCode.String())
 }
 
-// CreateAdapterFaultWithRpcCode creates and returns a new AdapterFault with the provided input RpcCode.
-func CreateAdapterFaultWithRpcCode(rpcCode rpc.Code) *AdapterFault {
+// NewAdapterFaultWithRpcCode creates and returns a new AdapterFault with the provided input RpcCode.
+func NewAdapterFaultWithRpcCode(rpcCode rpc.Code) *AdapterFault {
 	fault := new(AdapterFault)
 	fault.FaultCode = ""
 	fault.StatusCode = 0
@@ -52,8 +52,8 @@ func CreateAdapterFaultWithRpcCode(rpcCode rpc.Code) *AdapterFault {
 	return fault
 }
 
-// CreateAdapterFault creates and returns a new AdapterFault with the provided input arguments.
-func CreateAdapterFault(faultCode string, rpcCode rpc.Code, statusCode typev3.StatusCode) *AdapterFault {
+// NewAdapterFault creates and returns a new AdapterFault with the provided input arguments.
+func NewAdapterFault(faultCode string, rpcCode rpc.Code, statusCode typev3.StatusCode) *AdapterFault {
 	fault := new(AdapterFault)
 	fault.FaultCode = faultCode
 	fault.RpcCode = rpcCode

@@ -352,11 +352,11 @@ func (e *EnvironmentSpecRequest) JWTAuthentications() []*JWTAuthentication {
 }
 
 // looks up the JWTAuthentication by name and runs verification
-// returns nil if found and verified
+// return error if not found, or not verified
 // any error can be in e.jwtResults[name]
 func (e *EnvironmentSpecRequest) verifyJWTAuthentication(name string) error {
 	if e == nil {
-		return fault.CreateAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)
+		return fault.NewAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)
 	}
 	var jwtReq *JWTAuthentication
 	if len(e.GetOperation().jwtAuthentications) > 0 {
@@ -366,13 +366,13 @@ func (e *EnvironmentSpecRequest) verifyJWTAuthentication(name string) error {
 	}
 	if jwtReq == nil {
 		log.Debugf("JWTAuthentication %q not found", name)
-		return fault.CreateAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)
+		return fault.NewAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)
 	}
 	if result := e.jwtResults[name]; result != nil { // return from cache
 		if result.err == nil {
 			return nil
 		} else {
-			return fault.CreateAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)
+			return fault.NewAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)
 		}
 	}
 
@@ -423,7 +423,7 @@ func (e *EnvironmentSpecRequest) verifyJWTAuthentication(name string) error {
 		}
 	}
 
-	return fault.CreateAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)
+	return fault.NewAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)
 }
 
 // returns error if passed value is not in claim as string or []string
@@ -446,8 +446,8 @@ func mustBeInClaim(value, name string, claims map[string]interface{}) error {
 	return fmt.Errorf("%q not in claim %q", value, name)
 }
 
-// Authenticate returns nil if AuthenticatationRequirements are met for the request
-// Returns nil if AuthenticatationRequirements are empty or disabled.
+// Authenticate returns error if AuthenticationRequirements are not met for the request.
+// Empty or disabled requirements are considered  valid.
 func (e *EnvironmentSpecRequest) Authenticate() error {
 	return e.verifyAuthenticationRequirements(e.getAuthenticationRequirement())
 }
@@ -485,10 +485,9 @@ func (e *EnvironmentSpecRequest) GetHTTPRequestTransforms() (transforms HTTPRequ
 	return transforms
 }
 
-// returns nil if auth is empty or disabled
 func (e *EnvironmentSpecRequest) verifyAuthenticationRequirements(auth AuthenticationRequirement) error {
 	if e == nil {
-		return fault.CreateAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)
+		return fault.NewAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)
 	}
 	if auth.Requirements == nil || auth.Disabled {
 		return nil
@@ -502,16 +501,16 @@ func (e *EnvironmentSpecRequest) verifyAuthenticationRequirements(auth Authentic
 				return nil
 			}
 		}
-		return fault.CreateAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)
+		return fault.NewAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)
 	case AllAuthenticationRequirements:
 		for _, r := range []AuthenticationRequirement(a) {
 			if e.verifyAuthenticationRequirements(r) != nil {
-				return fault.CreateAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)
+				return fault.NewAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)
 			}
 		}
 		return nil
 	default:
-		return fault.CreateAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)
+		return fault.NewAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)
 	}
 }
 

@@ -445,7 +445,7 @@ func TestAuthenticationRequirementDisabled(t *testing.T) {
 		authnErr *fault.AdapterFault
 	}{
 		{"auth in api", "/v1/petstore", nil},
-		{"auth in operation", "/v2/petstore", fault.CreateAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)},
+		{"auth in operation", "/v2/petstore", fault.NewAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)},
 	}
 
 	for _, test := range tests {

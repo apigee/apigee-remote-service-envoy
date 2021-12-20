@@ -29,12 +29,12 @@ func TestErrorMessage(t *testing.T) {
 	}{
 		{
 			desc:                 "test valid input arguments",
-			fault:                CreateAdapterFault("test-code", rpc.DEADLINE_EXCEEDED, typev3.StatusCode_Forbidden),
+			fault:                NewAdapterFault("test-code", rpc.DEADLINE_EXCEEDED, typev3.StatusCode_Forbidden),
 			expectedErrorMessage: "FaultCode:test-code, RpcCode:DEADLINE_EXCEEDED, StatusCode:Forbidden",
 		},
 		{
 			desc:                 "test valid default input arguments",
-			fault:                CreateAdapterFault("", 1, 0),
+			fault:                NewAdapterFault("", 1, 0),
 			expectedErrorMessage: "FaultCode:, RpcCode:CANCELLED, StatusCode:Empty",
 		},
 		{
@@ -64,14 +64,14 @@ func TestCreateAdapterFault(t *testing.T) {
 	}{
 		{
 			desc:               "test valid input arguments",
-			fault:              CreateAdapterFault("test-code", rpc.DEADLINE_EXCEEDED, typev3.StatusCode_Forbidden),
+			fault:              NewAdapterFault("test-code", rpc.DEADLINE_EXCEEDED, typev3.StatusCode_Forbidden),
 			expectedFaultCode:  "test-code",
 			expectedRpcCode:    rpc.DEADLINE_EXCEEDED,
 			expectedStatusCode: typev3.StatusCode_Forbidden,
 		},
 		{
 			desc:               "test valid default input arguments",
-			fault:              CreateAdapterFault("", 1, 0),
+			fault:              NewAdapterFault("", 1, 0),
 			expectedFaultCode:  "",
 			expectedRpcCode:    1,
 			expectedStatusCode: 0,
@@ -94,7 +94,7 @@ func TestCreateAdapterFault(t *testing.T) {
 }
 
 func TestCreateAdapterFaultWithRpcCode(t *testing.T) {
-	actualFault := CreateAdapterFaultWithRpcCode(rpc.ALREADY_EXISTS)
+	actualFault := NewAdapterFaultWithRpcCode(rpc.ALREADY_EXISTS)
 	if actualFault.FaultCode != "" {
 		t.Fatalf("want: %v\n, got: %v\v", "", actualFault.FaultCode)
 	}

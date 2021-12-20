@@ -81,7 +81,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 			/* tracker= */ nil,
 			/* api= */ "",
 			/* authContext= */ nil,
-			fault.CreateAdapterFaultWithRpcCode(rpc.UNAVAILABLE)), nil
+			fault.NewAdapterFaultWithRpcCode(rpc.UNAVAILABLE)), nil
 	}
 
 	var rootContext context.Context = a.handler
@@ -111,7 +111,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 			tracker,
 			/* api= */ "",
 			/* authContext= */ nil,
-			fault.CreateAdapterFaultWithRpcCode(rpc.INTERNAL)), nil
+			fault.NewAdapterFaultWithRpcCode(rpc.INTERNAL)), nil
 
 	}
 
@@ -141,7 +141,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 				tracker,
 				api,
 				/* authContext= */ nil,
-				fault.CreateAdapterFaultWithRpcCode(rpc.NOT_FOUND)), nil
+				fault.NewAdapterFaultWithRpcCode(rpc.NOT_FOUND)), nil
 		}
 		api = apiSpec.ID
 		log.Debugf("api: %s", apiSpec.ID)
@@ -160,7 +160,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 				tracker,
 				api,
 				/* authContext= */ nil,
-				fault.CreateAdapterFaultWithRpcCode(rpc.NOT_FOUND)), nil
+				fault.NewAdapterFaultWithRpcCode(rpc.NOT_FOUND)), nil
 		}
 		log.Debugf("operation: %s", operation.Name)
 
@@ -185,7 +185,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 					tracker,
 					api,
 					&auth.Context{Context: rootContext},
-					fault.CreateAdapterFaultWithRpcCode(rpc.PERMISSION_DENIED)), nil
+					fault.NewAdapterFaultWithRpcCode(rpc.PERMISSION_DENIED)), nil
 			}
 			// Send the root context for limited dynamic metadata.
 			return a.authOK(req, tracker, &auth.Context{Context: rootContext}, api, envRequest), nil
@@ -219,7 +219,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 					tracker,
 					api,
 					/* authContext= */ nil,
-					fault.CreateAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)), nil
+					fault.NewAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)), nil
 			}
 			log.Debugf("api from header: %s", api)
 		}
@@ -265,7 +265,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 			tracker,
 			api,
 			/* authContext= */ nil,
-			fault.CreateAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)), nil
+			fault.NewAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)), nil
 	case auth.ErrBadAuth:
 		return a.handleFault(
 			req,
@@ -273,7 +273,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 			tracker,
 			api,
 			authContext,
-			fault.CreateAdapterFaultWithRpcCode(rpc.PERMISSION_DENIED)), nil
+			fault.NewAdapterFaultWithRpcCode(rpc.PERMISSION_DENIED)), nil
 	case auth.ErrInternalError:
 		log.Errorf("encountered internal error: %v", err)
 		return a.handleFault(
@@ -282,7 +282,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 			tracker,
 			/* api= */ "",
 			/* authContext= */ nil,
-			fault.CreateAdapterFaultWithRpcCode(rpc.INTERNAL)), nil
+			fault.NewAdapterFaultWithRpcCode(rpc.INTERNAL)), nil
 	case auth.ErrNetworkError:
 		if envRequest != nil && envRequest.GetConsumerAuthorization().FailOpen {
 			log.Debugf("FailOpen on operation: %v", envRequest.GetOperation().Name)
@@ -294,7 +294,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 					tracker,
 					api,
 					authContext,
-					fault.CreateAdapterFaultWithRpcCode(rpc.PERMISSION_DENIED)), nil
+					fault.NewAdapterFaultWithRpcCode(rpc.PERMISSION_DENIED)), nil
 			}
 			return a.authOK(req, tracker, authContext, api, envRequest), nil
 		} else {
@@ -304,7 +304,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 				tracker,
 				/* api= */ "",
 				/* authContext= */ nil,
-				fault.CreateAdapterFaultWithRpcCode(rpc.INTERNAL)), nil
+				fault.NewAdapterFaultWithRpcCode(rpc.INTERNAL)), nil
 		}
 	}
 
@@ -315,7 +315,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 			tracker,
 			api,
 			authContext,
-			fault.CreateAdapterFaultWithRpcCode(rpc.PERMISSION_DENIED)), nil
+			fault.NewAdapterFaultWithRpcCode(rpc.PERMISSION_DENIED)), nil
 	}
 
 	// authorize against products
@@ -328,7 +328,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 			tracker,
 			api,
 			authContext,
-			fault.CreateAdapterFaultWithRpcCode(rpc.PERMISSION_DENIED)), nil
+			fault.NewAdapterFaultWithRpcCode(rpc.PERMISSION_DENIED)), nil
 	}
 
 	// apply quotas to matched operations
@@ -341,7 +341,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 			tracker,
 			/* api= */ "",
 			/* authContext= */ nil,
-			fault.CreateAdapterFaultWithRpcCode(rpc.INTERNAL)), nil
+			fault.NewAdapterFaultWithRpcCode(rpc.INTERNAL)), nil
 	}
 	if exceeded {
 		return a.handleFault(
@@ -350,7 +350,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 			tracker,
 			api,
 			authContext,
-			fault.CreateAdapterFaultWithRpcCode(rpc.RESOURCE_EXHAUSTED)), nil
+			fault.NewAdapterFaultWithRpcCode(rpc.RESOURCE_EXHAUSTED)), nil
 	}
 
 	if err := envRequest.PrepareVariables(); err != nil {
@@ -361,7 +361,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 			tracker,
 			api,
 			authContext,
-			fault.CreateAdapterFaultWithRpcCode(rpc.PERMISSION_DENIED)), nil
+			fault.NewAdapterFaultWithRpcCode(rpc.PERMISSION_DENIED)), nil
 	}
 	return a.authOK(req, tracker, authContext, api, envRequest), nil
 }
@@ -602,7 +602,7 @@ func (a *AuthorizationServer) corsPreflightResponse(
 	api string) *authv3.CheckResponse {
 
 	log.Debugf("sending cors preflight for api: %v", envRequest.GetAPISpec().ID)
-	return a.createEnvoyDenied(envRequest.Request, envRequest, tracker, authContext, api, fault.CreateAdapterFault("", rpc.CANCELLED, typev3.StatusCode_NoContent))
+	return a.createEnvoyDenied(envRequest.Request, envRequest, tracker, authContext, api, fault.NewAdapterFault("", rpc.CANCELLED, typev3.StatusCode_NoContent))
 }
 
 func (a *AuthorizationServer) handleFault(req *authv3.CheckRequest, envRequest *config.EnvironmentSpecRequest,
@@ -622,7 +622,7 @@ func (a *AuthorizationServer) createConditionalEnvoyDenied(
 	adapterFault, ok := err.(*fault.AdapterFault)
 	if !ok {
 		log.Errorf("Could not cast err %v into AdapterFault.", err)
-		a.createEnvoyDenied(req, envRequest, tracker, authContext, api, fault.CreateAdapterFaultWithRpcCode(rpc.INTERNAL))
+		a.createEnvoyDenied(req, envRequest, tracker, authContext, api, fault.NewAdapterFaultWithRpcCode(rpc.INTERNAL))
 	}
 
 	statusCode := typev3.StatusCode_Forbidden
@@ -643,7 +643,7 @@ func (a *AuthorizationServer) createConditionalEnvoyDenied(
 	if authContext != nil && a.handler.allowUnauthorized {
 		if err := envRequest.PrepareVariables(); err != nil {
 			log.Errorf("failed to populate context variable: %v", err)
-			return a.createEnvoyDenied(req, envRequest, tracker, authContext, api, fault.CreateAdapterFault("", rpc.PERMISSION_DENIED, typev3.StatusCode_Forbidden))
+			return a.createEnvoyDenied(req, envRequest, tracker, authContext, api, fault.NewAdapterFault("", rpc.PERMISSION_DENIED, typev3.StatusCode_Forbidden))
 		}
 		log.Debugf("sending ok (actual: %s)", adapterFault.RpcCode.String())
 		return a.createEnvoyForwarded(req, tracker, authContext, api, envRequest)
