@@ -411,6 +411,17 @@ func TestEnvRequestCheck(t *testing.T) {
 			immediateAX: 0,
 		},
 		{
+			desc:   "good authn/z, network failure w/o fail open",
+			method: http.MethodGet,
+			path:   "/v4/petstore?x-api-key=foo",
+			headers: map[string]string{
+				"jwt": jwtString,
+			},
+			authErr:     auth.ErrNetworkError,
+			statusCode:  int32(rpc.INTERNAL),
+			immediateAX: 1,
+		},
+		{
 			desc:   "good request",
 			method: http.MethodGet,
 			path:   uri,
@@ -1600,6 +1611,54 @@ func createAuthEnvSpec() config.EnvironmentSpec {
 							Disabled: true,
 						},
 					},
+				},
+			},
+			{
+				ID:       "api-without-authorization-and-failopen",
+				BasePath: "/v4",
+				Authentication: config.AuthenticationRequirement{
+					Requirements: config.JWTAuthentication{
+						Name:                 "jwt",
+						Issuer:               "issuer",
+						Audiences:            []string{"aud1"},
+						JWKSSource:           config.RemoteJWKS{URL: "url", CacheDuration: time.Hour},
+						In:                   []config.APIOperationParameter{{Match: config.Header("jwt")}},
+						ForwardPayloadHeader: "jwt",
+					},
+				},
+				ConsumerAuthorization: config.ConsumerAuthorization{
+					In: []config.APIOperationParameter{
+						{Match: config.Query("x-api-key")},
+					},
+					FailOpen: false,
+				},
+				Operations: []config.APIOperation{
+					{
+						Name: "op",
+						HTTPMatches: []config.HTTPMatch{
+							{
+								PathTemplate: "/petstore",
+								Method:       "",
+							},
+						},
+					},
+				},
+				HTTPRequestTransforms: config.HTTPRequestTransforms{
+					HeaderTransforms: config.NameValueTransforms{
+						Add: []config.AddNameValue{
+							{Name: "target", Value: "add"},
+							{Name: "target", Value: "append", Append: true},
+						},
+						Remove: []string{"jw*"},
+					},
+				},
+				Cors: config.CorsPolicy{
+					AllowOrigins:     []string{"origin", "*"},
+					AllowHeaders:     []string{"AllowHeaders"},
+					AllowMethods:     []string{"AllowMethods"},
+					ExposeHeaders:    []string{"ExposeHeaders"},
+					MaxAge:           42,
+					AllowCredentials: true,
 				},
 			},
 		},
