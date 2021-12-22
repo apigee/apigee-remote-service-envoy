@@ -19,10 +19,12 @@ import (
 	"strings"
 
 	"github.com/apigee/apigee-remote-service-envoy/v2/config"
+	"github.com/apigee/apigee-remote-service-envoy/v2/fault"
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
 	"github.com/apigee/apigee-remote-service-golib/v2/context"
 	"github.com/apigee/apigee-remote-service-golib/v2/log"
 	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
+	"github.com/gogo/googleapis/google/rpc"
 	"github.com/google/uuid"
 )
 
@@ -90,7 +92,7 @@ func (h *Handler) decodeMetadataHeaders(headers map[string]string) (string, *aut
 
 // This returns HeaderValueOptions that have used to populate Apigee Dynamic Data access logs
 // in Apigee X/Hybrid.
-func apigeeDynamicDataHeaders(org, env, api string, apiSpec *config.APISpec, fault bool) (headers []*corev3.HeaderValueOption) {
+func apigeeDynamicDataHeaders(org, env, api string, apiSpec *config.APISpec, adapterFault *fault.AdapterFault) (headers []*corev3.HeaderValueOption) {
 	headers = append(headers, createHeaderValueOption(headerOrganization, org, false))
 	headers = append(headers, createHeaderValueOption(headerEnvironment, env, false))
 	headers = append(headers, createHeaderValueOption(headerProxy, api, false))
@@ -104,15 +106,19 @@ func apigeeDynamicDataHeaders(org, env, api string, apiSpec *config.APISpec, fau
 	}
 
 	// Include fault related headers.
-	if fault {
+	if adapterFault != nil && adapterFault.RpcCode == rpc.INTERNAL {
 		headers = append(headers, createHeaderValueOption(headerFaultSource, "ARC", false))
 		headers = append(headers, createHeaderValueOption(headerFaultFlag, "true", false))
 		if apiSpec != nil {
 			headers = append(headers, createHeaderValueOption(headerFaultRevision, apiSpec.RevisionID, false))
 		}
 
-		// A placeholder fault code value.
-		headers = append(headers, createHeaderValueOption(headerFaultCode, "fault", false))
+		if adapterFault.FaultCode == "" {
+			// A placeholder fault code value.
+			headers = append(headers, createHeaderValueOption(headerFaultCode, "fault", false))
+		} else {
+			headers = append(headers, createHeaderValueOption(headerFaultCode, adapterFault.FaultCode, false))
+		}
 	}
 
 	return

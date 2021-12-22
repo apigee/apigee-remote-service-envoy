@@ -20,14 +20,17 @@ package config
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"errors"
 	"fmt"
 	"net/http"
 	"testing"
 
+	"github.com/apigee/apigee-remote-service-envoy/v2/fault"
 	"github.com/apigee/apigee-remote-service-envoy/v2/testutil"
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
 	"github.com/apigee/apigee-remote-service-golib/v2/auth/jwt"
 	"github.com/apigee/apigee-remote-service-golib/v2/context"
+	"github.com/gogo/googleapis/google/rpc"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"google.golang.org/api/option"
@@ -40,10 +43,10 @@ func TestNilReceivers(t *testing.T) {
 	s.GetAPISpec()
 	s.GetOperation()
 	s.GetParamValue(APIOperationParameter{})
-	s.IsAuthenticated()
-	s.verifyJWTAuthentication("")
+	_ = s.Authenticate()
+	_ = s.verifyJWTAuthentication("")
 	s.getAuthenticationRequirement()
-	s.meetsAuthenticatationRequirements(AuthenticationRequirement{})
+	_ = s.verifyAuthenticationRequirements(AuthenticationRequirement{})
 	s.GetConsumerAuthorization()
 }
 
@@ -52,8 +55,8 @@ func TestUnknownAuthenticationRequirementType(t *testing.T) {
 		Requirements: unknownAR{},
 	}
 	req := EnvironmentSpecRequest{}
-	if req.meetsAuthenticatationRequirements(authReqs) {
-		t.Errorf("should be false")
+	if req.verifyAuthenticationRequirements(authReqs) == nil {
+		t.Errorf("should return error")
 	}
 }
 
@@ -328,7 +331,7 @@ func TestGetParamValueJWTClaim(t *testing.T) {
 	}
 }
 
-func TestIsAuthenticated(t *testing.T) {
+func TestAuthenticate(t *testing.T) {
 	envSpec := createGoodEnvSpec()
 	specExt, err := NewEnvironmentSpecExt(&envSpec)
 	if err != nil {
@@ -365,12 +368,12 @@ func TestIsAuthenticated(t *testing.T) {
 			envoyReq := testutil.NewEnvoyRequest(http.MethodGet, test.path, nil, nil)
 			req := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
 
-			if req.IsAuthenticated() {
-				t.Fatalf("IsAuthenticated should be false")
+			if err := req.Authenticate(); err == nil {
+				t.Fatalf("Authenticate should return error")
 			}
 
 			// internal: err should be cached
-			if ok := req.verifyJWTAuthentication("foo"); ok {
+			if err := req.verifyJWTAuthentication("foo"); err == nil {
 				t.Errorf("cache hit should also be correct")
 			}
 			if req.jwtResults["foo"].err == nil {
@@ -386,12 +389,12 @@ func TestIsAuthenticated(t *testing.T) {
 			req = NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
 
 			req.jwtResults = make(map[string]*jwtResult)
-			if !req.IsAuthenticated() {
-				t.Errorf("IsAuthenticated should be true")
+			if err := req.Authenticate(); err != nil {
+				t.Errorf("Authenticate() should be successful")
 			}
 
 			// internal: claims should be cached
-			if ok := req.verifyJWTAuthentication("foo"); !ok {
+			if err := req.verifyJWTAuthentication("foo"); err != nil {
 				t.Errorf("cache hit should also be correct")
 			}
 			if req.jwtResults["foo"].err != nil {
@@ -402,7 +405,7 @@ func TestIsAuthenticated(t *testing.T) {
 			}
 
 			// test verifyJWTAuthentication directly with bad key
-			if ok := req.verifyJWTAuthentication("bad"); ok {
+			if err := req.verifyJWTAuthentication("bad"); err == nil {
 				t.Errorf("verifyJWTAuthentication should return false for bad name")
 			}
 		})
@@ -437,12 +440,12 @@ func TestIsAuthorizationRequired(t *testing.T) {
 
 func TestAuthenticationRequirementDisabled(t *testing.T) {
 	tests := []struct {
-		desc string
-		path string
-		api  bool
+		desc     string
+		path     string
+		authnErr *fault.AdapterFault
 	}{
-		{"auth in api", "/v1/petstore", true},
-		{"auth in operation", "/v2/petstore", false},
+		{"auth in api", "/v1/petstore", nil},
+		{"auth in operation", "/v2/petstore", fault.NewAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)},
 	}
 
 	for _, test := range tests {
@@ -458,8 +461,8 @@ func TestAuthenticationRequirementDisabled(t *testing.T) {
 			envoyReq := testutil.NewEnvoyRequest(http.MethodGet, test.path, nil, nil)
 			req := NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
 
-			if req.IsAuthenticated() {
-				t.Errorf("IsAuthenticated should be false")
+			if err := req.Authenticate(); err == nil {
+				t.Errorf("Authenticate should be unsuccessful")
 			}
 
 			// both operations disabled at API Level, api hit should be ok
@@ -473,8 +476,8 @@ func TestAuthenticationRequirementDisabled(t *testing.T) {
 			envoyReq = testutil.NewEnvoyRequest(http.MethodGet, test.path, nil, nil)
 			req = NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
 
-			if req.IsAuthenticated() != test.api {
-				t.Errorf("IsAuthenticated should be %t", test.api)
+			if err := req.Authenticate(); errors.Is(err, test.authnErr) {
+				t.Errorf("Authenticate() result mismatch, want: %v, \ngot:  %v", test.authnErr, err)
 			}
 
 			// both operations disabled, both operations should be ok
@@ -488,8 +491,8 @@ func TestAuthenticationRequirementDisabled(t *testing.T) {
 			envoyReq = testutil.NewEnvoyRequest(http.MethodGet, test.path, nil, nil)
 			req = NewEnvironmentSpecRequest(&testAuthMan{}, specExt, envoyReq)
 
-			if !req.IsAuthenticated() {
-				t.Errorf("IsAuthenticated should be true")
+			if err := req.Authenticate(); err != nil {
+				t.Errorf("Authenticate should be successful")
 			}
 		})
 	}
