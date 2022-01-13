@@ -288,7 +288,7 @@ var (
 		Subsystem: "proxy",
 		Name:      "response_count",
 		Help:      "Total number of responses sent",
-	}, []string{"proxy_name", "method", "response_code", "fault_code", "fault_src"})
+	}, []string{"proxy_name", "method", "response_code", "fault_code", "fault_source"})
 	prometheusProxyLatencies = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Subsystem: "proxy",
 		Name:      "latencies",
