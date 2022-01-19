@@ -449,19 +449,18 @@ func (e *EnvironmentSpecRequest) verifyJWTAuthentication(name string) error {
 }
 
 func adapterFaultForJwtErr(err error) *fault.AdapterFault {
-	if err == nil {
+	switch {
+	case err == nil:
 		return fault.NewAdapterFault(fault.JwtUnknownException, rpc.UNAUTHENTICATED, 0)
-	}
-
-	if errors.Is(err, ErrUnsupportedJwkSource) {
+	case errors.Is(err, ErrUnsupportedJwkSource):
 		return fault.NewAdapterFault(fault.JwtInvalidToken, rpc.UNAUTHENTICATED, 0)
-	} else if errors.Is(err, ErrMissingIssuerInClaim) {
+	case errors.Is(err, ErrMissingIssuerInClaim):
 		return fault.NewAdapterFault(fault.JwtIssuerMismatch, rpc.UNAUTHENTICATED, 0)
-	} else if errors.Is(err, ErrMissingAudienceInClaim) {
+	case errors.Is(err, ErrMissingAudienceInClaim):
 		return fault.NewAdapterFault(fault.JwtAudienceMismatch, rpc.UNAUTHENTICATED, 0)
-	} else if errors.Is(err, ErrJwtParsingFailure) {
+	case errors.Is(err, ErrJwtParsingFailure):
 		return fault.NewAdapterFault(fault.JwtInvalidToken, rpc.UNAUTHENTICATED, 0)
-	} else {
+	default:
 		return fault.NewAdapterFault(fault.JwtUnknownException, rpc.UNAUTHENTICATED, 0)
 	}
 }
