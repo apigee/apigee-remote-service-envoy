@@ -25,7 +25,6 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/v2/log"
 	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	"github.com/gogo/googleapis/google/rpc"
-	"github.com/google/uuid"
 )
 
 const (
@@ -92,13 +91,13 @@ func (h *Handler) decodeMetadataHeaders(headers map[string]string) (string, *aut
 
 // This returns HeaderValueOptions that have used to populate Apigee Dynamic Data access logs
 // in Apigee X/Hybrid.
-func apigeeDynamicDataHeaders(org, env, api string, apiSpec *config.APISpec, adapterFault *fault.AdapterFault) (headers []*corev3.HeaderValueOption) {
+func apigeeDynamicDataHeaders(org, env, api, msgID string, apiSpec *config.APISpec, adapterFault *fault.AdapterFault) (headers []*corev3.HeaderValueOption) {
 	headers = append(headers, createHeaderValueOption(headerOrganization, org, false))
 	headers = append(headers, createHeaderValueOption(headerEnvironment, env, false))
 	headers = append(headers, createHeaderValueOption(headerProxy, api, false))
 	headers = append(headers, createHeaderValueOption(headerDPColor, os.Getenv("APIGEE_DPCOLOR"), false))
 	headers = append(headers, createHeaderValueOption(headerRegion, os.Getenv("APIGEE_REGION"), false))
-	headers = append(headers, createHeaderValueOption(headerMessageID, uuid.NewString(), false))
+	headers = append(headers, createHeaderValueOption(headerMessageID, msgID, false))
 	headers = append(headers, createHeaderValueOption("verboseerrors", "false", false))
 
 	if apiSpec != nil {
