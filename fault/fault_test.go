@@ -15,6 +15,7 @@
 package fault
 
 import (
+	"errors"
 	"testing"
 
 	typev3 "github.com/envoyproxy/go-control-plane/envoy/type/v3"
@@ -49,6 +50,67 @@ func TestErrorMessage(t *testing.T) {
 			got := test.fault.Error()
 			if got != test.expectedErrorMessage {
 				t.Fatalf("want: %v\n, got: %v\v", test.expectedErrorMessage, got)
+			}
+		})
+	}
+}
+
+func TestIsCheck(t *testing.T) {
+	sampleFault := NewAdapterFault("sample", 1, 3)
+	tests := []struct {
+		desc           string
+		fault          *AdapterFault
+		target         error
+		expectedOutput bool
+	}{
+		{
+			desc:           "fault details match",
+			fault:          NewAdapterFault("test-code", 1, 2),
+			target:         NewAdapterFault("test-code", 1, 2),
+			expectedOutput: true,
+		},
+		{
+			desc:           "same fault object",
+			fault:          sampleFault,
+			target:         sampleFault,
+			expectedOutput: true,
+		},
+		{
+			desc:           "different fault object",
+			fault:          NewAdapterFault("test-code", 1, 2),
+			target:         NewAdapterFault("test-code", 3, 4),
+			expectedOutput: false,
+		},
+		{
+			desc:           "different error type",
+			fault:          NewAdapterFault("test-code", 1, 2),
+			target:         errors.New("error of different type"),
+			expectedOutput: false,
+		},
+		{
+			desc:           "nil comparable target",
+			fault:          NewAdapterFault("test-code", 1, 2),
+			target:         nil,
+			expectedOutput: false,
+		},
+		{
+			desc:           "nil input fault",
+			fault:          nil,
+			target:         NewAdapterFault("test-code", 1, 2),
+			expectedOutput: false,
+		},
+		{
+			desc:           "nil input as well as target",
+			fault:          nil,
+			target:         nil,
+			expectedOutput: true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			got := test.fault.Is(test.target)
+			if got != test.expectedOutput {
+				t.Fatalf("output mismatch for fault: %v,\n target: %v\n", test.fault, test.target)
 			}
 		})
 	}

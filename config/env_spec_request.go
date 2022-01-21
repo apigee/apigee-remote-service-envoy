@@ -22,6 +22,8 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/pkg/errors"
+
 	"github.com/apigee/apigee-remote-service-envoy/v2/fault"
 	"github.com/apigee/apigee-remote-service-envoy/v2/transform"
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
@@ -67,6 +69,18 @@ const (
 var defaultOperation = &APIOperation{
 	Name: "default",
 }
+
+// ErrUnsupportedJwkSoource is raised when unsupported JWK source is encountered
+var ErrUnsupportedJwkSource = errors.New("unsupported JWK Source")
+
+// ErrMissingIssuerInClaim is raised when the required issuer value is missing from the supported claims
+var ErrMissingIssuerInClaim = errors.New("issuer value not in claim")
+
+// ErrMissingAudienceInClaim is raised when the required audience value is missing from the supported claims
+var ErrMissingAudienceInClaim = errors.New("audience value not in claim")
+
+// ErrJwtParsingFailure is raised when JWT Parsing fails
+var ErrJwtParsingFailure = errors.New("jwt parsing failed")
 
 // NewEnvironmentSpecRequest creates a new EnvironmentSpecRequest
 func NewEnvironmentSpecRequest(authMan auth.Manager, e *EnvironmentSpecExt, req *authv3.CheckRequest) *EnvironmentSpecRequest {
@@ -356,7 +370,7 @@ func (e *EnvironmentSpecRequest) JWTAuthentications() []*JWTAuthentication {
 // any error can be in e.jwtResults[name]
 func (e *EnvironmentSpecRequest) verifyJWTAuthentication(name string) error {
 	if e == nil {
-		return fault.NewAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)
+		return fault.NewAdapterFault(fault.InternalError, rpc.UNAUTHENTICATED, 0)
 	}
 	var jwtReq *JWTAuthentication
 	if len(e.GetOperation().jwtAuthentications) > 0 {
@@ -366,13 +380,13 @@ func (e *EnvironmentSpecRequest) verifyJWTAuthentication(name string) error {
 	}
 	if jwtReq == nil {
 		log.Debugf("JWTAuthentication %q not found", name)
-		return fault.NewAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)
+		return fault.NewAdapterFault(fault.JwtUnknownException, rpc.UNAUTHENTICATED, 0)
 	}
 	if result := e.jwtResults[name]; result != nil { // return from cache
 		if result.err == nil {
 			return nil
 		} else {
-			return fault.NewAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)
+			return adapterFaultForJwtErr(result.err)
 		}
 	}
 
@@ -389,21 +403,29 @@ func (e *EnvironmentSpecRequest) verifyJWTAuthentication(name string) error {
 		}
 	}
 
+	var err error
+	var claims map[string]interface{}
 	for _, p := range jwtReq.In {
 		jwksSource, ok := jwtReq.JWKSSource.(RemoteJWKS) // only RemoteJWKS supported for now
 		if !ok {
-			setResult(nil, fmt.Errorf("JWKSSource must be RemoteJWKS, got: %#v", jwtReq.JWKSSource))
+			setResult(nil, fmt.Errorf("%w. JWKSSource must be RemoteJWKS, got: %#v", ErrUnsupportedJwkSource, jwtReq.JWKSSource))
 		}
 		jwtString := e.GetParamValue(p)
 		provider := jwt.Provider{JWKSURL: jwksSource.URL}
 
-		claims, err := e.authMan.ParseJWT(jwtString, provider)
+		claims, err = e.authMan.ParseJWT(jwtString, provider)
+		// If parsing failed, log and wrap the error
+		if err != nil {
+			log.Warnf("error in jwt parsing %v", err)
+			err = errors.Wrap(ErrJwtParsingFailure, err.Error())
+		}
+
 		if err == nil {
-			err = mustBeInClaim(jwtReq.Issuer, "iss", claims)
+			err = mustBeInClaim(jwtReq.Issuer, "iss", claims, ErrMissingIssuerInClaim)
 		}
 		if err == nil {
 			for _, aud := range jwtReq.Audiences {
-				err = mustBeInClaim(aud, "aud", claims)
+				err = mustBeInClaim(aud, "aud", claims, ErrMissingAudienceInClaim)
 				// Any intersection between allowed audiences and
 				// those in the "aud" claim is accepted.
 				if err == nil {
@@ -423,11 +445,28 @@ func (e *EnvironmentSpecRequest) verifyJWTAuthentication(name string) error {
 		}
 	}
 
-	return fault.NewAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)
+	return adapterFaultForJwtErr(err)
+}
+
+func adapterFaultForJwtErr(err error) *fault.AdapterFault {
+	switch {
+	case err == nil:
+		return fault.NewAdapterFault(fault.JwtUnknownException, rpc.UNAUTHENTICATED, 0)
+	case errors.Is(err, ErrUnsupportedJwkSource):
+		return fault.NewAdapterFault(fault.JwtInvalidToken, rpc.UNAUTHENTICATED, 0)
+	case errors.Is(err, ErrMissingIssuerInClaim):
+		return fault.NewAdapterFault(fault.JwtIssuerMismatch, rpc.UNAUTHENTICATED, 0)
+	case errors.Is(err, ErrMissingAudienceInClaim):
+		return fault.NewAdapterFault(fault.JwtAudienceMismatch, rpc.UNAUTHENTICATED, 0)
+	case errors.Is(err, ErrJwtParsingFailure):
+		return fault.NewAdapterFault(fault.JwtInvalidToken, rpc.UNAUTHENTICATED, 0)
+	default:
+		return fault.NewAdapterFault(fault.JwtUnknownException, rpc.UNAUTHENTICATED, 0)
+	}
 }
 
 // returns error if passed value is not in claim as string or []string
-func mustBeInClaim(value, name string, claims map[string]interface{}) error {
+func mustBeInClaim(value, name string, claims map[string]interface{}, errToWrap error) error {
 	if value == "" {
 		return nil
 	}
@@ -443,7 +482,7 @@ func mustBeInClaim(value, name string, claims map[string]interface{}) error {
 			}
 		}
 	}
-	return fmt.Errorf("%q not in claim %q", value, name)
+	return fmt.Errorf("%w. %q not in claim %q", errToWrap, value, name)
 }
 
 // Authenticate returns error if AuthenticationRequirements are not met for the request.
@@ -487,7 +526,7 @@ func (e *EnvironmentSpecRequest) GetHTTPRequestTransforms() (transforms HTTPRequ
 
 func (e *EnvironmentSpecRequest) verifyAuthenticationRequirements(auth AuthenticationRequirement) error {
 	if e == nil {
-		return fault.NewAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)
+		return fault.NewAdapterFault(fault.InternalError, rpc.UNAUTHENTICATED, 0)
 	}
 	if auth.Requirements == nil || auth.Disabled {
 		return nil
@@ -496,21 +535,24 @@ func (e *EnvironmentSpecRequest) verifyAuthenticationRequirements(auth Authentic
 	case JWTAuthentication:
 		return e.verifyJWTAuthentication(a.Name)
 	case AnyAuthenticationRequirements:
+		var err error
 		for _, r := range []AuthenticationRequirement(a) {
-			if e.verifyAuthenticationRequirements(r) == nil {
+			if err = e.verifyAuthenticationRequirements(r); err == nil {
 				return nil
 			}
 		}
-		return fault.NewAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)
+		// none of the authentication requirements matched, returning the last error
+		return err
 	case AllAuthenticationRequirements:
 		for _, r := range []AuthenticationRequirement(a) {
-			if e.verifyAuthenticationRequirements(r) != nil {
-				return fault.NewAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)
+			// returing the first failing authentication requirement
+			if err := e.verifyAuthenticationRequirements(r); err != nil {
+				return err
 			}
 		}
 		return nil
 	default:
-		return fault.NewAdapterFaultWithRpcCode(rpc.UNAUTHENTICATED)
+		return fault.NewAdapterFault(fault.InternalError, rpc.UNAUTHENTICATED, 0)
 	}
 }
 

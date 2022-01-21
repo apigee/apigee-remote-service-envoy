@@ -852,6 +852,54 @@ func TestAllowedOrigin(t *testing.T) {
 	}
 }
 
+func TestAdapterFaultForJwtErr(t *testing.T) {
+	tests := []struct {
+		desc                 string
+		err                  error
+		expectedAdapterFault *fault.AdapterFault
+	}{
+		{
+			desc:                 "nil error",
+			err:                  nil,
+			expectedAdapterFault: fault.NewAdapterFault(fault.JwtUnknownException, rpc.UNAUTHENTICATED, 0),
+		},
+		{
+			desc:                 "unsupported jwk source error",
+			err:                  fmt.Errorf("%w, wrapping text", ErrUnsupportedJwkSource),
+			expectedAdapterFault: fault.NewAdapterFault(fault.JwtInvalidToken, rpc.UNAUTHENTICATED, 0),
+		},
+		{
+			desc:                 "missing issuer in claim",
+			err:                  fmt.Errorf("%w, wrapping text", ErrMissingIssuerInClaim),
+			expectedAdapterFault: fault.NewAdapterFault(fault.JwtIssuerMismatch, rpc.UNAUTHENTICATED, 0),
+		},
+		{
+			desc:                 "missing audience in claim",
+			err:                  fmt.Errorf("%w, wrapping text", ErrMissingAudienceInClaim),
+			expectedAdapterFault: fault.NewAdapterFault(fault.JwtAudienceMismatch, rpc.UNAUTHENTICATED, 0),
+		},
+		{
+			desc:                 "jwt parsing error",
+			err:                  fmt.Errorf("%w, wrapping text", ErrJwtParsingFailure),
+			expectedAdapterFault: fault.NewAdapterFault(fault.JwtInvalidToken, rpc.UNAUTHENTICATED, 0),
+		},
+		{
+			desc:                 "error not predefined",
+			err:                  fmt.Errorf("unexpected error"),
+			expectedAdapterFault: fault.NewAdapterFault(fault.JwtUnknownException, rpc.UNAUTHENTICATED, 0),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			got := adapterFaultForJwtErr(test.err)
+			if !errors.Is(got, test.expectedAdapterFault) {
+				t.Fatalf("\nwant: %v\ngot: %v\n", test.expectedAdapterFault, got)
+			}
+		})
+	}
+}
+
 func TestPrepareVariable(t *testing.T) {
 	srv := testutil.IAMServer()
 	defer srv.Close()

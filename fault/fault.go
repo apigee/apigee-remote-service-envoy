@@ -43,6 +43,27 @@ func (f *AdapterFault) Error() string {
 	return fmt.Sprintf("FaultCode:%v, RpcCode:%v, StatusCode:%v", f.FaultCode, f.RpcCode.String(), f.StatusCode.String())
 }
 
+// Is compares the value of adapter fault with the target error and returns a boolean
+func (f *AdapterFault) Is(target error) bool {
+	// nil is typed & nil of type error != nil of type AdapterFault by default
+	if f == nil && target == nil {
+		return true
+	}
+
+	if f == nil || target == nil {
+		return f == target
+	}
+
+	if target, ok := target.(*AdapterFault); ok {
+		if f.FaultCode == target.FaultCode &&
+			f.RpcCode == target.RpcCode &&
+			f.StatusCode == target.StatusCode {
+			return true
+		}
+	}
+	return false
+}
+
 // NewAdapterFaultWithRpcCode creates and returns a new AdapterFault with the provided input RpcCode.
 func NewAdapterFaultWithRpcCode(rpcCode rpc.Code) *AdapterFault {
 	fault := new(AdapterFault)

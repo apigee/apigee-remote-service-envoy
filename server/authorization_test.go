@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/apigee/apigee-remote-service-envoy/v2/config"
+	"github.com/apigee/apigee-remote-service-envoy/v2/fault"
 	"github.com/apigee/apigee-remote-service-envoy/v2/testutil"
 	"github.com/apigee/apigee-remote-service-golib/v2/analytics"
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
@@ -1064,7 +1065,7 @@ func TestApigeeFaultHeader(t *testing.T) {
 	if !hasHeaderAdd(resp.GetDeniedResponse().GetHeaders(), headerFaultFlag, "true", false) {
 		t.Errorf("expected response header add: %q", headerFaultFlag)
 	}
-	if !hasHeaderAdd(resp.GetDeniedResponse().GetHeaders(), headerFaultCode, "fault", false) {
+	if !hasHeaderAdd(resp.GetDeniedResponse().GetHeaders(), headerFaultCode, fault.InternalError, false) {
 		t.Errorf("expected response header add: %q", headerFaultCode)
 	}
 	if !hasHeaderAdd(resp.GetDeniedResponse().GetHeaders(), headerFaultRevision, "47", false) {
