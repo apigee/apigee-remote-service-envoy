@@ -319,12 +319,10 @@ func (a *AuthorizationServer) createEnvoyForwarded(
 
 	// apigee dynamic data response headers
 	var dynamicDataHeaders []*corev3.HeaderValueOption
+	// envRequest being nil means envoy adapter is standing alone and we don't need to send those headers.
 	if envRequest != nil {
-		var apiSpec *config.APISpec
-		if spec := envRequest.GetAPISpec(); spec != nil {
-			apiSpec = spec
-		}
-		dynamicDataHeaders = apigeeDynamicDataHeaders(a.handler.Organization(), a.handler.Environment(), api, apiSpec, nil)
+		msgID := req.GetAttributes().GetRequest().GetHttp().GetHeaders()[headerMessageID]
+		dynamicDataHeaders = apigeeDynamicDataHeaders(a.handler.Organization(), a.handler.Environment(), api, msgID, envRequest.GetAPISpec(), nil)
 	}
 
 	okResponse.ResponseHeadersToAdd = append(okResponse.ResponseHeadersToAdd, dynamicDataHeaders...)
@@ -581,11 +579,12 @@ func (a *AuthorizationServer) createEnvoyDenied(req *authv3.CheckRequest, envReq
 	}
 
 	// apigee dynamic data response headers
-	var apiSpec *config.APISpec
-	if envRequest != nil && envRequest.GetAPISpec() != nil {
-		apiSpec = envRequest.GetAPISpec()
+	var dynamicDataHeaders []*corev3.HeaderValueOption
+	// envRequest being nil means envoy adapter is standing alone and we don't need to send those headers.
+	if envRequest != nil {
+		msgID := req.GetAttributes().GetRequest().GetHttp().GetHeaders()[headerMessageID]
+		dynamicDataHeaders = apigeeDynamicDataHeaders(a.handler.Organization(), a.handler.Environment(), api, msgID, envRequest.GetAPISpec(), adapterFault)
 	}
-	dynamicDataHeaders := apigeeDynamicDataHeaders(a.handler.Organization(), a.handler.Environment(), api, apiSpec, adapterFault)
 
 	response := &authv3.CheckResponse{
 		Status: &status.Status{
