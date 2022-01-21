@@ -25,6 +25,7 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/v2/log"
 	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	"github.com/gogo/googleapis/google/rpc"
+	"github.com/google/uuid"
 )
 
 const (
@@ -97,8 +98,13 @@ func apigeeDynamicDataHeaders(org, env, api, msgID string, apiSpec *config.APISp
 	headers = append(headers, createHeaderValueOption(headerProxy, api, false))
 	headers = append(headers, createHeaderValueOption(headerDPColor, os.Getenv("APIGEE_DPCOLOR"), false))
 	headers = append(headers, createHeaderValueOption(headerRegion, os.Getenv("APIGEE_REGION"), false))
-	headers = append(headers, createHeaderValueOption(headerMessageID, msgID, false))
 	headers = append(headers, createHeaderValueOption("verboseerrors", "false", false))
+
+	// assign UUID if the given message ID is empty
+	if msgID == "" {
+		msgID = uuid.NewString()
+	}
+	headers = append(headers, createHeaderValueOption(headerMessageID, msgID, false))
 
 	if apiSpec != nil {
 		headers = append(headers, createHeaderValueOption(headerProxyBasepath, apiSpec.BasePath, false))

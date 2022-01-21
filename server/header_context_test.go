@@ -161,6 +161,25 @@ func TestDynamicDataHeaders(t *testing.T) {
 			excludedHeaders: []string{headerFaultSource, headerFaultFlag, headerFaultRevision, headerFaultCode},
 		},
 		{
+			desc: "give uuid if msgID is empty",
+			org:  org,
+			env:  env,
+			api:  api,
+			apiSpec: &config.APISpec{
+				BasePath:   basePath,
+				RevisionID: revision,
+			},
+			fault: fault.NewAdapterFault("", rpc.OK, 0),
+			requiredHeaders: map[string]interface{}{
+				headerOrganization:  org,
+				headerEnvironment:   env,
+				headerProxy:         api,
+				headerMessageID:     regexp.MustCompile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"),
+				headerProxyBasepath: basePath,
+			},
+			excludedHeaders: []string{headerFaultSource, headerFaultFlag, headerFaultRevision, headerFaultCode},
+		},
+		{
 			desc:  "non-fault headers without apispec",
 			org:   org,
 			env:   env,
