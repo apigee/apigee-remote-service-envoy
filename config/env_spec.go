@@ -288,7 +288,7 @@ type HTTPRequestTransforms struct {
 	HeaderTransforms NameValueTransforms `yaml:"headers,omitempty" mapstructure:"headers,omitempty"`
 
 	// QueryParam transformations
-	QueryTransforms NameValueTransforms `yaml:"query,omitempty" mapstructure:"headers,omitempty"`
+	QueryTransforms NameValueTransforms `yaml:"query,omitempty" mapstructure:"query,omitempty"`
 
 	// PathTransform will rewrite the request path per the provided specification including
 	// constant values and replacement variable names from the path_template, headers, or
