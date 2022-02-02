@@ -24,6 +24,7 @@ import (
 	"net/url"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -152,6 +153,56 @@ func TestAddHeaderTransforms(t *testing.T) {
 				}
 				if _, ok := test.requestHeaders[k]; !ok && hasHeaderRemove(okResponse, k) {
 					t.Errorf("did not expect header remove: %q", k)
+				}
+			}
+
+			logged := printHeaderMods(okResponse)
+			if test.expectedLog != logged {
+				t.Errorf("want: %q\n, got: %q\n", test.expectedLog, logged)
+			}
+		})
+	}
+}
+
+func TestRemoveApigeeHeaders(t *testing.T) {
+	tests := []struct {
+		desc            string
+		requestHeaders  map[string]string
+		expectedRemoves int
+		expectedLog     string
+	}{
+		{
+			desc:           "remove x-apigee-header",
+			requestHeaders: map[string]string{"x-apigee-header": "value"},
+			expectedLog:    "Request header mods:\n  = \":path\": \"/pets...\"\n   - \"x-apigee-header\"\n",
+		},
+		{
+			// TODO: "x-apigee-route" must be included as request header until both we and Envoy
+			// support dynamic metadata routing. Remove this test and associated check when true.
+			desc:           "don't remove x-apigee-route",
+			requestHeaders: map[string]string{"x-apigee-header": "value", "x-apigee-route": "value"},
+			expectedLog:    "Request header mods:\n  = \":path\": \"/pets...\"\n   - \"x-apigee-header\"\n",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			envSpec := createAuthEnvSpec()
+			specExt, err := config.NewEnvironmentSpecExt(&envSpec)
+			if err != nil {
+				t.Fatalf("%v", err)
+			}
+			envoyReq := testutil.NewEnvoyRequest("GET", "/v2/petstore", test.requestHeaders, nil)
+			specReq := config.NewEnvironmentSpecRequest(nil, specExt, envoyReq)
+			okResponse := &authv3.OkHttpResponse{}
+
+			addRequestHeaderTransforms(envoyReq, specReq, okResponse)
+
+			for k := range test.requestHeaders {
+				if strings.HasPrefix(k, "x-apigee-") && !hasHeaderRemove(okResponse, k) {
+					if k != "x-apigee-route" {
+						t.Errorf("expected header remove: %q", k)
+					}
 				}
 			}
 

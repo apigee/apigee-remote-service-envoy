@@ -295,7 +295,9 @@ func (a *AuthorizationServer) authOK(
 	envRequest *config.EnvironmentSpecRequest) *authv3.CheckResponse {
 
 	checkResponse := a.createEnvoyForwarded(req, tracker, authContext, api, envRequest)
-	checkResponse.GetOkResponse().Headers = append(checkResponse.GetOkResponse().Headers, createHeaderValueOption(headerAuthorized, "true", false))
+	if envRequest == nil {
+		checkResponse.GetOkResponse().Headers = append(checkResponse.GetOkResponse().Headers, createHeaderValueOption(headerAuthorized, "true", false))
+	}
 	return checkResponse
 }
 
@@ -318,14 +320,14 @@ func (a *AuthorizationServer) createEnvoyForwarded(
 	okResponse.ResponseHeadersToAdd = append(okResponse.ResponseHeadersToAdd, corsResponseHeaders(envRequest)...)
 
 	// apigee dynamic data response headers
-	var dynamicDataHeaders []*corev3.HeaderValueOption
+	var apigeeResponseHeaders []*corev3.HeaderValueOption
 	// envRequest being nil means envoy adapter is standing alone and we don't need to send those headers.
 	if envRequest != nil {
 		msgID := req.GetAttributes().GetRequest().GetHttp().GetHeaders()[headerMessageID]
-		dynamicDataHeaders = apigeeDynamicDataHeaders(a.handler.Organization(), a.handler.Environment(), api, msgID, envRequest.GetAPISpec(), nil)
+		apigeeResponseHeaders = apigeeDynamicDataHeaders(a.handler.Organization(), a.handler.Environment(), api, msgID, envRequest.GetAPISpec(), nil)
 	}
 
-	okResponse.ResponseHeadersToAdd = append(okResponse.ResponseHeadersToAdd, dynamicDataHeaders...)
+	okResponse.ResponseHeadersToAdd = append(okResponse.ResponseHeadersToAdd, apigeeResponseHeaders...)
 
 	if log.DebugEnabled() {
 		log.Debugf(printHeaderMods(okResponse))
@@ -433,17 +435,27 @@ func addRequestHeaderTransforms(req *authv3.CheckRequest, envRequest *config.Env
 				targetPath = targetPath + "?" + strings.Join(queryParams, "&")
 			}
 
-			addRequestHeader(okResponse, envoyPathHeader, targetPath, false)
-
 			// header transforms
-			for _, t := range transforms.HeaderTransforms.Remove {
-				t = strings.ToLower(t)
-				for hdr := range req.Attributes.Request.Http.Headers {
-					if util.SimpleGlobMatch(t, hdr) {
-						okResponse.HeadersToRemove = append(okResponse.HeadersToRemove, hdr)
+			for hdr := range req.GetAttributes().GetRequest().GetHttp().GetHeaders() {
+				// strip all x-apigee-* request headers before target
+				if strings.HasPrefix(hdr, "x-apigee-") {
+					if hdr == "x-apigee-route" {
+						// TODO: "x-apigee-route" must be included as request header until both we and Envoy
+						// support dynamic metadata routing. Remove this test and associated check when true.
+						continue
+					}
+					okResponse.HeadersToRemove = append(okResponse.HeadersToRemove, hdr)
+				} else {
+					// header remove transforms
+					for _, t := range transforms.HeaderTransforms.Remove {
+						t = strings.ToLower(t)
+						if util.SimpleGlobMatch(t, hdr) {
+							okResponse.HeadersToRemove = append(okResponse.HeadersToRemove, hdr)
+						}
 					}
 				}
 			}
+			addRequestHeader(okResponse, envoyPathHeader, targetPath, false)
 			for _, t := range transforms.HeaderTransforms.Add {
 				value := envRequest.Reify(t.Value)
 				addRequestHeader(okResponse, t.Name, value, t.Append)
