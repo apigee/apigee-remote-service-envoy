@@ -110,19 +110,20 @@ func apigeeDynamicDataHeaders(org, env, api, msgID string, apiSpec *config.APISp
 		headers = append(headers, createHeaderValueOption(headerProxyBasepath, apiSpec.BasePath, false))
 	}
 
-	// Include fault related headers.
-	if adapterFault != nil && adapterFault.RpcCode == rpc.INTERNAL {
-		headers = append(headers, createHeaderValueOption(headerFaultSource, "ARC", false))
-		headers = append(headers, createHeaderValueOption(headerFaultFlag, "true", false))
-		if apiSpec != nil {
-			headers = append(headers, createHeaderValueOption(headerFaultRevision, apiSpec.RevisionID, false))
+	// Include fault related headers if response code is not OK.
+	if adapterFault != nil && adapterFault.RpcCode != rpc.OK {
+		if adapterFault.RpcCode == rpc.INTERNAL {
+			headers = append(headers, createHeaderValueOption(headerFaultSource, "ARC", false))
+			headers = append(headers, createHeaderValueOption(headerFaultFlag, "true", false))
+			if apiSpec != nil {
+				headers = append(headers, createHeaderValueOption(headerFaultRevision, apiSpec.RevisionID, false))
+			}
 		}
 
-		if adapterFault.FaultCode == "" {
-			// A placeholder fault code value.
-			headers = append(headers, createHeaderValueOption(headerFaultCode, "fault", false))
-		} else {
+		if adapterFault.FaultCode != "" {
 			headers = append(headers, createHeaderValueOption(headerFaultCode, adapterFault.FaultCode, false))
+		} else {
+			headers = append(headers, createHeaderValueOption(headerFaultCode, fault.InternalError, false))
 		}
 	}
 
