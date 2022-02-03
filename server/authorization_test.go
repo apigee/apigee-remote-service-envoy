@@ -391,6 +391,21 @@ func TestEnvRequestCheck(t *testing.T) {
 		t.Fatalf("generateJWT() failed: %v", err)
 	}
 
+	badIssuerJwt, err := testutil.GenerateJWT(privateKey, map[string]interface{}{
+		"iss": "somebody else",
+		"aud": []string{"aud1", "aud2"},
+	})
+	if err != nil {
+		t.Fatalf("generateJWT() failed: %v", err)
+	}
+
+	badAudienceJwt, err := testutil.GenerateJWT(privateKey, map[string]interface{}{
+		"iss": "issuer",
+		"aud": []string{"wrong", "audience"},
+	})
+	if err != nil {
+		t.Fatalf("generateJWT() failed: %v", err)
+	}
 	uri := "/v1/petstore?x-api-key=foo"
 	contextExtensions := map[string]string{
 		envSpecContextKey: specExt.ID,
@@ -414,6 +429,9 @@ func TestEnvRequestCheck(t *testing.T) {
 			method:      http.MethodGet,
 			path:        "/v0/missing",
 			statusCode:  int32(rpc.NOT_FOUND),
+			wantHeaders: []string{"x-apigee-fault-code"},
+			wantValues:  []string{fault.UnknownAPIProxy},
+			wantAppends: []bool{false},
 			immediateAX: 1,
 		},
 		{
@@ -421,13 +439,43 @@ func TestEnvRequestCheck(t *testing.T) {
 			method:      http.MethodGet,
 			path:        "/v1/missing",
 			statusCode:  int32(rpc.NOT_FOUND),
+			wantHeaders: []string{"x-apigee-fault-code"},
+			wantValues:  []string{fault.UnknownAPIProxy},
+			wantAppends: []bool{false},
 			immediateAX: 1,
 		},
 		{
-			desc:        "bad authentication",
+			desc:        "bad authentication (invalid token)",
 			method:      http.MethodGet,
 			path:        uri,
 			statusCode:  int32(rpc.UNAUTHENTICATED),
+			wantHeaders: []string{"x-apigee-fault-code"},
+			wantValues:  []string{fault.JwtInvalidToken},
+			wantAppends: []bool{false},
+			immediateAX: 1,
+		},
+		{desc: "bad authentication (invalid issuer)",
+			method:     http.MethodGet,
+			path:       uri,
+			statusCode: int32(rpc.UNAUTHENTICATED),
+			headers: map[string]string{
+				"jwt": badIssuerJwt,
+			},
+			wantHeaders: []string{"x-apigee-fault-code"},
+			wantValues:  []string{fault.JwtIssuerMismatch},
+			wantAppends: []bool{false},
+			immediateAX: 1,
+		},
+		{desc: "bad authentication (invalid audience)",
+			method:     http.MethodGet,
+			path:       uri,
+			statusCode: int32(rpc.UNAUTHENTICATED),
+			headers: map[string]string{
+				"jwt": badAudienceJwt,
+			},
+			wantHeaders: []string{"x-apigee-fault-code"},
+			wantValues:  []string{fault.JwtAudienceMismatch},
+			wantAppends: []bool{false},
 			immediateAX: 1,
 		},
 		{
@@ -438,6 +486,9 @@ func TestEnvRequestCheck(t *testing.T) {
 				"jwt": jwtString,
 			},
 			statusCode:  int32(rpc.UNAUTHENTICATED),
+			wantHeaders: []string{"x-apigee-fault-code"},
+			wantValues:  []string{fault.JwtInvalidToken},
+			wantAppends: []bool{false},
 			immediateAX: 1,
 		},
 		{
@@ -449,6 +500,9 @@ func TestEnvRequestCheck(t *testing.T) {
 			},
 			authErr:     auth.ErrBadAuth,
 			statusCode:  int32(rpc.PERMISSION_DENIED),
+			wantHeaders: []string{"x-apigee-fault-code"},
+			wantValues:  []string{fault.InvalidAuthorizationCode},
+			wantAppends: []bool{false},
 			immediateAX: 1,
 		},
 		{
@@ -471,6 +525,9 @@ func TestEnvRequestCheck(t *testing.T) {
 			},
 			authErr:     auth.ErrNetworkError,
 			statusCode:  int32(rpc.INTERNAL),
+			wantHeaders: []string{"x-apigee-fault-code"},
+			wantValues:  []string{fault.InternalError},
+			wantAppends: []bool{false},
 			immediateAX: 1,
 		},
 		{
@@ -543,23 +600,33 @@ func TestEnvRequestCheck(t *testing.T) {
 				t.Errorf("want %d immediate analytics record, got: %d", test.immediateAX, len(testAnalyticsMan.records))
 			}
 			testAnalyticsMan.records = []analytics.Record{}
+			var headers []*corev3.HeaderValueOption
 			if test.statusCode == int32(rpc.OK) {
 				okr, ok := resp.HttpResponse.(*authv3.CheckResponse_OkResponse)
 				if !ok {
 					t.Fatal("must be OkResponse")
 				}
-				for i, h := range test.wantHeaders {
-					if !hasHeaderAdd(okr.OkResponse.GetHeaders(), h, test.wantValues[i], test.wantAppends[i]) {
-						if test.wantAppends[i] {
-							t.Errorf("%q not appended to header %q", test.wantValues[i], h)
-						} else {
-							t.Errorf("%q header should be: %q", h, test.wantValues[i])
-						}
-					}
-				}
 				// Test selected Apigee dynamic data response header
 				if !hasHeaderAdd(okr.OkResponse.GetResponseHeadersToAdd(), headerDPColor, os.Getenv("APIGEE_DPCOLOR"), false) {
 					t.Errorf("expected response header add: %q", headerDPColor)
+				}
+
+				headers = okr.OkResponse.GetHeaders()
+			} else {
+				deniedr, ok := resp.HttpResponse.(*authv3.CheckResponse_DeniedResponse)
+				if !ok {
+					t.Fatal("must be DeniedResponse")
+				}
+				headers = deniedr.DeniedResponse.GetHeaders()
+			}
+
+			for i, h := range test.wantHeaders {
+				if !hasHeaderAdd(headers, h, test.wantValues[i], test.wantAppends[i]) {
+					if test.wantAppends[i] {
+						t.Errorf("%q not appended to header %q", test.wantValues[i], h)
+					} else {
+						t.Errorf("%q header not correct (got: %q, want: %q)", h, headers[i].Header.GetValue(), test.wantValues[i])
+					}
 				}
 			}
 		})
