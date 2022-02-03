@@ -25,6 +25,6 @@ const (
 	InternalQuotaError            = "consumerAuthorization.quota.InternalError"
 	JwtUnknownException           = "authentication.jwt.InternalError"
 	JwtInvalidToken               = "authentication.jwt.InvalidToken"
-	JwtIssuerMismatch             = "authentication.jwt.JwtIssuerMismatch"
-	JwtAudienceMismatch           = "authentication.jwt.JwtAudienceMismatch"
+	JwtIssuerMismatch             = "authentication.jwt.IssuerMismatch"
+	JwtAudienceMismatch           = "authentication.jwt.AudienceMismatch"
 )

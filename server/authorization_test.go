@@ -395,12 +395,17 @@ func TestEnvRequestCheck(t *testing.T) {
 		"iss": "somebody else",
 		"aud": []string{"aud1", "aud2"},
 	})
+	if err != nil {
+		t.Fatalf("generateJWT() failed: %v", err)
+	}
 
 	badAudienceJwt, err := testutil.GenerateJWT(privateKey, map[string]interface{}{
 		"iss": "issuer",
 		"aud": []string{"wrong", "audience"},
 	})
-
+	if err != nil {
+		t.Fatalf("generateJWT() failed: %v", err)
+	}
 	uri := "/v1/petstore?x-api-key=foo"
 	contextExtensions := map[string]string{
 		envSpecContextKey: specExt.ID,
