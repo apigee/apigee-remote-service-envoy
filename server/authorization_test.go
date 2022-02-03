@@ -391,6 +391,16 @@ func TestEnvRequestCheck(t *testing.T) {
 		t.Fatalf("generateJWT() failed: %v", err)
 	}
 
+	badIssuerJwt, err := testutil.GenerateJWT(privateKey, map[string]interface{}{
+		"iss": "somebody else",
+		"aud": []string{"aud1", "aud2"},
+	})
+
+	badAudienceJwt, err := testutil.GenerateJWT(privateKey, map[string]interface{}{
+		"iss": "issuer",
+		"aud": []string{"wrong", "audience"},
+	})
+
 	uri := "/v1/petstore?x-api-key=foo"
 	contextExtensions := map[string]string{
 		envSpecContextKey: specExt.ID,
@@ -415,7 +425,7 @@ func TestEnvRequestCheck(t *testing.T) {
 			path:        "/v0/missing",
 			statusCode:  int32(rpc.NOT_FOUND),
 			wantHeaders: []string{"x-apigee-fault-code"},
-			wantValues:  []string{"environment.ApiProxyNotFound"},
+			wantValues:  []string{fault.UnknownAPIProxy},
 			wantAppends: []bool{false},
 			immediateAX: 1,
 		},
@@ -425,17 +435,41 @@ func TestEnvRequestCheck(t *testing.T) {
 			path:        "/v1/missing",
 			statusCode:  int32(rpc.NOT_FOUND),
 			wantHeaders: []string{"x-apigee-fault-code"},
-			wantValues:  []string{"environment.ApiProxyNotFound"},
+			wantValues:  []string{fault.UnknownAPIProxy},
 			wantAppends: []bool{false},
 			immediateAX: 1,
 		},
 		{
-			desc:        "bad authentication",
+			desc:        "bad authentication (invalid token)",
 			method:      http.MethodGet,
 			path:        uri,
 			statusCode:  int32(rpc.UNAUTHENTICATED),
 			wantHeaders: []string{"x-apigee-fault-code"},
-			wantValues:  []string{"authentication.jwt.InvalidToken"},
+			wantValues:  []string{fault.JwtInvalidToken},
+			wantAppends: []bool{false},
+			immediateAX: 1,
+		},
+		{desc: "bad authentication (invalid issuer)",
+			method:     http.MethodGet,
+			path:       uri,
+			statusCode: int32(rpc.UNAUTHENTICATED),
+			headers: map[string]string{
+				"jwt": badIssuerJwt,
+			},
+			wantHeaders: []string{"x-apigee-fault-code"},
+			wantValues:  []string{fault.JwtIssuerMismatch},
+			wantAppends: []bool{false},
+			immediateAX: 1,
+		},
+		{desc: "bad authentication (invalid audience)",
+			method:     http.MethodGet,
+			path:       uri,
+			statusCode: int32(rpc.UNAUTHENTICATED),
+			headers: map[string]string{
+				"jwt": badAudienceJwt,
+			},
+			wantHeaders: []string{"x-apigee-fault-code"},
+			wantValues:  []string{fault.JwtAudienceMismatch},
 			wantAppends: []bool{false},
 			immediateAX: 1,
 		},
@@ -448,7 +482,7 @@ func TestEnvRequestCheck(t *testing.T) {
 			},
 			statusCode:  int32(rpc.UNAUTHENTICATED),
 			wantHeaders: []string{"x-apigee-fault-code"},
-			wantValues:  []string{"authentication.jwt.InvalidToken"},
+			wantValues:  []string{fault.JwtInvalidToken},
 			wantAppends: []bool{false},
 			immediateAX: 1,
 		},
@@ -462,7 +496,7 @@ func TestEnvRequestCheck(t *testing.T) {
 			authErr:     auth.ErrBadAuth,
 			statusCode:  int32(rpc.PERMISSION_DENIED),
 			wantHeaders: []string{"x-apigee-fault-code"},
-			wantValues:  []string{"consumerAuthorization.UnknownKey"},
+			wantValues:  []string{fault.InvalidAuthorizationCode},
 			wantAppends: []bool{false},
 			immediateAX: 1,
 		},
@@ -487,7 +521,7 @@ func TestEnvRequestCheck(t *testing.T) {
 			authErr:     auth.ErrNetworkError,
 			statusCode:  int32(rpc.INTERNAL),
 			wantHeaders: []string{"x-apigee-fault-code"},
-			wantValues:  []string{"apiProxy.InternalError"},
+			wantValues:  []string{fault.InternalError},
 			wantAppends: []bool{false},
 			immediateAX: 1,
 		},
