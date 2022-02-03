@@ -440,7 +440,7 @@ func TestEnvRequestCheck(t *testing.T) {
 			path:        "/v1/missing",
 			statusCode:  int32(rpc.NOT_FOUND),
 			wantHeaders: []string{"x-apigee-fault-code"},
-			wantValues:  []string{fault.UnknownAPIProxy},
+			wantValues:  []string{fault.OperationNotFound},
 			wantAppends: []bool{false},
 			immediateAX: 1,
 		},
