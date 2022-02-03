@@ -218,7 +218,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 	authContext, err := a.handler.authMan.Authenticate(rootContext, apiKey, claims, a.handler.apiKeyClaim)
 	switch err {
 	case auth.ErrNoAuth:
-		return a.handleFault(req, envRequest, tracker, api, nil, fault.NewAdapterFault(fault.InvalidAuthorizationCode, rpc.UNAUTHENTICATED, 0)), nil
+		return a.handleFault(req, envRequest, tracker, api, nil, fault.NewAdapterFault(fault.AuthorizationCodeNotFound, rpc.UNAUTHENTICATED, 0)), nil
 	case auth.ErrBadAuth:
 		return a.handleFault(req, envRequest, tracker, api, authContext, fault.NewAdapterFault(fault.InvalidAuthorizationCode, rpc.PERMISSION_DENIED, 0)), nil
 	case auth.ErrInternalError:

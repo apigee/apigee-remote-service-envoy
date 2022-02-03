@@ -15,15 +15,16 @@
 package fault
 
 const (
-	UnknownAPIProxy               = "messaging.runtime.UnknownAPIProxy"
-	UnknownKeyManagementException = "keymanagement.service.UnknownException"
-	InvalidAuthorizationCode      = "keymanagement.service.invalid_request-authorization_code_invalid"
-	InternalError                 = "messaging.runtime.InternalError"
-	NoApiProductMatchFound        = "keymanagement.service.InvalidAPICallAsNoApiProductMatchFound"
-	OperationQuotaExceeded        = "policies.ratelimit.QuotaViolation"
-	InternalQuotaError            = "policies.ratelimit.InternalError"
-	JwtUnknownException           = "steps.jwt.UnknownException"
-	JwtInvalidToken               = "steps.jwt.InvalidToken"
-	JwtIssuerMismatch             = "steps.jwt.JwtIssuerMismatch"
-	JwtAudienceMismatch           = "steps.jwt.JwtAudienceMismatch"
+	UnknownAPIProxy               = "environment.ApiProxyNotFound"
+	UnknownKeyManagementException = "consumerAuthorization.InternalError"
+	AuthorizationCodeNotFound     = "consumerAuthorization.RequestMissingKey"
+	InvalidAuthorizationCode      = "consumerAuthorization.UnknownKey"
+	InternalError                 = "apiProxy.InternalError"
+	NoApiProductMatchFound        = "consumerAuthorization.NoApiProductMatchFound"
+	OperationQuotaExceeded        = "consumerAuthorization.quota.LimitExceeded"
+	InternalQuotaError            = "consumerAuthorization.quota.InternalError"
+	JwtUnknownException           = "authentication.jwt.UnknownException"
+	JwtInvalidToken               = "authentication.jwt.InvalidToken"
+	JwtIssuerMismatch             = "authentication.jwt.JwtIssuerMismatch"
+	JwtAudienceMismatch           = "authentication.jwt.JwtAudienceMismatch"
 )
