@@ -23,7 +23,7 @@ const (
 	NoApiProductMatchFound        = "consumerAuthorization.NoApiProductMatchFound"
 	OperationQuotaExceeded        = "consumerAuthorization.quota.LimitExceeded"
 	InternalQuotaError            = "consumerAuthorization.quota.InternalError"
-	JwtUnknownException           = "authentication.jwt.UnknownException"
+	JwtUnknownException           = "authentication.jwt.InternalError"
 	JwtInvalidToken               = "authentication.jwt.InvalidToken"
 	JwtIssuerMismatch             = "authentication.jwt.JwtIssuerMismatch"
 	JwtAudienceMismatch           = "authentication.jwt.JwtAudienceMismatch"
