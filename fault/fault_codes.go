@@ -16,6 +16,7 @@ package fault
 
 const (
 	UnknownAPIProxy               = "environment.ApiProxyNotFound"
+	OperationNotFound             = "apiProxy.OperationNotFound"
 	UnknownKeyManagementException = "consumerAuthorization.InternalError"
 	AuthorizationCodeNotFound     = "consumerAuthorization.RequestMissingKey"
 	InvalidAuthorizationCode      = "consumerAuthorization.UnknownKey"

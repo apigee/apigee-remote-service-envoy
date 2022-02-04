@@ -136,7 +136,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *authv3.CheckRequ
 		operation = envRequest.GetOperation()
 		if operation == nil {
 			log.Debugf("no valid operation found for api %s", apiSpec.ID)
-			return a.handleFault(req, envRequest, tracker, api, nil, fault.NewAdapterFault(fault.UnknownAPIProxy, rpc.NOT_FOUND, 0)), nil
+			return a.handleFault(req, envRequest, tracker, api, nil, fault.NewAdapterFault(fault.OperationNotFound, rpc.NOT_FOUND, 0)), nil
 		}
 		log.Debugf("operation: %s", operation.Name)
 
