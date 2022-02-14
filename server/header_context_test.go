@@ -213,7 +213,7 @@ func TestDynamicDataHeaders(t *testing.T) {
 				headerFaultSource:   "ARC",
 				headerFaultFlag:     "true",
 				headerFaultRevision: revision,
-				headerFaultCode:     "apiProxy.InternalError",
+				headerFaultCode:     "environment.InternalError",
 			},
 		},
 		{

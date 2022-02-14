@@ -20,7 +20,7 @@ const (
 	UnknownKeyManagementException = "consumerAuthorization.InternalError"
 	AuthorizationCodeNotFound     = "consumerAuthorization.RequestMissingKey"
 	InvalidAuthorizationCode      = "consumerAuthorization.UnknownKey"
-	InternalError                 = "apiProxy.InternalError"
+	InternalError                 = "environment.InternalError"
 	NoApiProductMatchFound        = "consumerAuthorization.NoApiProductMatchFound"
 	OperationQuotaExceeded        = "consumerAuthorization.quota.LimitExceeded"
 	InternalQuotaError            = "consumerAuthorization.quota.InternalError"
