@@ -42,7 +42,10 @@ func TestEncodeMetadata(t *testing.T) {
 		Scopes:         []string{"scope1", "scope2"},
 	}
 	api := "api"
-	metadata := encodeExtAuthzMetadata(api, authContext, true)
+	metadata, err := encodeAuthMetadata(api, authContext, true)
+	if err != nil {
+		t.Fatal(err)
+	}
 	headers := map[string]string{}
 	for k, v := range metadata.GetFields() {
 		headers[k] = v.GetStringValue()
@@ -64,7 +67,7 @@ func TestEncodeMetadata(t *testing.T) {
 	equal(headerOrganization, authContext.Organization())
 	equal(headerScope, strings.Join(authContext.Scopes, " "))
 
-	api2, ac2 := h.decodeExtAuthzMetadata(metadata.GetFields())
+	api2, ac2 := h.decodeAuthMetadata(metadata.GetFields())
 	if api != api2 {
 		t.Errorf("got: '%s', want: '%s'", api2, api)
 	}
@@ -75,8 +78,12 @@ func TestEncodeMetadata(t *testing.T) {
 }
 
 func TestEncodeMetadataNilCheck(t *testing.T) {
-	if encodeExtAuthzMetadata("api", nil, true) != nil {
-		t.Errorf("should return nil if no context")
+	v, err := encodeAuthMetadata("api", nil, true)
+	if err != nil {
+		t.Errorf("should not return err: %v", err)
+	}
+	if v == nil || v.Fields == nil {
+		t.Errorf("should not return nil")
 	}
 }
 
@@ -95,7 +102,10 @@ func TestEncodeMetadataAuthorizedField(t *testing.T) {
 		Scopes:         []string{"scope1", "scope2"},
 	}
 
-	metadata := encodeExtAuthzMetadata("api", authContext, true)
+	metadata, err := encodeAuthMetadata("api", authContext, true)
+	if err != nil {
+		t.Fatal(err)
+	}
 	value, ok := metadata.GetFields()[headerAuthorized]
 	if !ok {
 		t.Fatalf("'x-apigee-authorized' field not found in metadata")
@@ -104,7 +114,10 @@ func TestEncodeMetadataAuthorizedField(t *testing.T) {
 		t.Errorf("'x-apigee-authorized' should be true, got %s", value.GetStringValue())
 	}
 
-	metadata = encodeExtAuthzMetadata("api", authContext, false)
+	metadata, err = encodeAuthMetadata("api", authContext, false)
+	if err != nil {
+		t.Fatal(err)
+	}
 	_, ok = metadata.GetFields()[headerAuthorized]
 	if ok {
 		t.Fatalf("should not have 'x-apigee-authorized' field in metadata")
@@ -119,11 +132,11 @@ func TestEncodeMetadataHeadersExceptions(t *testing.T) {
 	h.apiHeader = "api"
 	metadata := &structpb.Struct{
 		Fields: map[string]*structpb.Value{
-			headerAPI: stringValueFrom("api"),
+			headerAPI: structpb.NewStringValue("api"),
 		},
 	}
 
-	api, ac := h.decodeExtAuthzMetadata(metadata.GetFields())
+	api, ac := h.decodeAuthMetadata(metadata.GetFields())
 	if ac.Environment() != "*" {
 		t.Errorf("got: %s, want: %s", ac.Environment(), "*")
 	}
@@ -132,7 +145,7 @@ func TestEncodeMetadataHeadersExceptions(t *testing.T) {
 	}
 
 	h.isMultitenant = true
-	api, ac = h.decodeExtAuthzMetadata(metadata.GetFields())
+	api, ac = h.decodeAuthMetadata(metadata.GetFields())
 	if api != "api" {
 		t.Errorf("got: %s, want: %s", api, "api")
 	}
@@ -143,8 +156,8 @@ func TestEncodeMetadataHeadersExceptions(t *testing.T) {
 		t.Errorf("got: %s, want empty string", ac.Environment())
 	}
 
-	metadata.Fields[headerEnvironment] = stringValueFrom("test")
-	api, ac = h.decodeExtAuthzMetadata(metadata.GetFields())
+	metadata.Fields[headerEnvironment] = structpb.NewStringValue("test")
+	api, ac = h.decodeAuthMetadata(metadata.GetFields())
 	if api != "api" {
 		t.Errorf("got: %s, want: %s", api, "api")
 	}

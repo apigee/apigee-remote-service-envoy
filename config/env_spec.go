@@ -253,6 +253,9 @@ type APISpec struct {
 	// Can be overridden at the operation level.
 	ContextVariables []ContextVariable `yaml:"context_variables,omitempty" mapstructure:"context_variables,omitempty"`
 
+	// DynamicMetadata
+	DynamicMetadata map[string]interface{} `yaml:"dynamic_metadata,omitempty" mapstructure:"dynamic_metadata,omitempty"`
+
 	// JWTAuthentication.Name -> *JWTAuthentication
 	jwtAuthentications map[string]*JWTAuthentication `yaml:"-" mapstructure:"-"`
 }
@@ -277,6 +280,9 @@ type APIOperation struct {
 	// ContextVariables are variables generated and used in the request transform.
 	// Completely overrides the API (proxy) level settings. No merging will happen.
 	ContextVariables []ContextVariable `yaml:"context_variables,omitempty" mapstructure:"context_variables,omitempty"`
+
+	// DynamicMetadata to be given to Envoy. If specified, overrides any DynamicMetadata specified at the API level.
+	DynamicMetadata map[string]interface{} `yaml:"dynamic_metadata,omitempty" mapstructure:"dynamic_metadata,omitempty"`
 
 	// JWTAuthentication.Name -> *JWTAuthentication
 	jwtAuthentications map[string]*JWTAuthentication `yaml:"-" mapstructure:"-"`

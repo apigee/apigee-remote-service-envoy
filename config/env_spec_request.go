@@ -524,6 +524,20 @@ func (e *EnvironmentSpecRequest) GetHTTPRequestTransforms() (transforms HTTPRequ
 	return transforms
 }
 
+func (e *EnvironmentSpecRequest) GetDynamicMetadata() (metadata map[string]interface{}) {
+	if e != nil {
+		op := e.GetOperation()
+		if op != nil && len(op.DynamicMetadata) > 0 {
+			metadata = op.DynamicMetadata
+			log.Debugf("using DynamicMetadata from operation %q", op.Name)
+		} else if api := e.GetAPISpec(); api != nil {
+			metadata = api.DynamicMetadata
+			log.Debugf("using DynamicMetadata from api %q", api.ID)
+		}
+	}
+	return metadata
+}
+
 func (e *EnvironmentSpecRequest) verifyAuthenticationRequirements(auth AuthenticationRequirement) error {
 	if e == nil {
 		return fault.NewAdapterFault(fault.InternalError, rpc.UNAUTHENTICATED, 0)

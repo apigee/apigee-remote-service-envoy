@@ -41,18 +41,19 @@ import (
 	wrappers "github.com/golang/protobuf/ptypes/wrappers"
 )
 
-func makeExtAuthFields() map[string]*structpb.Value {
-	return map[string]*structpb.Value{
-		headerAPI:            stringValueFrom("api"),
-		headerAPIProducts:    stringValueFrom("product1,product2"),
-		headerAccessToken:    stringValueFrom("token"),
-		headerApplication:    stringValueFrom("app"),
-		headerClientID:       stringValueFrom("clientID"),
-		headerDeveloperEmail: stringValueFrom("email@google.com"),
-		headerEnvironment:    stringValueFrom("env"),
-		headerOrganization:   stringValueFrom("org"),
-		headerScope:          stringValueFrom("scope1 scope2"),
+func makeExtAuthMetadata() (*structpb.Struct, error) {
+	fields := map[string]interface{}{
+		headerAPI:            "api",
+		headerAPIProducts:    "product1,product2",
+		headerAccessToken:    "token",
+		headerApplication:    "app",
+		headerClientID:       "clientID",
+		headerDeveloperEmail: "email@google.com",
+		headerEnvironment:    "env",
+		headerOrganization:   "org",
+		headerScope:          "scope1 scope2",
 	}
+	return structpb.NewStruct(fields)
 }
 
 func TestHandleHTTPAccessLogs(t *testing.T) {
@@ -65,7 +66,10 @@ func TestHandleHTTPAccessLogs(t *testing.T) {
 	thenUnix := now.Add(dur).UnixNano() / 1000000
 	durProto := durationpb.New(dur)
 
-	extAuthzFields := makeExtAuthFields()
+	extAuthzMetadata, err := makeExtAuthMetadata()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	path := "path"
 	uri := "path?x=foo"
@@ -84,15 +88,12 @@ func TestHandleHTTPAccessLogs(t *testing.T) {
 			TimeToLastDownstreamTxByte:  durProto,
 			Metadata: &core.Metadata{
 				FilterMetadata: map[string]*structpb.Struct{
-					extAuthzFilterNamespace: {
-						Fields: extAuthzFields,
-					},
+					extAuthzFilterNamespace: extAuthzMetadata,
 					datacaptureNamespace: {
 						Fields: map[string]*structpb.Value{
-							"string": stringValueFrom("yellow"),
-							"number": numberValueFrom(3.14),
-							"bool":   boolValueFrom(true),
-							"struct": structValueFrom(struct{}{}),
+							"string": structpb.NewStringValue("yellow"),
+							"number": structpb.NewNumberValue(3.14),
+							"bool":   structpb.NewBoolValue(true),
 						},
 					},
 				},
@@ -103,7 +104,6 @@ func TestHandleHTTPAccessLogs(t *testing.T) {
 			RequestMethod: core.RequestMethod_GET,
 			UserAgent:     userAgent,
 			ForwardedFor:  clientIP,
-			// RequestHeaders: headers,
 		},
 		Response: &v3.HTTPResponseProperties{
 			ResponseCode: &wrappers.UInt32Value{
@@ -121,8 +121,8 @@ func TestHandleHTTPAccessLogs(t *testing.T) {
 	testAnalyticsMan := &testAnalyticsMan{}
 	server := AccessLogServer{
 		handler: &Handler{
-			orgName:      extAuthzFields[headerOrganization].GetStringValue(),
-			envName:      extAuthzFields[headerEnvironment].GetStringValue(),
+			orgName:      extAuthzMetadata.Fields[headerOrganization].GetStringValue(),
+			envName:      extAuthzMetadata.Fields[headerEnvironment].GetStringValue(),
 			analyticsMan: testAnalyticsMan,
 		},
 		gatewaySource: managedGatewaySource,
@@ -137,8 +137,8 @@ func TestHandleHTTPAccessLogs(t *testing.T) {
 	}
 
 	rec := recs[0]
-	if rec.APIProxy != extAuthzFields[headerAPI].GetStringValue() {
-		t.Errorf("got: %s, want: %s", rec.APIProxy, extAuthzFields[headerAPI].GetStringValue())
+	if rec.APIProxy != extAuthzMetadata.Fields[headerAPI].GetStringValue() {
+		t.Errorf("got: %s, want: %s", rec.APIProxy, extAuthzMetadata.Fields[headerAPI].GetStringValue())
 	}
 	if rec.ClientIP != clientIP {
 		t.Errorf("got: %s, want: %s", rec.ClientIP, clientIP)
@@ -301,7 +301,7 @@ func TestStreamAccessLogs(t *testing.T) {
 	}
 
 	logMsgs := []*als.StreamAccessLogsMessage{
-		makeValidHTTPLog(),
+		makeValidHTTPLog(t),
 		makeHTTPLogWithoutCommonProperties(),
 		makeHTTPLogWithoutMetadata(),
 		makeHTTPLogWithoutExtAuthFilterMetadata(),
@@ -379,7 +379,7 @@ func TestPrometheusProxyRecord(t *testing.T) {
 		tests[i].wantCount = int(testutil.ToFloat64(tests[i].counter.WithLabelValues(tests[i].labels...))) + 1
 	}
 
-	if err := stream.Send(makeValidHTTPLog()); err != nil {
+	if err := stream.Send(makeValidHTTPLog(t)); err != nil {
 		t.Error(err)
 	}
 
@@ -431,7 +431,11 @@ func (tals *testAccessLogService) getBufDialer() func(context.Context, string) (
 	}
 }
 
-func makeValidHTTPLog() *als.StreamAccessLogsMessage {
+func makeValidHTTPLog(t *testing.T) *als.StreamAccessLogsMessage {
+	extAuthMetadata, err := makeExtAuthMetadata()
+	if err != nil {
+		t.Fatal(err)
+	}
 	return &als.StreamAccessLogsMessage{
 		LogEntries: &als.StreamAccessLogsMessage_HttpLogs{
 			HttpLogs: &als.StreamAccessLogsMessage_HTTPAccessLogEntries{
@@ -456,9 +460,7 @@ func makeValidHTTPLog() *als.StreamAccessLogsMessage {
 						CommonProperties: &v3.AccessLogCommon{
 							Metadata: &core.Metadata{
 								FilterMetadata: map[string]*structpb.Struct{
-									extAuthzFilterNamespace: {
-										Fields: makeExtAuthFields(),
-									},
+									extAuthzFilterNamespace: extAuthMetadata,
 								},
 							},
 							TimeToLastUpstreamTxByte: durationpb.New(time.Millisecond),
