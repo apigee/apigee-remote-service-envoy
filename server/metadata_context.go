@@ -42,7 +42,7 @@ const (
 // Envoy ext_authz's filter's dynamic metadata
 func encodeAuthMetadata(api string, ac *auth.Context, authorized bool) (*structpb.Struct, error) {
 	if ac == nil {
-		return &structpb.Struct{Fields: make(map[string]*structpb.Value, 0)}, nil
+		return &structpb.Struct{Fields: make(map[string]*structpb.Value)}, nil
 	}
 
 	fields := map[string]interface{}{
