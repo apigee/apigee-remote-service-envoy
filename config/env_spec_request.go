@@ -340,7 +340,8 @@ func (e *EnvironmentSpecRequest) getClaimValue(claim JWTClaim) string {
 	if e != nil {
 		r, ok := e.jwtResults[claim.Requirement]
 		if !ok {
-			e.verifyJWTAuthentication(claim.Requirement)
+			// error is ignored here, but is cached and retrieved during verification
+			_ = e.verifyJWTAuthentication(claim.Requirement)
 			r = e.jwtResults[claim.Requirement]
 		}
 		if r != nil && r.claims != nil && r.claims[claim.Name] != nil {
