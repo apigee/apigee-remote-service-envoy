@@ -376,6 +376,19 @@ func TestDynamicMetadata(t *testing.T) {
 			},
 		},
 		{
+			desc: "empty op override api",
+			authContext: map[string]interface{}{
+				"auth": "value",
+			},
+			apiMetadata: map[string]interface{}{
+				"api": "value",
+			},
+			opMetadata: map[string]interface{}{},
+			want: map[string]interface{}{
+				"auth": "value",
+			},
+		},
+		{
 			desc: "api overwrite auth",
 			authContext: map[string]interface{}{
 				"auth":  "value",
@@ -385,7 +398,7 @@ func TestDynamicMetadata(t *testing.T) {
 				"auth": "override",
 				"api":  "value",
 			},
-			opMetadata: map[string]interface{}{},
+			opMetadata: nil,
 			want: map[string]interface{}{
 				"auth":  "override",
 				"auth2": "value",

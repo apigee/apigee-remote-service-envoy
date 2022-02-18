@@ -357,7 +357,7 @@ func (a *AuthorizationServer) createEnvoyForwarded(
 }
 
 func addDynamicMetadata(encodedAuthMetadata *structpb.Struct, envRequest *config.EnvironmentSpecRequest) error {
-	for k, v := range envRequest.GetDynamicMetadata() {
+	for k, v := range envRequest.DynamicMetadata() {
 		val, err := structpb.NewValue(v)
 		if err != nil {
 			return err
