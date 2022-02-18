@@ -340,7 +340,8 @@ func (e *EnvironmentSpecRequest) getClaimValue(claim JWTClaim) string {
 	if e != nil {
 		r, ok := e.jwtResults[claim.Requirement]
 		if !ok {
-			e.verifyJWTAuthentication(claim.Requirement)
+			// error is ignored here, but is cached and retrieved during verification
+			_ = e.verifyJWTAuthentication(claim.Requirement)
 			r = e.jwtResults[claim.Requirement]
 		}
 		if r != nil && r.claims != nil && r.claims[claim.Name] != nil {
@@ -522,6 +523,20 @@ func (e *EnvironmentSpecRequest) GetHTTPRequestTransforms() (transforms HTTPRequ
 		}
 	}
 	return transforms
+}
+
+func (e *EnvironmentSpecRequest) DynamicMetadata() (metadata map[string]interface{}) {
+	if e != nil {
+		op := e.GetOperation()
+		if op != nil && op.DynamicMetadata != nil {
+			metadata = op.DynamicMetadata
+			log.Debugf("using DynamicMetadata from operation %q", op.Name)
+		} else if api := e.GetAPISpec(); api != nil {
+			metadata = api.DynamicMetadata
+			log.Debugf("using DynamicMetadata from api %q", api.ID)
+		}
+	}
+	return metadata
 }
 
 func (e *EnvironmentSpecRequest) verifyAuthenticationRequirements(auth AuthenticationRequirement) error {

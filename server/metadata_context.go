@@ -38,70 +38,34 @@ const (
 	headerScope          = "x-apigee-scope"
 )
 
-// encodeExtAuthzMetadata encodes given api and auth context into
+// encodeAuthMetadata encodes given api and auth context into
 // Envoy ext_authz's filter's dynamic metadata
-func encodeExtAuthzMetadata(api string, ac *auth.Context, authorized bool) *structpb.Struct {
+func encodeAuthMetadata(api string, ac *auth.Context, authorized bool) (*structpb.Struct, error) {
 	if ac == nil {
-		return nil
+		return &structpb.Struct{Fields: make(map[string]*structpb.Value)}, nil
 	}
 
-	fields := map[string]*structpb.Value{
-		headerAccessToken:    stringValueFrom(ac.AccessToken),
-		headerAPI:            stringValueFrom(api),
-		headerAPIProducts:    stringValueFrom(strings.Join(ac.APIProducts, ",")),
-		headerApplication:    stringValueFrom(ac.Application),
-		headerClientID:       stringValueFrom(ac.ClientID),
-		headerDeveloperEmail: stringValueFrom(ac.DeveloperEmail),
-		headerEnvironment:    stringValueFrom(ac.Environment()),
-		headerOrganization:   stringValueFrom(ac.Organization()),
-		headerScope:          stringValueFrom(strings.Join(ac.Scopes, " ")),
+	fields := map[string]interface{}{
+		headerAccessToken:    ac.AccessToken,
+		headerAPI:            api,
+		headerAPIProducts:    strings.Join(ac.APIProducts, ","),
+		headerApplication:    ac.Application,
+		headerClientID:       ac.ClientID,
+		headerDeveloperEmail: ac.DeveloperEmail,
+		headerEnvironment:    ac.Environment(),
+		headerOrganization:   ac.Organization(),
+		headerScope:          strings.Join(ac.Scopes, " "),
 	}
 	if authorized {
-		fields[headerAuthorized] = stringValueFrom("true")
+		fields[headerAuthorized] = "true"
 	}
 
-	return &structpb.Struct{
-		Fields: fields,
-	}
-
+	return structpb.NewStruct(fields)
 }
 
-// stringValueFrom returns a *structpb.Value with a StringValue Kind
-func stringValueFrom(v string) *structpb.Value {
-	return &structpb.Value{
-		Kind: &structpb.Value_StringValue{
-			StringValue: v,
-		},
-	}
-}
-
-func numberValueFrom(v float64) *structpb.Value {
-	return &structpb.Value{
-		Kind: &structpb.Value_NumberValue{
-			NumberValue: v,
-		},
-	}
-}
-
-func boolValueFrom(v bool) *structpb.Value {
-	return &structpb.Value{
-		Kind: &structpb.Value_BoolValue{
-			BoolValue: v,
-		},
-	}
-}
-
-func structValueFrom(v struct{}) *structpb.Value {
-	return &structpb.Value{
-		Kind: &structpb.Value_StructValue{
-			StructValue: &structpb.Struct{},
-		},
-	}
-}
-
-// decodeExtAuthzMetadata decodes the Envoy ext_authz's filter's metadata
+// decodeAuthMetadata decodes the Envoy ext_authz's filter's metadata
 // fields into api and auth context
-func (h *Handler) decodeExtAuthzMetadata(fields map[string]*structpb.Value) (string, *auth.Context) {
+func (h *Handler) decodeAuthMetadata(fields map[string]*structpb.Value) (string, *auth.Context) {
 
 	api := fields[headerAPI].GetStringValue()
 	if api == "" {

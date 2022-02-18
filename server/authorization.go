@@ -45,6 +45,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
@@ -333,6 +334,16 @@ func (a *AuthorizationServer) createEnvoyForwarded(
 		log.Debugf(printHeaderMods(okResponse))
 	}
 
+	dynamicMetadata, err := encodeAuthMetadata(api, authContext, true)
+	if err != nil {
+		log.Errorf("processiong auth metadata: %v", err)
+		return a.internalError(req, envRequest, tracker)
+	}
+	if err = addDynamicMetadata(dynamicMetadata, envRequest); err != nil {
+		log.Errorf("processiong dynamic metadata: %v", err)
+		return a.internalError(req, envRequest, tracker)
+	}
+
 	tracker.statusCode = typev3.StatusCode_OK
 	return &authv3.CheckResponse{
 		Status: &status.Status{
@@ -341,8 +352,19 @@ func (a *AuthorizationServer) createEnvoyForwarded(
 		HttpResponse: &authv3.CheckResponse_OkResponse{
 			OkResponse: okResponse,
 		},
-		DynamicMetadata: encodeExtAuthzMetadata(api, authContext, true),
+		DynamicMetadata: dynamicMetadata,
 	}
+}
+
+func addDynamicMetadata(encodedAuthMetadata *structpb.Struct, envRequest *config.EnvironmentSpecRequest) error {
+	for k, v := range envRequest.DynamicMetadata() {
+		val, err := structpb.NewValue(v)
+		if err != nil {
+			return err
+		}
+		encodedAuthMetadata.Fields[k] = val
+	}
+	return nil
 }
 
 // if CORS request, created appropriate response header options

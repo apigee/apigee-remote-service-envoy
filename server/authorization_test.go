@@ -340,6 +340,119 @@ func TestPathTransforms(t *testing.T) {
 	}
 }
 
+func TestDynamicMetadata(t *testing.T) {
+	tests := []struct {
+		desc        string
+		authContext map[string]interface{}
+		apiMetadata map[string]interface{}
+		opMetadata  map[string]interface{}
+		want        map[string]interface{}
+	}{
+		{
+			desc: "no dynamic metadata",
+			authContext: map[string]interface{}{
+				"auth": "value",
+			},
+			apiMetadata: nil,
+			opMetadata:  nil,
+			want: map[string]interface{}{
+				"auth": "value",
+			},
+		},
+		{
+			desc: "op override api",
+			authContext: map[string]interface{}{
+				"auth": "value",
+			},
+			apiMetadata: map[string]interface{}{
+				"api": "value",
+			},
+			opMetadata: map[string]interface{}{
+				"op": "value",
+			},
+			want: map[string]interface{}{
+				"auth": "value",
+				"op":   "value",
+			},
+		},
+		{
+			desc: "empty op override api",
+			authContext: map[string]interface{}{
+				"auth": "value",
+			},
+			apiMetadata: map[string]interface{}{
+				"api": "value",
+			},
+			opMetadata: map[string]interface{}{},
+			want: map[string]interface{}{
+				"auth": "value",
+			},
+		},
+		{
+			desc: "api overwrite auth",
+			authContext: map[string]interface{}{
+				"auth":  "value",
+				"auth2": "value",
+			},
+			apiMetadata: map[string]interface{}{
+				"auth": "override",
+				"api":  "value",
+			},
+			opMetadata: nil,
+			want: map[string]interface{}{
+				"auth":  "override",
+				"auth2": "value",
+				"api":   "value",
+			},
+		},
+		{
+			desc: "op overwrite auth",
+			authContext: map[string]interface{}{
+				"auth":  "value",
+				"auth2": "value",
+			},
+			apiMetadata: map[string]interface{}{},
+			opMetadata: map[string]interface{}{
+				"auth": "override",
+				"op":   "value",
+			},
+			want: map[string]interface{}{
+				"auth":  "override",
+				"auth2": "value",
+				"op":    "value",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			envSpec := createAuthEnvSpec()
+			envSpec.APIs[0].DynamicMetadata = test.apiMetadata
+			envSpec.APIs[0].Operations[0].DynamicMetadata = test.opMetadata
+
+			specExt, err := config.NewEnvironmentSpecExt(&envSpec)
+			if err != nil {
+				t.Fatal(err)
+			}
+			envoyReq := testutil.NewEnvoyRequest("GET", "/v1/petstore", nil, nil)
+			specReq := config.NewEnvironmentSpecRequest(nil, specExt, envoyReq)
+
+			got, err := structpb.NewStruct(test.authContext)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = addDynamicMetadata(got, specReq)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if diff := cmp.Diff(test.want, got.AsMap()); diff != "" {
+				t.Errorf("query diff (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestEnvRequestCheck(t *testing.T) {
 	envSpec := createAuthEnvSpec()
 	specExt, err := config.NewEnvironmentSpecExt(&envSpec)

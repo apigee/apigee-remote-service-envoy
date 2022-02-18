@@ -129,7 +129,7 @@ func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLo
 
 		extAuthzMetadata := getMetadata(extAuthzFilterNamespace)
 		if extAuthzMetadata != nil {
-			api, authContext = a.handler.decodeExtAuthzMetadata(extAuthzMetadata.GetFields())
+			api, authContext = a.handler.decodeAuthMetadata(extAuthzMetadata.GetFields())
 		} else if a.handler.appendMetadataHeaders { // only check headers if knowing it may exist
 			log.Debugf("No dynamic metadata for ext_authz filter, falling back to headers")
 			api, authContext = a.handler.decodeMetadataHeaders(req.GetRequestHeaders())
