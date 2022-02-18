@@ -525,7 +525,7 @@ func (e *EnvironmentSpecRequest) GetHTTPRequestTransforms() (transforms HTTPRequ
 	return transforms
 }
 
-func (e *EnvironmentSpecRequest) GetDynamicMetadata() (metadata map[string]interface{}) {
+func (e *EnvironmentSpecRequest) DynamicMetadata() (metadata map[string]interface{}) {
 	if e != nil {
 		op := e.GetOperation()
 		if op != nil && len(op.DynamicMetadata) > 0 {
