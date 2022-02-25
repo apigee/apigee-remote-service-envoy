@@ -36,11 +36,29 @@ const (
 	headerEnvironment    = "x-apigee-environment"
 	headerOrganization   = "x-apigee-organization"
 	headerScope          = "x-apigee-scope"
+	headerGrpcService    = "x-apigee-grpcservice"
+	headerOperation      = "x-apigee-operation"
 )
+
+//TODO: Decide if I want to keep this naming
+//TODO: Determine if there is a better place for the stuct to live
+type Metadata struct {
+	Api string
+	Ac *auth.Context
+	Authorized bool
+	GrpcService string
+	Operation string
+}
 
 // encodeAuthMetadata encodes given api and auth context into
 // Envoy ext_authz's filter's dynamic metadata
-func encodeAuthMetadata(api string, ac *auth.Context, authorized bool) (*structpb.Struct, error) {
+func encodeAuthMetadata(metadata *Metadata) (*structpb.Struct, error) {
+	api := metadata.Api
+	ac := metadata.Ac
+	authorized := metadata.Authorized
+	grpcService	:= metadata.GrpcService
+	operation	:= metadata.Operation
+
 	if ac == nil {
 		return &structpb.Struct{Fields: make(map[string]*structpb.Value)}, nil
 	}
@@ -55,6 +73,8 @@ func encodeAuthMetadata(api string, ac *auth.Context, authorized bool) (*structp
 		headerEnvironment:    ac.Environment(),
 		headerOrganization:   ac.Organization(),
 		headerScope:          strings.Join(ac.Scopes, " "),
+		headerGrpcService:    grpcService,
+		headerOperation:      operation,
 	}
 	if authorized {
 		fields[headerAuthorized] = "true"
@@ -65,12 +85,12 @@ func encodeAuthMetadata(api string, ac *auth.Context, authorized bool) (*structp
 
 // decodeAuthMetadata decodes the Envoy ext_authz's filter's metadata
 // fields into api and auth context
-func (h *Handler) decodeAuthMetadata(fields map[string]*structpb.Value) (string, *auth.Context) {
+func (h *Handler) decodeAuthMetadata(fields map[string]*structpb.Value) *Metadata {
 
 	api := fields[headerAPI].GetStringValue()
 	if api == "" {
 		log.Debugf("No context header: %s", headerAPI)
-		return "", nil
+		return nil
 	}
 
 	var rootContext context.Context = h
@@ -82,13 +102,19 @@ func (h *Handler) decodeAuthMetadata(fields map[string]*structpb.Value) (string,
 		rootContext = &multitenantContext{h, env}
 	}
 
-	return api, &auth.Context{
-		Context:        rootContext,
-		AccessToken:    fields[headerAccessToken].GetStringValue(),
-		APIProducts:    strings.Split(fields[headerAPIProducts].GetStringValue(), ","),
-		Application:    fields[headerApplication].GetStringValue(),
-		ClientID:       fields[headerClientID].GetStringValue(),
-		DeveloperEmail: fields[headerDeveloperEmail].GetStringValue(),
-		Scopes:         strings.Split(fields[headerScope].GetStringValue(), " "),
+	return &Metadata{
+		Api: api,
+		Ac: &auth.Context{
+			Context:        rootContext,
+			AccessToken:    fields[headerAccessToken].GetStringValue(),
+			APIProducts:    strings.Split(fields[headerAPIProducts].GetStringValue(), ","),
+			Application:    fields[headerApplication].GetStringValue(),
+			ClientID:       fields[headerClientID].GetStringValue(),
+			DeveloperEmail: fields[headerDeveloperEmail].GetStringValue(),
+			Scopes:         strings.Split(fields[headerScope].GetStringValue(), " "),
+		},
+		Authorized: fields[headerAuthorized].GetBoolValue(),
+		GrpcService: fields[headerGrpcService].GetStringValue(),
+		Operation: fields[headerOperation].GetStringValue(),
 	}
 }

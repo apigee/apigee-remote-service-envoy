@@ -322,10 +322,16 @@ func (a *AuthorizationServer) createEnvoyForwarded(
 
 	// apigee dynamic data response headers
 	var apigeeResponseHeaders []*corev3.HeaderValueOption
+
+	var grpcService string
+	var operation string
 	// envRequest being nil means envoy adapter is standing alone and we don't need to send those headers.
 	if envRequest != nil {
 		msgID := req.GetAttributes().GetRequest().GetHttp().GetHeaders()[headerMessageID]
 		apigeeResponseHeaders = apigeeDynamicDataHeaders(a.handler.Organization(), a.handler.Environment(), api, msgID, envRequest.GetAPISpec(), nil)
+
+		grpcService = envRequest.GetAPISpec().GrpcService
+		operation = envRequest.GetOperationPath()
 	}
 
 	okResponse.ResponseHeadersToAdd = append(okResponse.ResponseHeadersToAdd, apigeeResponseHeaders...)
@@ -334,7 +340,7 @@ func (a *AuthorizationServer) createEnvoyForwarded(
 		log.Debugf(printHeaderMods(okResponse))
 	}
 
-	dynamicMetadata, err := encodeAuthMetadata(api, authContext, true)
+	dynamicMetadata, err := encodeAuthMetadata(&Metadata{api, authContext, true, grpcService, operation})
 	if err != nil {
 		log.Errorf("processiong auth metadata: %v", err)
 		return a.internalError(req, envRequest, tracker)

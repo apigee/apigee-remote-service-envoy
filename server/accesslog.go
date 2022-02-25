@@ -126,13 +126,21 @@ func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLo
 
 		var api string
 		var authContext *auth.Context
+		var grpcService string
+		var operation string
 
 		extAuthzMetadata := getMetadata(extAuthzFilterNamespace)
 		if extAuthzMetadata != nil {
-			api, authContext = a.handler.decodeAuthMetadata(extAuthzMetadata.GetFields())
+			metadata := a.handler.decodeAuthMetadata(extAuthzMetadata.GetFields())
+			if metadata != nil {
+				api, authContext, grpcService, operation = metadata.Api, metadata.Ac, metadata.GrpcService, metadata.Operation
+			} else {
+				//TODO: What do I do here...
+				log.Debugf("Ut oh")
+			}
 		} else if a.handler.appendMetadataHeaders { // only check headers if knowing it may exist
 			log.Debugf("No dynamic metadata for ext_authz filter, falling back to headers")
-			api, authContext = a.handler.decodeMetadataHeaders(req.GetRequestHeaders())
+			api, authContext = a.handler.decodeMetadataHeaders(req.GetRequestHeaders()) //TODO: Should I change anything here...
 		} else {
 			log.Debugf("No dynamic metadata for ext_authz filter, skipped accesslog: %#v", req)
 			continue
@@ -194,6 +202,8 @@ func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLo
 			ResponseStatusCode:           responseCode,
 			GatewaySource:                a.gatewaySource,
 			ClientIP:                     req.GetForwardedFor(),
+			GrpcStatusCode:               v.GetResponse().GetResponseHeaders()["grpc-status"],
+			GrpcMethod:                   grpcMethod(grpcService, operation),
 			Attributes:                   attributes,
 		}
 
@@ -209,6 +219,14 @@ func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLo
 
 	return nil
 }
+
+func grpcMethod(grpcService string, operation string) string {
+	if grpcService == "" && operation == "" {
+		return ""
+	}
+	return grpcService + "." + operation
+}
+
 
 // returns ms since epoch
 func pbTimestampToApigee(ts *timestamp.Timestamp) int64 {
