@@ -322,16 +322,15 @@ func createVerifyAPIKeyResponse(product product.APIProduct, privateKey *rsa.Priv
 		panic("failed to create signer:" + err.Error())
 	}
 
-	claims := jwt.Claims{
-		Audience:  jwt.Audience{"remote-service-client"},
-		ID:        "29e2320b-787c-4625-8599-acc5e05c68d0",
-		Issuer:    "testserver",
-		NotBefore: jwt.NewNumericDate(time.Now().Add(-10 * time.Minute)),
-		IssuedAt:  jwt.NewNumericDate(time.Now()),
-		Expiry:    jwt.NewNumericDate(time.Now().Add(10 * time.Minute)),
-	}
 	jwt, err := jwt.Signed(rsaSigner).
-		Claims(claims).
+		Claims(jwt.Claims{
+			Audience:  jwt.Audience{"remote-service-client"},
+			ID:        "29e2320b-787c-4625-8599-acc5e05c68d0",
+			Issuer:    "testserver",
+			NotBefore: jwt.NewNumericDate(time.Now().Add(-10 * time.Minute)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			Expiry:    jwt.NewNumericDate(time.Now().Add(10 * time.Minute)),
+		}).
 		Claims(map[string]interface{}{
 			"access_token":     "f2d45913643bccf3ad92998d06aabbd445e5376271b83fc95e5fc8515f59a5e9",
 			"client_id":        "f2d45913643bccf3ad92998d06aabbd445e5376271b83fc95e5fc8515f59a5e9",
