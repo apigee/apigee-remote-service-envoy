@@ -17,6 +17,7 @@ package server
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -26,8 +27,8 @@ import (
 
 	"github.com/apigee/apigee-remote-service-envoy/v2/config"
 	"github.com/apigee/apigee-remote-service-envoy/v2/testutil"
-	"github.com/lestrrat-go/jwx/jwk"
-	"github.com/lestrrat-go/jwx/jws"
+	"gopkg.in/square/go-jose.v2"
+	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 func TestStaticAuthManager(t *testing.T) {
@@ -66,7 +67,7 @@ func TestJWTAuthManager(t *testing.T) {
 			PrivateKeyID:        kid,
 			PrivateKey:          privateKey,
 			InternalJWTDuration: time.Second,
-			InternalJWTRefresh:  0,
+			InternalJWTRefresh:  time.Millisecond,
 		},
 	}
 	if !cfg.IsGCPManaged() {
@@ -84,11 +85,19 @@ func TestJWTAuthManager(t *testing.T) {
 	verifyHdr := func(hdr string) {
 		token := strings.TrimPrefix(hdr, "Bearer ")
 
-		jwkSet, err := jwk.Parse(jwksBuf)
+		tok, err := jwt.ParseSigned(token)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err = jws.VerifySet([]byte(token), jwkSet); err != nil {
+		var jwks jose.JSONWebKeySet
+		err = json.Unmarshal(jwksBuf, &jwks)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		var claims map[string]interface{}
+		err = tok.Claims(jwks, &claims)
+		if err != nil {
 			t.Fatal(err)
 		}
 	}

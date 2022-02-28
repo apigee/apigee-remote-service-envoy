@@ -17,7 +17,6 @@ package server
 import (
 	"crypto/rsa"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
@@ -25,9 +24,8 @@ import (
 
 	"github.com/apigee/apigee-remote-service-envoy/v2/config"
 	"github.com/apigee/apigee-remote-service-golib/v2/log"
-	"github.com/lestrrat-go/jwx/jwa"
-	"github.com/lestrrat-go/jwx/jws"
-	"github.com/lestrrat-go/jwx/jwt"
+	"gopkg.in/square/go-jose.v2"
+	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 const (
@@ -69,7 +67,7 @@ func (a *StaticAuthManager) getAuthorizationHeader() string {
 
 // JWTAuthManager creates and maintains a current JWT token
 type JWTAuthManager struct {
-	authToken     *jwt.Token
+	authToken     string
 	authHeader    string
 	authHeaderMux sync.RWMutex
 	timer         *time.Timer
@@ -108,18 +106,30 @@ func (a *JWTAuthManager) stop() {
 func (a *JWTAuthManager) replaceJWT(privateKey *rsa.PrivateKey, kid string, jwtExpiration time.Duration) error {
 	log.Debugf("setting internal JWT")
 
-	token, err := NewToken(jwtExpiration)
+	rsaSigner, err := jose.NewSigner(
+		jose.SigningKey{Algorithm: jose.RS256, Key: privateKey},
+		(&jose.SignerOptions{}).
+			WithType("JWT").
+			WithHeader("kid", kid))
 	if err != nil {
 		return err
 	}
 
-	payload, err := SignJWT(token, jwa.RS256, privateKey, kid)
+	now := time.Now()
+	claims := jwt.Claims{
+		ID:       now.String(),
+		Audience: jwt.Audience{jwtAudience},
+		Issuer:   jwtIssuer,
+		IssuedAt: jwt.NewNumericDate(now),
+		Expiry:   jwt.NewNumericDate(now.Add(jwtExpiration)),
+	}
+	payload, err := jwt.Signed(rsaSigner).Claims(claims).CompactSerialize()
 	if err != nil {
 		return err
 	}
 
 	a.authHeaderMux.Lock()
-	a.authToken = &token
+	a.authToken = payload
 	a.authHeader = fmt.Sprintf("Bearer %s", payload)
 	a.authHeaderMux.Unlock()
 	return nil
@@ -131,55 +141,11 @@ func (a *JWTAuthManager) getAuthorizationHeader() string {
 	return a.authHeader
 }
 
-func (a *JWTAuthManager) getToken() *jwt.Token {
+func (a *JWTAuthManager) getToken() string {
 	a.authHeaderMux.RLock()
 	defer a.authHeaderMux.RUnlock()
+	log.Errorf("get: %s", a.authToken)
 	return a.authToken
-}
-
-// SignJWT signs an token with specified algorithm and keys
-func SignJWT(t jwt.Token, method jwa.SignatureAlgorithm, key interface{}, kid string) ([]byte, error) {
-	buf, err := json.Marshal(t)
-	if err != nil {
-		return nil, err
-	}
-
-	hdr := jws.NewHeaders()
-	if hdr.Set(jws.AlgorithmKey, method.String()) != nil {
-		return nil, err
-	}
-	if hdr.Set(jws.TypeKey, "JWT") != nil {
-		return nil, err
-	}
-	if hdr.Set(jws.KeyIDKey, kid) != nil {
-		return nil, err
-	}
-	signed, err := jws.Sign(buf, method, key, jws.WithHeaders(hdr))
-	if err != nil {
-		return nil, err
-	}
-
-	return signed, nil
-}
-
-// NewToken generates a new jwt.Token with the necessary claims
-func NewToken(jwtExpiration time.Duration) (jwt.Token, error) {
-	now := time.Now()
-
-	token := jwt.New()
-	if err := token.Set(jwt.AudienceKey, jwtAudience); err != nil {
-		return nil, err
-	}
-	if err := token.Set(jwt.IssuerKey, jwtIssuer); err != nil {
-		return nil, err
-	}
-	if err := token.Set(jwt.IssuedAtKey, now.Unix()); err != nil {
-		return nil, err
-	}
-	if err := token.Set(jwt.ExpirationKey, now.Add(jwtExpiration)); err != nil {
-		return nil, err
-	}
-	return token, nil
 }
 
 // RoundTripperFunc is a RoundTripper

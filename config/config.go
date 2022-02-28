@@ -34,10 +34,10 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/v2/errorset"
 	"github.com/apigee/apigee-remote-service-golib/v2/log"
 	"github.com/apigee/apigee-remote-service-golib/v2/product"
-	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"golang.org/x/oauth2/google"
+	"gopkg.in/square/go-jose.v2"
 	"gopkg.in/yaml.v3"
 )
 
@@ -192,12 +192,12 @@ type Tenant struct {
 	ClientTimeout    time.Duration `yaml:"client_timeout,omitempty" mapstructure:"client_timeout,omitempty"`
 	TLS              TLSClientSpec `yaml:"tls,omitempty" mapstructure:"tls,omitempty"`
 	// OperationConfigType set to "proxy" switches to Apigee "proxy" type API Product operations from "remoteservice" type
-	OperationConfigType string          `yaml:"operation_config_type,omitempty" mapstructure:"operation_config_type,omitempty"`
-	PrivateKey          *rsa.PrivateKey `yaml:"-" json:"-"`
-	PrivateKeyID        string          `yaml:"-" json:"-"`
-	JWKS                jwk.Set         `yaml:"-" json:"-"`
-	InternalJWTDuration time.Duration   `yaml:"-"`
-	InternalJWTRefresh  time.Duration   `yaml:"-"`
+	OperationConfigType string              `yaml:"operation_config_type,omitempty" mapstructure:"operation_config_type,omitempty"`
+	PrivateKey          *rsa.PrivateKey     `yaml:"-" json:"-"`
+	PrivateKeyID        string              `yaml:"-" json:"-"`
+	JWKS                *jose.JSONWebKeySet `yaml:"-" json:"-"`
+	InternalJWTDuration time.Duration       `yaml:"-"`
+	InternalJWTRefresh  time.Duration       `yaml:"-"`
 }
 
 func (t *Tenant) IsMultitenant() bool {
@@ -331,9 +331,9 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string, 
 		}
 
 		c.Tenant.PrivateKeyID = props[SecretPropsKIDKey]
-		jwks := jwk.NewSet()
-		if err = json.Unmarshal(jwksBytes, jwks); err == nil {
-			c.Tenant.JWKS = jwks
+		var jwks jose.JSONWebKeySet
+		if err = json.Unmarshal(jwksBytes, &jwks); err == nil {
+			c.Tenant.JWKS = &jwks
 			if c.Tenant.PrivateKey, err = util.LoadPrivateKey(key); err != nil {
 				return err
 			}
@@ -414,11 +414,11 @@ func (c *Config) secretsFromEnv() error {
 		c.Tenant.PrivateKeyID = val
 	}
 	if val := viper.GetString(RemoteServiceJWKS); val != "" {
-		jwks := jwk.NewSet()
-		if err = json.Unmarshal([]byte(val), jwks); err != nil {
+		var jwks jose.JSONWebKeySet
+		if err = json.Unmarshal([]byte(val), &jwks); err != nil {
 			return err
 		}
-		c.Tenant.JWKS = jwks
+		c.Tenant.JWKS = &jwks
 	}
 	if val := viper.GetString(RemoteServiceKey); val != "" {
 		if c.Tenant.PrivateKey, err = util.LoadPrivateKey([]byte(val)); err != nil {
