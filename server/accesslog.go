@@ -139,7 +139,7 @@ func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLo
 			api, authContext, grpcService, operation = metadata.Api, metadata.Ac, metadata.GrpcService, metadata.Operation
 		} else if a.handler.appendMetadataHeaders { // only check headers if knowing it may exist
 			log.Debugf("No dynamic metadata for ext_authz filter, falling back to headers")
-			api, authContext = a.handler.decodeMetadataHeaders(req.GetRequestHeaders()) //TODO: Should I change anything here...
+			api, authContext = a.handler.decodeMetadataHeaders(req.GetRequestHeaders())
 		} else {
 			log.Debugf("No dynamic metadata for ext_authz filter, skipped accesslog: %#v", req)
 			continue

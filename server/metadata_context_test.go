@@ -22,7 +22,7 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
 	"google.golang.org/protobuf/types/known/structpb"
 )
-//TODO: Think about testing the happy path of a GRPC call
+
 func TestEncodeMetadata(t *testing.T) {
 	h := &multitenantContext{
 		&Handler{
@@ -67,7 +67,11 @@ func TestEncodeMetadata(t *testing.T) {
 	equal(headerOrganization, authContext.Organization())
 	equal(headerScope, strings.Join(authContext.Scopes, " "))
 
-	metadata2, _ := h.decodeAuthMetadata(metadata.GetFields())
+	metadata2, err := h.decodeAuthMetadata(metadata.GetFields())
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	api2, ac2 := metadata2.Api, metadata2.Ac
 	if api != api2 {
 		t.Errorf("got: '%s', want: '%s'", api2, api)
@@ -111,7 +115,10 @@ func TestEncodeMetadatagRPCCheck(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-  decodeGot, _ := h.decodeAuthMetadata(encodeGot.GetFields())
+  decodeGot, err := h.decodeAuthMetadata(encodeGot.GetFields())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if got, want := decodeGot.GrpcService, "service"; got != want {
 		t.Errorf("\ngot:\n%#v,\nwant\n%#v\n", got , want)
@@ -171,7 +178,11 @@ func TestEncodeMetadataHeadersExceptions(t *testing.T) {
 		},
 	}
 
-	metadataGot, _ := h.decodeAuthMetadata(metadata.GetFields())
+	metadataGot, err := h.decodeAuthMetadata(metadata.GetFields())
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	api, ac := metadataGot.Api, metadataGot.Ac
 	if ac.Environment() != "*" {
 		t.Errorf("got: %s, want: %s", ac.Environment(), "*")
@@ -181,7 +192,11 @@ func TestEncodeMetadataHeadersExceptions(t *testing.T) {
 	}
 
 	h.isMultitenant = true
-	metadataGot, _ = h.decodeAuthMetadata(metadata.GetFields())
+	metadataGot, err = h.decodeAuthMetadata(metadata.GetFields())
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	api, ac = metadataGot.Api, metadataGot.Ac
 	if api != "api" {
 		t.Errorf("got: %s, want: %s", api, "api")
@@ -194,7 +209,11 @@ func TestEncodeMetadataHeadersExceptions(t *testing.T) {
 	}
 
 	metadata.Fields[headerEnvironment] = structpb.NewStringValue("test")
-	metadataGot, _ = h.decodeAuthMetadata(metadata.GetFields())
+	metadataGot, err = h.decodeAuthMetadata(metadata.GetFields())
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	api, ac = metadataGot.Api, metadataGot.Ac
 	if api != "api" {
 		t.Errorf("got: %s, want: %s", api, "api")
