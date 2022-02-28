@@ -15,6 +15,7 @@
 package server
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
@@ -40,9 +41,7 @@ const (
 	headerOperation      = "x-apigee-operation"
 )
 
-//TODO: Decide if I want to keep this naming
-//TODO: Determine if there is a better place for the stuct to live
-type Metadata struct {
+type AuthMetadata struct {
 	Api string
 	Ac *auth.Context
 	Authorized bool
@@ -52,12 +51,12 @@ type Metadata struct {
 
 // encodeAuthMetadata encodes given api and auth context into
 // Envoy ext_authz's filter's dynamic metadata
-func encodeAuthMetadata(metadata *Metadata) (*structpb.Struct, error) {
-	api := metadata.Api
-	ac := metadata.Ac
-	authorized := metadata.Authorized
-	grpcService	:= metadata.GrpcService
-	operation	:= metadata.Operation
+func encodeAuthMetadata(authMetadata *AuthMetadata) (*structpb.Struct, error) {
+	api := authMetadata.Api
+	ac := authMetadata.Ac
+	authorized := authMetadata.Authorized
+	grpcService	:= authMetadata.GrpcService
+	operation	:= authMetadata.Operation
 
 	if ac == nil {
 		return &structpb.Struct{Fields: make(map[string]*structpb.Value)}, nil
@@ -85,12 +84,11 @@ func encodeAuthMetadata(metadata *Metadata) (*structpb.Struct, error) {
 
 // decodeAuthMetadata decodes the Envoy ext_authz's filter's metadata
 // fields into api and auth context
-func (h *Handler) decodeAuthMetadata(fields map[string]*structpb.Value) *Metadata {
+func (h *Handler) decodeAuthMetadata(fields map[string]*structpb.Value) (*AuthMetadata, error) {
 
 	api := fields[headerAPI].GetStringValue()
 	if api == "" {
-		log.Debugf("No context header: %s", headerAPI)
-		return nil
+		return nil, fmt.Errorf("No context header: %s", headerAPI)
 	}
 
 	var rootContext context.Context = h
@@ -102,7 +100,7 @@ func (h *Handler) decodeAuthMetadata(fields map[string]*structpb.Value) *Metadat
 		rootContext = &multitenantContext{h, env}
 	}
 
-	return &Metadata{
+	return &AuthMetadata{
 		Api: api,
 		Ac: &auth.Context{
 			Context:        rootContext,
@@ -116,5 +114,5 @@ func (h *Handler) decodeAuthMetadata(fields map[string]*structpb.Value) *Metadat
 		Authorized: fields[headerAuthorized].GetBoolValue(),
 		GrpcService: fields[headerGrpcService].GetStringValue(),
 		Operation: fields[headerOperation].GetStringValue(),
-	}
+	}, nil
 }

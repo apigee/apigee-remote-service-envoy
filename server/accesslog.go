@@ -131,13 +131,12 @@ func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLo
 
 		extAuthzMetadata := getMetadata(extAuthzFilterNamespace)
 		if extAuthzMetadata != nil {
-			metadata := a.handler.decodeAuthMetadata(extAuthzMetadata.GetFields())
-			if metadata != nil {
-				api, authContext, grpcService, operation = metadata.Api, metadata.Ac, metadata.GrpcService, metadata.Operation
-			} else {
-				//TODO: What do I do here...
-				log.Debugf("Ut oh")
+			metadata, err := a.handler.decodeAuthMetadata(extAuthzMetadata.GetFields())
+			if err != nil {
+				log.Debugf(err.Error())
+				continue
 			}
+			api, authContext, grpcService, operation = metadata.Api, metadata.Ac, metadata.GrpcService, metadata.Operation
 		} else if a.handler.appendMetadataHeaders { // only check headers if knowing it may exist
 			log.Debugf("No dynamic metadata for ext_authz filter, falling back to headers")
 			api, authContext = a.handler.decodeMetadataHeaders(req.GetRequestHeaders()) //TODO: Should I change anything here...

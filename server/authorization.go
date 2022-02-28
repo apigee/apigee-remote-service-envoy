@@ -340,7 +340,7 @@ func (a *AuthorizationServer) createEnvoyForwarded(
 		log.Debugf(printHeaderMods(okResponse))
 	}
 
-	dynamicMetadata, err := encodeAuthMetadata(&Metadata{api, authContext, true, grpcService, operation})
+	dynamicMetadata, err := encodeAuthMetadata(&AuthMetadata{api, authContext, true, grpcService, operation})
 	if err != nil {
 		log.Errorf("processiong auth metadata: %v", err)
 		return a.internalError(req, envRequest, tracker)
