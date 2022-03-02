@@ -92,7 +92,7 @@ func TestEncodeMetadataNilCheck(t *testing.T) {
 	}
 }
 
-func TestEncodeMetadatagRPCCheck(t *testing.T) {
+func TestEncodeMetadataGrpcCheck(t *testing.T) {
 	h := &multitenantContext{
 		&Handler{
 			orgName:       "org",

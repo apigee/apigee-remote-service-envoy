@@ -15,6 +15,7 @@
 package server
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
@@ -59,15 +60,14 @@ func metadataHeaders(api string, ac *auth.Context) (headers []*corev3.HeaderValu
 	return
 }
 
-func (h *Handler) decodeMetadataHeaders(headers map[string]string) (string, *auth.Context) {
+func (h *Handler) decodeMetadataHeaders(headers map[string]string) (*AuthMetadata, error) {
 
 	api, ok := headers[headerAPI]
 	if !ok {
 		if api, ok = headers[h.apiHeader]; ok {
 			log.Debugf("No context header %s, using api header: %s", headerAPI, h.apiHeader)
 		} else {
-			log.Debugf("No context header %s or api header: %s", headerAPI, h.apiHeader)
-			return "", nil
+			return nil, fmt.Errorf("No context header %s or api header: %s", headerAPI, h.apiHeader)
 		}
 	}
 
@@ -78,8 +78,9 @@ func (h *Handler) decodeMetadataHeaders(headers map[string]string) (string, *aut
 		}
 		rootContext = &multitenantContext{h, headers[headerEnvironment]}
 	}
-
-	return api, &auth.Context{
+	return &AuthMetadata{
+		Api: api,
+		Ac: &auth.Context{
 		Context:        rootContext,
 		AccessToken:    headers[headerAccessToken],
 		APIProducts:    strings.Split(headers[headerAPIProducts], ","),
@@ -87,7 +88,7 @@ func (h *Handler) decodeMetadataHeaders(headers map[string]string) (string, *aut
 		ClientID:       headers[headerClientID],
 		DeveloperEmail: headers[headerDeveloperEmail],
 		Scopes:         strings.Split(headers[headerScope], " "),
-	}
+	}}, nil
 }
 
 // This returns HeaderValueOptions that have used to populate Apigee Dynamic Data access logs

@@ -68,7 +68,11 @@ func TestMetadataHeaders(t *testing.T) {
 	equal(headerOrganization, authContext.Organization())
 	equal(headerScope, strings.Join(authContext.Scopes, " "))
 
-	api2, ac2 := h.decodeMetadataHeaders(headers)
+	metadata, err := h.decodeMetadataHeaders(headers)
+	if err != nil {
+		t.Fatal()
+	}
+	api2, ac2 := metadata.Api, metadata.Ac
 	if api != api2 {
 		t.Errorf("got: '%s', want: '%s'", api2, api)
 	}
@@ -94,7 +98,11 @@ func TestMetadataHeadersExceptions(t *testing.T) {
 		headerEnvironment: "test",
 	}
 
-	api, ac := h.decodeMetadataHeaders(header)
+	metadata, err := h.decodeMetadataHeaders(header)
+	if err != nil {
+		t.Fatal()
+	}
+	api, ac := metadata.Api, metadata.Ac
 	if ac.Environment() != "*" {
 		t.Errorf("got: %s, want: %s", ac.Environment(), "*")
 	}
@@ -103,7 +111,11 @@ func TestMetadataHeadersExceptions(t *testing.T) {
 	}
 
 	h.isMultitenant = true
-	api, ac = h.decodeMetadataHeaders(header)
+	metadata, err = h.decodeMetadataHeaders(header)
+	if err != nil {
+		t.Fatal()
+	}
+	api, ac = metadata.Api, metadata.Ac
 	if api != "api" {
 		t.Errorf("got: %s, want: %s", api, "api")
 	}
@@ -115,14 +127,10 @@ func TestMetadataHeadersExceptions(t *testing.T) {
 	}
 
 	h.apiHeader = "missing"
-	api, ac = h.decodeMetadataHeaders(header)
-	if api != "" {
-		t.Errorf("api should be empty")
+	metadata, err = h.decodeMetadataHeaders(header)
+	if err == nil {
+		t.Errorf("metadata should be empty")
 	}
-	if ac != nil {
-		t.Errorf("authContext should be nil")
-	}
-
 }
 
 func TestDynamicDataHeaders(t *testing.T) {
