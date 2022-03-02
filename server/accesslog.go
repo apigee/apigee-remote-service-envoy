@@ -129,23 +129,16 @@ func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLo
 		extAuthzMetadata := getMetadata(extAuthzFilterNamespace)
 		if extAuthzMetadata != nil {
 			authMetadata, err = a.handler.decodeAuthMetadata(extAuthzMetadata.GetFields())
-			if err != nil {
-				log.Debugf(err.Error())
-				continue
-			}
 		} else if a.handler.appendMetadataHeaders { // only check headers if knowing it may exist
 			log.Debugf("No dynamic metadata for ext_authz filter, falling back to headers")
 			authMetadata, err = a.handler.decodeMetadataHeaders(req.GetRequestHeaders())
-			if err != nil {
-				log.Debugf(err.Error())
-				continue
-			}
 		} else {
 			log.Debugf("No dynamic metadata for ext_authz filter, skipped accesslog: %#v", req)
 			continue
 		}
 
-		if authMetadata.Api == "" {
+		if err != nil {
+			log.Debugf(err.Error())
 			log.Debugf("Unknown target, skipped accesslog: %#v", v.Request)
 			continue
 		}
