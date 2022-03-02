@@ -127,7 +127,7 @@ func TestMetadataHeadersExceptions(t *testing.T) {
 	}
 
 	h.apiHeader = "missing"
-	metadata, err = h.decodeMetadataHeaders(header)
+	_, err = h.decodeMetadataHeaders(header)
 	if err == nil {
 		t.Errorf("metadata should be empty")
 	}
