@@ -23,7 +23,7 @@ FROM goboring/golang:1.16.1b7
 ARG GITHUB_TOKEN
 ARG VERSION
 
-RUN curl -sfL https://install.goreleaser.com/github.com/goreleaser/goreleaser.sh | sh
+RUN go install github.com/goreleaser/goreleaser@latest
 
 WORKDIR /app
 ADD . .
