@@ -22,3 +22,6 @@ apigee-remote-service-envoy
 /config.yaml
 /configmap.yaml
 __pycache__
+
+# IDE files
+.idea/

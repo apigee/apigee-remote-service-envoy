@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/apigee/apigee-remote-service-golib/v2/analytics"
-	"github.com/apigee/apigee-remote-service-golib/v2/auth"
 	"github.com/apigee/apigee-remote-service-golib/v2/log"
 	"github.com/apigee/apigee-remote-service-golib/v2/product"
 	v3 "github.com/envoyproxy/go-control-plane/envoy/data/accesslog/v3"
@@ -124,21 +123,22 @@ func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLo
 			return metadata.GetFilterMetadata()[namespace]
 		}
 
-		var api string
-		var authContext *auth.Context
+		var authMetadata *AuthMetadata
+		var err error
 
 		extAuthzMetadata := getMetadata(extAuthzFilterNamespace)
 		if extAuthzMetadata != nil {
-			api, authContext = a.handler.decodeAuthMetadata(extAuthzMetadata.GetFields())
+			authMetadata, err = a.handler.decodeAuthMetadata(extAuthzMetadata.GetFields())
 		} else if a.handler.appendMetadataHeaders { // only check headers if knowing it may exist
 			log.Debugf("No dynamic metadata for ext_authz filter, falling back to headers")
-			api, authContext = a.handler.decodeMetadataHeaders(req.GetRequestHeaders())
+			authMetadata, err = a.handler.decodeMetadataHeaders(req.GetRequestHeaders())
 		} else {
 			log.Debugf("No dynamic metadata for ext_authz filter, skipped accesslog: %#v", req)
 			continue
 		}
 
-		if api == "" {
+		if err != nil {
+			log.Debugf(err.Error())
 			log.Debugf("Unknown target, skipped accesslog: %#v", v.Request)
 			continue
 		}
@@ -186,7 +186,7 @@ func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLo
 			TargetReceivedEndTimestamp:   pbTimestampAddDurationApigee(st, cp.GetTimeToLastUpstreamRxByte()),
 			ClientSentStartTimestamp:     pbTimestampAddDurationApigee(st, cp.GetTimeToFirstDownstreamTxByte()),
 			ClientSentEndTimestamp:       pbTimestampAddDurationApigee(st, cp.GetTimeToLastDownstreamTxByte()),
-			APIProxy:                     api,
+			APIProxy:                     authMetadata.Api,
 			RequestURI:                   req.GetPath(),
 			RequestPath:                  requestPath,
 			RequestVerb:                  req.GetRequestMethod().String(),
@@ -194,13 +194,15 @@ func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLo
 			ResponseStatusCode:           responseCode,
 			GatewaySource:                a.gatewaySource,
 			ClientIP:                     req.GetForwardedFor(),
+			GrpcStatusCode:               v.GetResponse().GetResponseHeaders()["grpc-status"],
+			GrpcMethod:                   grpcMethod(authMetadata.GrpcService, authMetadata.Operation),
 			Attributes:                   attributes,
 		}
 
 		// this may be more efficient to batch, but changing the golib impl would require
 		// a rewrite as it assumes the same authContext for all records
 		records := []analytics.Record{record}
-		err := a.handler.analyticsMan.SendRecords(authContext, records)
+		err = a.handler.analyticsMan.SendRecords(authMetadata.Ac, records)
 		if err != nil {
 			log.Warnf("Unable to send ax: %v", err)
 			return err
@@ -209,6 +211,14 @@ func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLo
 
 	return nil
 }
+
+func grpcMethod(grpcService string, operation string) string {
+	if grpcService == "" && operation == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s.%s", grpcService, operation)
+}
+
 
 // returns ms since epoch
 func pbTimestampToApigee(ts *timestamp.Timestamp) int64 {

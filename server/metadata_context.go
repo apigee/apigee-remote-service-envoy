@@ -15,6 +15,7 @@
 package server
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
@@ -36,11 +37,27 @@ const (
 	headerEnvironment    = "x-apigee-environment"
 	headerOrganization   = "x-apigee-organization"
 	headerScope          = "x-apigee-scope"
+	headerGrpcService    = "x-apigee-grpcservice"
+	headerOperation      = "x-apigee-operation"
 )
+
+type AuthMetadata struct {
+	Api string
+	Ac *auth.Context
+	Authorized bool
+	GrpcService string
+	Operation string
+}
 
 // encodeAuthMetadata encodes given api and auth context into
 // Envoy ext_authz's filter's dynamic metadata
-func encodeAuthMetadata(api string, ac *auth.Context, authorized bool) (*structpb.Struct, error) {
+func encodeAuthMetadata(authMetadata *AuthMetadata) (*structpb.Struct, error) {
+	api := authMetadata.Api
+	ac := authMetadata.Ac
+	authorized := authMetadata.Authorized
+	grpcService	:= authMetadata.GrpcService
+	operation	:= authMetadata.Operation
+
 	if ac == nil {
 		return &structpb.Struct{Fields: make(map[string]*structpb.Value)}, nil
 	}
@@ -55,6 +72,8 @@ func encodeAuthMetadata(api string, ac *auth.Context, authorized bool) (*structp
 		headerEnvironment:    ac.Environment(),
 		headerOrganization:   ac.Organization(),
 		headerScope:          strings.Join(ac.Scopes, " "),
+		headerGrpcService:    grpcService,
+		headerOperation:      operation,
 	}
 	if authorized {
 		fields[headerAuthorized] = "true"
@@ -65,12 +84,11 @@ func encodeAuthMetadata(api string, ac *auth.Context, authorized bool) (*structp
 
 // decodeAuthMetadata decodes the Envoy ext_authz's filter's metadata
 // fields into api and auth context
-func (h *Handler) decodeAuthMetadata(fields map[string]*structpb.Value) (string, *auth.Context) {
+func (h *Handler) decodeAuthMetadata(fields map[string]*structpb.Value) (*AuthMetadata, error) {
 
 	api := fields[headerAPI].GetStringValue()
 	if api == "" {
-		log.Debugf("No context header: %s", headerAPI)
-		return "", nil
+		return nil, fmt.Errorf("No context header: %s", headerAPI)
 	}
 
 	var rootContext context.Context = h
@@ -82,13 +100,19 @@ func (h *Handler) decodeAuthMetadata(fields map[string]*structpb.Value) (string,
 		rootContext = &multitenantContext{h, env}
 	}
 
-	return api, &auth.Context{
-		Context:        rootContext,
-		AccessToken:    fields[headerAccessToken].GetStringValue(),
-		APIProducts:    strings.Split(fields[headerAPIProducts].GetStringValue(), ","),
-		Application:    fields[headerApplication].GetStringValue(),
-		ClientID:       fields[headerClientID].GetStringValue(),
-		DeveloperEmail: fields[headerDeveloperEmail].GetStringValue(),
-		Scopes:         strings.Split(fields[headerScope].GetStringValue(), " "),
-	}
+	return &AuthMetadata{
+		Api: api,
+		Ac: &auth.Context{
+			Context:        rootContext,
+			AccessToken:    fields[headerAccessToken].GetStringValue(),
+			APIProducts:    strings.Split(fields[headerAPIProducts].GetStringValue(), ","),
+			Application:    fields[headerApplication].GetStringValue(),
+			ClientID:       fields[headerClientID].GetStringValue(),
+			DeveloperEmail: fields[headerDeveloperEmail].GetStringValue(),
+			Scopes:         strings.Split(fields[headerScope].GetStringValue(), " "),
+		},
+		Authorized: fields[headerAuthorized].GetBoolValue(),
+		GrpcService: fields[headerGrpcService].GetStringValue(),
+		Operation: fields[headerOperation].GetStringValue(),
+	}, nil
 }
