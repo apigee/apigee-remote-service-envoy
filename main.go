@@ -122,7 +122,7 @@ func main() {
 
 	// Take environment spec files from the command line flag and bind it to the
 	// corresponding field in the config.
-	rootCmd.Flags().StringSlice("environment-specs", nil, "A list of environment-spec config files or directories containg the files (no further recursion)")
+	rootCmd.Flags().StringSlice("environment-specs", nil, "A list of environment-spec config files or directories containing the files (no further recursion)")
 	if err := viper.BindPFlag(config.EnvironmentSpecsReferences, rootCmd.Flags().Lookup("environment-specs")); err != nil {
 		log.Errorf("%v", err)
 		os.Exit(1)

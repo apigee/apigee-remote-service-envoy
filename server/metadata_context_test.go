@@ -42,7 +42,7 @@ func TestEncodeMetadata(t *testing.T) {
 		Scopes:         []string{"scope1", "scope2"},
 	}
 	api := "api"
-	metadata, err := encodeAuthMetadata(api, authContext, true)
+	metadata, err := encodeAuthMetadata(&AuthMetadata{api, authContext, true, "", ""})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +67,12 @@ func TestEncodeMetadata(t *testing.T) {
 	equal(headerOrganization, authContext.Organization())
 	equal(headerScope, strings.Join(authContext.Scopes, " "))
 
-	api2, ac2 := h.decodeAuthMetadata(metadata.GetFields())
+	metadata2, err := h.decodeAuthMetadata(metadata.GetFields())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	api2, ac2 := metadata2.Api, metadata2.Ac
 	if api != api2 {
 		t.Errorf("got: '%s', want: '%s'", api2, api)
 	}
@@ -78,12 +83,49 @@ func TestEncodeMetadata(t *testing.T) {
 }
 
 func TestEncodeMetadataNilCheck(t *testing.T) {
-	v, err := encodeAuthMetadata("api", nil, true)
+	v, err := encodeAuthMetadata(&AuthMetadata{"api", nil, true, "", ""})
 	if err != nil {
 		t.Errorf("should not return err: %v", err)
 	}
 	if v == nil || v.Fields == nil {
 		t.Errorf("should not return nil")
+	}
+}
+
+func TestEncodeMetadataGrpcCheck(t *testing.T) {
+	h := &multitenantContext{
+		&Handler{
+			orgName:       "org",
+			envName:       "*",
+			isMultitenant: true,
+		},
+		"env",
+	}
+	authContext := &auth.Context{
+		Context:        h,
+		ClientID:       "clientid",
+		AccessToken:    "accesstoken",
+		Application:    "application",
+		APIProducts:    []string{"prod1", "prod2"},
+		DeveloperEmail: "dev@google.com",
+		Scopes:         []string{"scope1", "scope2"},
+	}
+
+	encodeGot, err := encodeAuthMetadata(&AuthMetadata{"api", authContext, true, "service", "operation"})
+	if err != nil {
+		t.Fatal(err)
+	}
+  decodeGot, err := h.decodeAuthMetadata(encodeGot.GetFields())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got, want := decodeGot.GrpcService, "service"; got != want {
+		t.Errorf("\ngot:\n%#v,\nwant\n%#v\n", got , want)
+	}
+
+	if got, want := decodeGot.Operation, "operation"; got != want {
+		t.Errorf("\ngot:\n%#v,\nwant\n%#v\n", got , want)
 	}
 }
 
@@ -102,7 +144,7 @@ func TestEncodeMetadataAuthorizedField(t *testing.T) {
 		Scopes:         []string{"scope1", "scope2"},
 	}
 
-	metadata, err := encodeAuthMetadata("api", authContext, true)
+	metadata, err := encodeAuthMetadata(&AuthMetadata{"api", authContext, true, "", ""})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +156,7 @@ func TestEncodeMetadataAuthorizedField(t *testing.T) {
 		t.Errorf("'x-apigee-authorized' should be true, got %s", value.GetStringValue())
 	}
 
-	metadata, err = encodeAuthMetadata("api", authContext, false)
+	metadata, err = encodeAuthMetadata(&AuthMetadata{"api", authContext, false, "", ""})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +178,12 @@ func TestEncodeMetadataHeadersExceptions(t *testing.T) {
 		},
 	}
 
-	api, ac := h.decodeAuthMetadata(metadata.GetFields())
+	metadataGot, err := h.decodeAuthMetadata(metadata.GetFields())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	api, ac := metadataGot.Api, metadataGot.Ac
 	if ac.Environment() != "*" {
 		t.Errorf("got: %s, want: %s", ac.Environment(), "*")
 	}
@@ -145,7 +192,12 @@ func TestEncodeMetadataHeadersExceptions(t *testing.T) {
 	}
 
 	h.isMultitenant = true
-	api, ac = h.decodeAuthMetadata(metadata.GetFields())
+	metadataGot, err = h.decodeAuthMetadata(metadata.GetFields())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	api, ac = metadataGot.Api, metadataGot.Ac
 	if api != "api" {
 		t.Errorf("got: %s, want: %s", api, "api")
 	}
@@ -157,7 +209,12 @@ func TestEncodeMetadataHeadersExceptions(t *testing.T) {
 	}
 
 	metadata.Fields[headerEnvironment] = structpb.NewStringValue("test")
-	api, ac = h.decodeAuthMetadata(metadata.GetFields())
+	metadataGot, err = h.decodeAuthMetadata(metadata.GetFields())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	api, ac = metadataGot.Api, metadataGot.Ac
 	if api != "api" {
 		t.Errorf("got: %s, want: %s", api, "api")
 	}
