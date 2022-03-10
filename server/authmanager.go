@@ -106,11 +106,8 @@ func (a *JWTAuthManager) stop() {
 func (a *JWTAuthManager) replaceJWT(privateKey *rsa.PrivateKey, kid string, jwtExpiration time.Duration) error {
 	log.Debugf("setting internal JWT")
 
-	rsaSigner, err := jose.NewSigner(
-		jose.SigningKey{Algorithm: jose.RS256, Key: privateKey},
-		(&jose.SignerOptions{}).
-			WithType("JWT").
-			WithHeader("kid", kid))
+	rsaSigner, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.RS256, Key: privateKey},
+		(&jose.SignerOptions{}).WithType("JWT").WithHeader("kid", kid))
 	if err != nil {
 		return err
 	}

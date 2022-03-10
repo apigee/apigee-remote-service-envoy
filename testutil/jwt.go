@@ -46,6 +46,7 @@ func GenerateKeyAndJWKs(kid string) (privateKey *rsa.PrivateKey, jwksBuf []byte,
 	return
 }
 
+// Generate a test JWT from a privateKey
 func GenerateJWT(privateKey *rsa.PrivateKey, claims map[string]interface{}) (string, error) {
 	rsaSigner, err := jose.NewSigner(
 		jose.SigningKey{Algorithm: jose.RS256, Key: privateKey},

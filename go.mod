@@ -31,10 +31,9 @@ require (
 	google.golang.org/grpc v1.38.0
 	google.golang.org/protobuf v1.26.0
 	gopkg.in/check.v1 v1.0.0-20200902074654-038fdea0a05b // indirect
+	gopkg.in/square/go-jose.v2 v2.6.0
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 )
-
-require gopkg.in/square/go-jose.v2 v2.6.0
 
 require (
 	cloud.google.com/go v0.81.0 // indirect
