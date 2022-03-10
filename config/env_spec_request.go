@@ -476,7 +476,7 @@ func mustBeInClaim(value, name string, claims map[string]interface{}, errToWrap 
 		if value == claim {
 			return nil
 		}
-	case []string:
+	case []interface{}:
 		for _, ea := range claim {
 			if value == ea {
 				return nil

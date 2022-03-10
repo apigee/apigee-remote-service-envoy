@@ -34,9 +34,8 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/v2/product"
 	"github.com/apigee/apigee-remote-service-golib/v2/quota"
 	"github.com/apigee/apigee-remote-service-golib/v2/util"
-	"github.com/lestrrat-go/jwx/jwa"
-	"github.com/lestrrat-go/jwx/jwk"
-	"github.com/lestrrat-go/jwx/jwt"
+	"gopkg.in/square/go-jose.v2"
+	"gopkg.in/square/go-jose.v2/jwt"
 	"gopkg.in/yaml.v3"
 )
 
@@ -108,10 +107,6 @@ type (
 		quotaLock   sync.Mutex
 		host        string
 		hasTLS      bool
-	}
-
-	JWKS struct {
-		Keys []jwk.Key `json:"keys"`
 	}
 )
 
@@ -318,41 +313,46 @@ func createProducts(num int) map[string]product.APIProduct {
 }
 
 func createVerifyAPIKeyResponse(product product.APIProduct, privateKey *rsa.PrivateKey) (key.APIKeyResponse, error) {
-	token := jwt.New()
-	_ = token.Set(jwt.AudienceKey, "remote-service-client")
-	_ = token.Set(jwt.JwtIDKey, "29e2320b-787c-4625-8599-acc5e05c68d0")
-	_ = token.Set(jwt.IssuerKey, "testserver")
-	_ = token.Set(jwt.NotBeforeKey, time.Now().Add(-10*time.Minute).Unix())
-	_ = token.Set(jwt.IssuedAtKey, time.Now().Unix())
-	_ = token.Set(jwt.ExpirationKey, (time.Now().Add(10 * time.Minute)).Unix())
-	_ = token.Set("access_token", "f2d45913643bccf3ad92998d06aabbd445e5376271b83fc95e5fc8515f59a5e9")
-	_ = token.Set("client_id", "f2d45913643bccf3ad92998d06aabbd445e5376271b83fc95e5fc8515f59a5e9")
-	_ = token.Set("application_name", "application-name")
-	_ = token.Set("api_product_list", []string{product.Name})
-	payload, err := jwt.Sign(token, jwa.RS256, privateKey)
+	rsaSigner, err := jose.NewSigner(
+		jose.SigningKey{Algorithm: jose.RS256, Key: privateKey},
+		(&jose.SignerOptions{}).
+			WithType("JWT").
+			WithHeader("kid", "1"))
+	if err != nil {
+		panic("failed to create signer:" + err.Error())
+	}
 
-	return key.APIKeyResponse{Token: string(payload)}, err
+	jwt, err := jwt.Signed(rsaSigner).
+		Claims(jwt.Claims{
+			Audience:  jwt.Audience{"remote-service-client"},
+			ID:        "29e2320b-787c-4625-8599-acc5e05c68d0",
+			Issuer:    "testserver",
+			NotBefore: jwt.NewNumericDate(time.Now().Add(-10 * time.Minute)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			Expiry:    jwt.NewNumericDate(time.Now().Add(10 * time.Minute)),
+		}).
+		Claims(map[string]interface{}{
+			"access_token":     "f2d45913643bccf3ad92998d06aabbd445e5376271b83fc95e5fc8515f59a5e9",
+			"client_id":        "f2d45913643bccf3ad92998d06aabbd445e5376271b83fc95e5fc8515f59a5e9",
+			"application_name": "application-name",
+			"api_product_list": []string{product.Name},
+		}).
+		CompactSerialize()
+	return key.APIKeyResponse{Token: string(jwt)}, err
 }
 
-func createJWKS(privateKey *rsa.PrivateKey) (*JWKS, error) {
-	key, err := jwk.New(&privateKey.PublicKey)
-	if err != nil {
-		return nil, err
-	}
-	if err := key.Set("kid", "1"); err != nil {
-		return nil, err
-	}
-	if err := key.Set("alg", jwa.RS256.String()); err != nil {
-		return nil, err
+func createJWKS(privateKey *rsa.PrivateKey) ([]byte, error) {
+	jwk := jose.JSONWebKey{
+		KeyID:     "1",
+		Algorithm: "RSA",
+		Key:       &privateKey.PublicKey,
 	}
 
-	jwks := &JWKS{
-		Keys: []jwk.Key{
-			key,
-		},
+	jwks := jose.JSONWebKeySet{
+		Keys: []jose.JSONWebKey{jwk},
 	}
 
-	return jwks, nil
+	return json.MarshalIndent(jwks, "", "")
 }
 
 func makeConfigCRD(cfg config.Config) (*config.ConfigMapCRD, error) {
