@@ -26,12 +26,12 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/v2/product"
 	v3 "github.com/envoyproxy/go-control-plane/envoy/data/accesslog/v3"
 	als "github.com/envoyproxy/go-control-plane/envoy/service/accesslog/v3"
-	"github.com/golang/protobuf/ptypes/duration"
-	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/structpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const (
@@ -219,9 +219,8 @@ func grpcMethod(grpcService string, operation string) string {
 	return fmt.Sprintf("%s.%s", grpcService, operation)
 }
 
-
 // returns ms since epoch
-func pbTimestampToApigee(ts *timestamp.Timestamp) int64 {
+func pbTimestampToApigee(ts *timestamppb.Timestamp) int64 {
 	if err := ts.CheckValid(); err != nil {
 		log.Debugf("invalid timestamp: %s", err)
 		return 0
@@ -230,7 +229,7 @@ func pbTimestampToApigee(ts *timestamp.Timestamp) int64 {
 }
 
 // returns ms since epoch
-func pbTimestampAddDurationApigee(ts *timestamp.Timestamp, d *duration.Duration) int64 {
+func pbTimestampAddDurationApigee(ts *timestamppb.Timestamp, d *durationpb.Duration) int64 {
 	if err := ts.CheckValid(); err != nil {
 		log.Debugf("invalid timestamp: %s", err)
 		return 0

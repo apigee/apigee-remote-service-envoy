@@ -23,7 +23,7 @@ import (
 	"io"
 	"strings"
 
-	pb "github.com/golang/protobuf/ptypes/struct"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 const (
@@ -31,9 +31,9 @@ const (
 	PEMKeyType = "RSA PRIVATE KEY"
 )
 
-// DecodeToMap converts a pb.Struct to a map from strings to Go types.
+// DecodeToMap converts a structpb.Struct to a map from strings to Go types.
 // DecodeToMap panics if s is invalid.
-func DecodeToMap(s *pb.Struct) map[string]interface{} {
+func DecodeToMap(s *structpb.Struct) map[string]interface{} {
 	if s == nil {
 		return nil
 	}
@@ -44,19 +44,19 @@ func DecodeToMap(s *pb.Struct) map[string]interface{} {
 	return m
 }
 
-func decodeValue(v *pb.Value) interface{} {
+func decodeValue(v *structpb.Value) interface{} {
 	switch k := v.Kind.(type) {
-	case *pb.Value_NullValue:
+	case *structpb.Value_NullValue:
 		return nil
-	case *pb.Value_NumberValue:
+	case *structpb.Value_NumberValue:
 		return k.NumberValue
-	case *pb.Value_StringValue:
+	case *structpb.Value_StringValue:
 		return k.StringValue
-	case *pb.Value_BoolValue:
+	case *structpb.Value_BoolValue:
 		return k.BoolValue
-	case *pb.Value_StructValue:
+	case *structpb.Value_StructValue:
 		return DecodeToMap(k.StructValue)
-	case *pb.Value_ListValue:
+	case *structpb.Value_ListValue:
 		s := make([]interface{}, len(k.ListValue.Values))
 		for i, e := range k.ListValue.Values {
 			s[i] = decodeValue(e)

@@ -38,7 +38,6 @@ import (
 	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	v3 "github.com/envoyproxy/go-control-plane/envoy/data/accesslog/v3"
 	als "github.com/envoyproxy/go-control-plane/envoy/service/accesslog/v3"
-	wrappers "github.com/golang/protobuf/ptypes/wrappers"
 )
 
 func makeExtAuthMetadata() (*structpb.Struct, error) {
@@ -106,7 +105,7 @@ func TestHandleHTTPAccessLogs(t *testing.T) {
 			ForwardedFor:  clientIP,
 		},
 		Response: &v3.HTTPResponseProperties{
-			ResponseCode: &wrappers.UInt32Value{
+			ResponseCode: &wrapperspb.UInt32Value{
 				Value: 200,
 			},
 		},
