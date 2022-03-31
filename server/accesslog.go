@@ -62,7 +62,7 @@ func (a *AccessLogServer) Register(s *grpc.Server, handler *Handler, d time.Dura
 }
 
 // StreamAccessLogs streams
-func (a *AccessLogServer) StreamAccessLogs(srv als.AccessLogService_StreamAccessLogsServer) error {
+func (a *AccessLogServer) StreamAccessLogs(srv als_grpc.AccessLogService_StreamAccessLogsServer) error {
 	go func() {
 		select {
 		case <-srv.Context().Done():
