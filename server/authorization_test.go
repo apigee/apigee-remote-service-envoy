@@ -994,9 +994,9 @@ func TestGlobalCheck(t *testing.T) {
 	if resp.Status.Code != int32(rpc.RESOURCE_EXHAUSTED) {
 		t.Errorf("got: %d, want: %d", resp.Status.Code, int32(rpc.RESOURCE_EXHAUSTED))
 	}
-	code := resp.HttpResponse.(*authv3.CheckResponse_DeniedResponse).DeniedResponse.Status.Code
-	if code != http.StatusTooManyRequests {
-		t.Errorf("got: %d, want: %d", code, http.StatusTooManyRequests)
+	responseCode := resp.HttpResponse.(*authv3.CheckResponse_DeniedResponse).DeniedResponse.Status.Code
+	if responseCode != http.StatusTooManyRequests {
+		t.Errorf("got: %d, want: %d", responseCode, http.StatusTooManyRequests)
 	}
 	testQuotaMan.exceeded = 0
 
