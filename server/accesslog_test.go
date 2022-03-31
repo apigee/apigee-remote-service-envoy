@@ -38,6 +38,7 @@ import (
 	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	v3 "github.com/envoyproxy/go-control-plane/envoy/data/accesslog/v3"
 	als "github.com/envoyproxy/go-control-plane/envoy/service/accesslog/v3"
+	als_grpc "github.com/envoyproxy/go-control-plane/envoy/service/accesslog/v3"
 )
 
 func makeExtAuthMetadata() (*structpb.Struct, error) {
@@ -293,7 +294,7 @@ func TestStreamAccessLogs(t *testing.T) {
 	}
 	defer conn.Close()
 
-	client := als.NewAccessLogServiceClient(conn)
+	client := als_grpc.NewAccessLogServiceClient(conn)
 	stream, err := client.StreamAccessLogs(ctx)
 	if err != nil {
 		t.Fatalf("failed to open client stream: %v", err)
@@ -349,7 +350,7 @@ func TestPrometheusProxyRecord(t *testing.T) {
 	}
 	defer conn.Close()
 
-	client := als.NewAccessLogServiceClient(conn)
+	client := als_grpc.NewAccessLogServiceClient(conn)
 	stream, err := client.StreamAccessLogs(ctx)
 	if err != nil {
 		t.Fatalf("failed to open client stream: %v", err)
