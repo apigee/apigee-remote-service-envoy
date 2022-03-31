@@ -26,7 +26,7 @@ import (
 
 	"github.com/apigee/apigee-remote-service-envoy/v2/testutil"
 	"github.com/apigee/apigee-remote-service-envoy/v2/util"
-	pb "github.com/golang/protobuf/ptypes/struct"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 func TestLoadPrivateKey(t *testing.T) {
@@ -88,19 +88,19 @@ func TestDecodeToMap(t *testing.T) {
 	if got := util.DecodeToMap(nil); !testutil.Equal(got, map[string]interface{}(nil)) {
 		t.Errorf("DecodeToMap(nil) = %v, want nil", got)
 	}
-	nullv := &pb.Value{Kind: &pb.Value_NullValue{}}
-	stringv := &pb.Value{Kind: &pb.Value_StringValue{StringValue: "x"}}
-	boolv := &pb.Value{Kind: &pb.Value_BoolValue{BoolValue: true}}
-	numberv := &pb.Value{Kind: &pb.Value_NumberValue{NumberValue: 2.7}}
-	in := &pb.Struct{Fields: map[string]*pb.Value{
+	nullv := &structpb.Value{Kind: &structpb.Value_NullValue{}}
+	stringv := &structpb.Value{Kind: &structpb.Value_StringValue{StringValue: "x"}}
+	boolv := &structpb.Value{Kind: &structpb.Value_BoolValue{BoolValue: true}}
+	numberv := &structpb.Value{Kind: &structpb.Value_NumberValue{NumberValue: 2.7}}
+	in := &structpb.Struct{Fields: map[string]*structpb.Value{
 		"n": nullv,
 		"s": stringv,
 		"b": boolv,
 		"f": numberv,
-		"l": {Kind: &pb.Value_ListValue{ListValue: &pb.ListValue{
-			Values: []*pb.Value{nullv, stringv, boolv, numberv},
+		"l": {Kind: &structpb.Value_ListValue{ListValue: &structpb.ListValue{
+			Values: []*structpb.Value{nullv, stringv, boolv, numberv},
 		}}},
-		"S": {Kind: &pb.Value_StructValue{StructValue: &pb.Struct{Fields: map[string]*pb.Value{
+		"S": {Kind: &structpb.Value_StructValue{StructValue: &structpb.Struct{Fields: map[string]*structpb.Value{
 			"n1": nullv,
 			"b1": boolv,
 		}}}},
