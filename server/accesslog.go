@@ -26,6 +26,7 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/v2/product"
 	v3 "github.com/envoyproxy/go-control-plane/envoy/data/accesslog/v3"
 	als "github.com/envoyproxy/go-control-plane/envoy/service/accesslog/v3"
+	als_grpc "github.com/envoyproxy/go-control-plane/envoy/service/accesslog/v3"
 	"github.com/golang/protobuf/ptypes/duration"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/prometheus/client_golang/prometheus"
@@ -50,7 +51,7 @@ type AccessLogServer struct {
 
 // Register registers
 func (a *AccessLogServer) Register(s *grpc.Server, handler *Handler, d time.Duration, ctx context.Context) {
-	als.RegisterAccessLogServiceServer(s, a)
+	als_grpc.RegisterAccessLogServiceServer(s, a)
 	a.handler = handler
 	a.streamTimeout = d
 	a.context = ctx
@@ -218,7 +219,6 @@ func grpcMethod(grpcService string, operation string) string {
 	}
 	return fmt.Sprintf("%s.%s", grpcService, operation)
 }
-
 
 // returns ms since epoch
 func pbTimestampToApigee(ts *timestamp.Timestamp) int64 {

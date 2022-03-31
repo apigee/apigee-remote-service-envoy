@@ -39,6 +39,7 @@ import (
 	golibutil "github.com/apigee/apigee-remote-service-golib/v2/util"
 	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
+	authv3_grpc "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	typev3 "github.com/envoyproxy/go-control-plane/envoy/type/v3"
 	"github.com/gogo/googleapis/google/rpc"
 	"github.com/prometheus/client_golang/prometheus"
@@ -65,7 +66,7 @@ type AuthorizationServer struct {
 
 // Register registers
 func (a *AuthorizationServer) Register(s *grpc.Server, handler *Handler) {
-	authv3.RegisterAuthorizationServer(s, a)
+	authv3_grpc.RegisterAuthorizationServer(s, a)
 	a.handler = handler
 	a.gatewaySource = defaultGatewaySource
 	if a.handler.operationConfigType == product.ProxyOperationConfigType {
