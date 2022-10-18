@@ -18,12 +18,12 @@
 # Runs goreleaser in Boring Crypto Go container in order to allow
 # goreleaser to build a valid Boring Crypto binary
 
-FROM goboring/golang:1.16.1b7
+FROM goboring/golang:1.16.7b7
 
 ARG GITHUB_TOKEN
 ARG VERSION
 
-RUN go install github.com/goreleaser/goreleaser@latest
+RUN go install github.com/goreleaser/goreleaser@v1.6.3
 
 WORKDIR /app
 ADD . .
