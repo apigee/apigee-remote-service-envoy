@@ -64,6 +64,8 @@ func DefaultConfig() *Config {
 			ClientTimeout:       30 * time.Second,
 			InternalJWTDuration: 10 * time.Minute,
 			InternalJWTRefresh:  30 * time.Second,
+			Key:                 os.Getenv("APIGEE_REMOTE_SERVICE_TENANT_KEY"),
+			Secret:              os.Getenv("APIGEE_REMOTE_SERVICE_TENANT_SECRET"),
 		},
 		Products: ProductsConfig{
 			RefreshRate: 2 * time.Minute,
