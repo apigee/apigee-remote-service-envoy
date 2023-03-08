@@ -370,7 +370,7 @@ func TestImmediateAnalytics(t *testing.T) {
 		DeveloperEmail:   "email",
 		Scopes:           []string{"scope"},
 		APIKey:           "apikey",
-		CustomAttributes: "",
+		CustomAttributes: "{\"tier\":\"standard\"}",
 	}
 	testAuthMan.sendAuth(ac, auth.ErrBadAuth)
 

@@ -41,7 +41,7 @@ func TestMetadataHeaders(t *testing.T) {
 		APIProducts:      []string{"prod1", "prod2"},
 		DeveloperEmail:   "dev@google.com",
 		Scopes:           []string{"scope1", "scope2"},
-		CustomAttributes: "",
+		CustomAttributes: "{\"tier\":\"standard\"}",
 	}
 	api := "api"
 	opts = makeMetadataHeaders(api, authContext, true)
