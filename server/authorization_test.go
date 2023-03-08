@@ -362,14 +362,15 @@ func TestImmediateAnalytics(t *testing.T) {
 
 	testAuthMan := &testAuthMan{}
 	ac := &auth.Context{
-		ClientID:       "client id",
-		AccessToken:    "token",
-		Application:    "app",
-		APIProducts:    []string{"product1"},
-		Expires:        time.Now(),
-		DeveloperEmail: "email",
-		Scopes:         []string{"scope"},
-		APIKey:         "apikey",
+		ClientID:         "client id",
+		AccessToken:      "token",
+		Application:      "app",
+		APIProducts:      []string{"product1"},
+		Expires:          time.Now(),
+		DeveloperEmail:   "email",
+		Scopes:           []string{"scope"},
+		APIKey:           "apikey",
+		CustomAttributes: "",
 	}
 	testAuthMan.sendAuth(ac, auth.ErrBadAuth)
 

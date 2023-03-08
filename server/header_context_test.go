@@ -34,13 +34,14 @@ func TestMetadataHeaders(t *testing.T) {
 		"env",
 	}
 	authContext := &auth.Context{
-		Context:        h,
-		ClientID:       "clientid",
-		AccessToken:    "accesstoken",
-		Application:    "application",
-		APIProducts:    []string{"prod1", "prod2"},
-		DeveloperEmail: "dev@google.com",
-		Scopes:         []string{"scope1", "scope2"},
+		Context:          h,
+		ClientID:         "clientid",
+		AccessToken:      "accesstoken",
+		Application:      "application",
+		APIProducts:      []string{"prod1", "prod2"},
+		DeveloperEmail:   "dev@google.com",
+		Scopes:           []string{"scope1", "scope2"},
+		CustomAttributes: "",
 	}
 	api := "api"
 	opts = makeMetadataHeaders(api, authContext, true)
@@ -61,6 +62,7 @@ func TestMetadataHeaders(t *testing.T) {
 	equal(headerApplication, authContext.Application)
 	equal(headerClientID, authContext.ClientID)
 	equal(headerDeveloperEmail, authContext.DeveloperEmail)
+	equal(headerCustomAttributes, authContext.CustomAttributes)
 	equal(headerEnvironment, authContext.Environment())
 	equal(headerOrganization, authContext.Organization())
 	equal(headerScope, strings.Join(authContext.Scopes, " "))

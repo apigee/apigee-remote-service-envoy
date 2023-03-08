@@ -26,16 +26,17 @@ import (
 const (
 	extAuthzFilterNamespace = "envoy.filters.http.ext_authz"
 
-	headerAuthorized     = "x-apigee-authorized"
-	headerAccessToken    = "x-apigee-accesstoken"
-	headerAPI            = "x-apigee-api"
-	headerAPIProducts    = "x-apigee-apiproducts"
-	headerApplication    = "x-apigee-application"
-	headerClientID       = "x-apigee-clientid"
-	headerDeveloperEmail = "x-apigee-developeremail"
-	headerEnvironment    = "x-apigee-environment"
-	headerOrganization   = "x-apigee-organization"
-	headerScope          = "x-apigee-scope"
+	headerAuthorized       = "x-apigee-authorized"
+	headerAccessToken      = "x-apigee-accesstoken"
+	headerAPI              = "x-apigee-api"
+	headerAPIProducts      = "x-apigee-apiproducts"
+	headerApplication      = "x-apigee-application"
+	headerClientID         = "x-apigee-clientid"
+	headerDeveloperEmail   = "x-apigee-developeremail"
+	headerEnvironment      = "x-apigee-environment"
+	headerOrganization     = "x-apigee-organization"
+	headerScope            = "x-apigee-scope"
+	headerCustomAttributes = "x-apigee-customattributes"
 )
 
 // encodeExtAuthzMetadata encodes given api and auth context into
@@ -46,15 +47,16 @@ func encodeExtAuthzMetadata(api string, ac *auth.Context, authorized bool) *stru
 	}
 
 	fields := map[string]*structpb.Value{
-		headerAccessToken:    stringValueFrom(ac.AccessToken),
-		headerAPI:            stringValueFrom(api),
-		headerAPIProducts:    stringValueFrom(strings.Join(ac.APIProducts, ",")),
-		headerApplication:    stringValueFrom(ac.Application),
-		headerClientID:       stringValueFrom(ac.ClientID),
-		headerDeveloperEmail: stringValueFrom(ac.DeveloperEmail),
-		headerEnvironment:    stringValueFrom(ac.Environment()),
-		headerOrganization:   stringValueFrom(ac.Organization()),
-		headerScope:          stringValueFrom(strings.Join(ac.Scopes, " ")),
+		headerAccessToken:      stringValueFrom(ac.AccessToken),
+		headerAPI:              stringValueFrom(api),
+		headerAPIProducts:      stringValueFrom(strings.Join(ac.APIProducts, ",")),
+		headerApplication:      stringValueFrom(ac.Application),
+		headerClientID:         stringValueFrom(ac.ClientID),
+		headerDeveloperEmail:   stringValueFrom(ac.DeveloperEmail),
+		headerEnvironment:      stringValueFrom(ac.Environment()),
+		headerOrganization:     stringValueFrom(ac.Organization()),
+		headerScope:            stringValueFrom(strings.Join(ac.Scopes, " ")),
+		headerCustomAttributes: stringValueFrom(ac.CustomAttributes),
 	}
 	if authorized {
 		fields[headerAuthorized] = stringValueFrom("true")
@@ -119,12 +121,13 @@ func (h *Handler) decodeExtAuthzMetadata(fields map[string]*structpb.Value) (str
 	}
 
 	return api, &auth.Context{
-		Context:        rootContext,
-		AccessToken:    fields[headerAccessToken].GetStringValue(),
-		APIProducts:    strings.Split(fields[headerAPIProducts].GetStringValue(), ","),
-		Application:    fields[headerApplication].GetStringValue(),
-		ClientID:       fields[headerClientID].GetStringValue(),
-		DeveloperEmail: fields[headerDeveloperEmail].GetStringValue(),
-		Scopes:         strings.Split(fields[headerScope].GetStringValue(), " "),
+		Context:          rootContext,
+		AccessToken:      fields[headerAccessToken].GetStringValue(),
+		APIProducts:      strings.Split(fields[headerAPIProducts].GetStringValue(), ","),
+		Application:      fields[headerApplication].GetStringValue(),
+		ClientID:         fields[headerClientID].GetStringValue(),
+		DeveloperEmail:   fields[headerDeveloperEmail].GetStringValue(),
+		Scopes:           strings.Split(fields[headerScope].GetStringValue(), " "),
+		CustomAttributes: fields[headerCustomAttributes].GetStringValue(),
 	}
 }
