@@ -75,7 +75,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.Check
 	defer tracker.record()
 
 	if err != nil {
-		return a.internalError(req, tracker, err), nil
+		return a.internalError(req, tracker, nil, "", err), nil
 	}
 
 	var api string
@@ -85,7 +85,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.Check
 		api, ok = req.Attributes.Request.Http.Headers[a.handler.apiHeader]
 		if !ok {
 			log.Debugf("missing api header %s", a.handler.apiHeader)
-			return a.unauthorized(req, tracker), nil
+			return a.unauthorized(req, tracker, nil, ""), nil
 		}
 	}
 
@@ -127,11 +127,11 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.Check
 	authContext, err := a.handler.authMan.Authenticate(rootContext, apiKey, claims, a.handler.apiKeyClaim)
 	switch err {
 	case auth.ErrNoAuth:
-		return a.unauthorized(req, tracker), nil
+		return a.unauthorized(req, tracker, authContext, api), nil
 	case auth.ErrBadAuth:
 		return a.denied(req, tracker, authContext, api), nil
 	case auth.ErrInternalError:
-		return a.internalError(req, tracker, err), nil
+		return a.internalError(req, tracker, authContext, api, err), nil
 	}
 
 	if len(authContext.APIProducts) == 0 {
@@ -162,7 +162,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.Check
 		}
 	}
 	if anyError != nil {
-		return a.internalError(req, tracker, anyError), nil
+		return a.internalError(req, tracker, authContext, api, anyError), nil
 	}
 	if exceeded {
 		return a.quotaExceeded(req, tracker, authContext, api), nil
@@ -192,13 +192,13 @@ func (a *AuthorizationServer) authOK(tracker *prometheusRequestMetricTracker, au
 	}
 }
 
-func (a *AuthorizationServer) unauthorized(req *envoy_auth.CheckRequest, tracker *prometheusRequestMetricTracker) *envoy_auth.CheckResponse {
-	return a.createDenyResponse(req, tracker, nil, "", rpc.UNAUTHENTICATED)
+func (a *AuthorizationServer) unauthorized(req *envoy_auth.CheckRequest, tracker *prometheusRequestMetricTracker, authContext *auth.Context, api string) *envoy_auth.CheckResponse {
+	return a.createDenyResponse(req, tracker, authContext, api, rpc.UNAUTHENTICATED)
 }
 
-func (a *AuthorizationServer) internalError(req *envoy_auth.CheckRequest, tracker *prometheusRequestMetricTracker, err error) *envoy_auth.CheckResponse {
+func (a *AuthorizationServer) internalError(req *envoy_auth.CheckRequest, tracker *prometheusRequestMetricTracker, authContext *auth.Context, api string, err error) *envoy_auth.CheckResponse {
 	log.Errorf("sending internal error: %v", err)
-	return a.createDenyResponse(req, tracker, nil, "", rpc.INTERNAL)
+	return a.createDenyResponse(req, tracker, authContext, api, rpc.INTERNAL)
 }
 
 func (a *AuthorizationServer) denied(req *envoy_auth.CheckRequest, tracker *prometheusRequestMetricTracker, authContext *auth.Context, api string) *envoy_auth.CheckResponse {
