@@ -38,6 +38,7 @@ func makeMetadataHeaders(api string, ac *auth.Context, authorized bool) []*core.
 		header(headerEnvironment, ac.Environment()),
 		header(headerOrganization, ac.Organization()),
 		header(headerScope, strings.Join(ac.Scopes, " ")),
+		header(headerCustomAttributes, ac.CustomAttributes),
 	}
 
 	if authorized {
@@ -77,12 +78,13 @@ func (h *Handler) decodeMetadataHeaders(headers map[string]string) (string, *aut
 	}
 
 	return api, &auth.Context{
-		Context:        rootContext,
-		AccessToken:    headers[headerAccessToken],
-		APIProducts:    strings.Split(headers[headerAPIProducts], ","),
-		Application:    headers[headerApplication],
-		ClientID:       headers[headerClientID],
-		DeveloperEmail: headers[headerDeveloperEmail],
-		Scopes:         strings.Split(headers[headerScope], " "),
+		Context:          rootContext,
+		AccessToken:      headers[headerAccessToken],
+		APIProducts:      strings.Split(headers[headerAPIProducts], ","),
+		Application:      headers[headerApplication],
+		ClientID:         headers[headerClientID],
+		DeveloperEmail:   headers[headerDeveloperEmail],
+		Scopes:           strings.Split(headers[headerScope], " "),
+		CustomAttributes: headers[headerCustomAttributes],
 	}
 }
