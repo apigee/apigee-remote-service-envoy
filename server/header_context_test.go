@@ -34,13 +34,14 @@ func TestMetadataHeaders(t *testing.T) {
 		"env",
 	}
 	authContext := &auth.Context{
-		Context:        h,
-		ClientID:       "clientid",
-		AccessToken:    "accesstoken",
-		Application:    "application",
-		APIProducts:    []string{"prod1", "prod2"},
-		DeveloperEmail: "dev@google.com",
-		Scopes:         []string{"scope1", "scope2"},
+		Context:          h,
+		ClientID:         "clientid",
+		AccessToken:      "accesstoken",
+		Application:      "application",
+		APIProducts:      []string{"prod1", "prod2"},
+		DeveloperEmail:   "dev@google.com",
+		Scopes:           []string{"scope1", "scope2"},
+		CustomAttributes: "{\"tier\":\"standard\"}",
 	}
 	api := "api"
 	opts = makeMetadataHeaders(api, authContext, true)
@@ -61,6 +62,7 @@ func TestMetadataHeaders(t *testing.T) {
 	equal(headerApplication, authContext.Application)
 	equal(headerClientID, authContext.ClientID)
 	equal(headerDeveloperEmail, authContext.DeveloperEmail)
+	equal(headerCustomAttributes, authContext.CustomAttributes)
 	equal(headerEnvironment, authContext.Environment())
 	equal(headerOrganization, authContext.Organization())
 	equal(headerScope, strings.Join(authContext.Scopes, " "))
@@ -75,6 +77,35 @@ func TestMetadataHeaders(t *testing.T) {
 	}
 }
 
+func TestCustomAttributeMetadata(t *testing.T) {
+	h := &multitenantContext{
+		&Handler{
+			orgName:       "org",
+			envName:       "*",
+			isMultitenant: true,
+		},
+		"env",
+	}
+	ac := &auth.Context{
+		Context:        h,
+		ClientID:       "clientid",
+		AccessToken:    "accesstoken",
+		Application:    "application",
+		APIProducts:    []string{"prod1", "prod2"},
+		DeveloperEmail: "dev@google.com",
+		Scopes:         []string{"scope1", "scope2"},
+	}
+
+	// Call the function with authorized set to true
+	headers := makeMetadataHeaders("api", ac, true)
+
+	// Verify that the CustomAttributes header is not included in the headers
+	for _, h := range headers {
+		if h.Header.Key == headerCustomAttributes {
+			t.Errorf("Expected CustomAttributes header to not be included, but found it with value %s", h.Header.Value)
+		}
+	}
+}
 func TestMetadataHeadersExceptions(t *testing.T) {
 	opts := makeMetadataHeaders("api", nil, true)
 	if opts != nil {

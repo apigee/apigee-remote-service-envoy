@@ -33,13 +33,14 @@ func TestEncodeMetadata(t *testing.T) {
 		"env",
 	}
 	authContext := &auth.Context{
-		Context:        h,
-		ClientID:       "clientid",
-		AccessToken:    "accesstoken",
-		Application:    "application",
-		APIProducts:    []string{"prod1", "prod2"},
-		DeveloperEmail: "dev@google.com",
-		Scopes:         []string{"scope1", "scope2"},
+		Context:          h,
+		ClientID:         "clientid",
+		AccessToken:      "accesstoken",
+		Application:      "application",
+		APIProducts:      []string{"prod1", "prod2"},
+		DeveloperEmail:   "dev@google.com",
+		Scopes:           []string{"scope1", "scope2"},
+		CustomAttributes: "{\"tier\":\"standard\"}",
 	}
 	api := "api"
 	metadata := encodeExtAuthzMetadata(api, authContext, true)
@@ -63,6 +64,7 @@ func TestEncodeMetadata(t *testing.T) {
 	equal(headerEnvironment, authContext.Environment())
 	equal(headerOrganization, authContext.Organization())
 	equal(headerScope, strings.Join(authContext.Scopes, " "))
+	equal(headerCustomAttributes, authContext.CustomAttributes)
 
 	api2, ac2 := h.decodeExtAuthzMetadata(metadata.GetFields())
 	if api != api2 {
@@ -86,13 +88,14 @@ func TestEncodeMetadataAuthorizedField(t *testing.T) {
 		envName: "env",
 	}
 	authContext := &auth.Context{
-		Context:        h,
-		ClientID:       "clientid",
-		AccessToken:    "accesstoken",
-		Application:    "application",
-		APIProducts:    []string{"prod1", "prod2"},
-		DeveloperEmail: "dev@google.com",
-		Scopes:         []string{"scope1", "scope2"},
+		Context:          h,
+		ClientID:         "clientid",
+		AccessToken:      "accesstoken",
+		Application:      "application",
+		APIProducts:      []string{"prod1", "prod2"},
+		DeveloperEmail:   "dev@google.com",
+		Scopes:           []string{"scope1", "scope2"},
+		CustomAttributes: "",
 	}
 
 	metadata := encodeExtAuthzMetadata("api", authContext, true)
