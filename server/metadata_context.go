@@ -47,17 +47,21 @@ func encodeExtAuthzMetadata(api string, ac *auth.Context, authorized bool) *stru
 	}
 
 	fields := map[string]*structpb.Value{
-		headerAccessToken:      stringValueFrom(ac.AccessToken),
-		headerAPI:              stringValueFrom(api),
-		headerAPIProducts:      stringValueFrom(strings.Join(ac.APIProducts, ",")),
-		headerApplication:      stringValueFrom(ac.Application),
-		headerClientID:         stringValueFrom(ac.ClientID),
-		headerDeveloperEmail:   stringValueFrom(ac.DeveloperEmail),
-		headerEnvironment:      stringValueFrom(ac.Environment()),
-		headerOrganization:     stringValueFrom(ac.Organization()),
-		headerScope:            stringValueFrom(strings.Join(ac.Scopes, " ")),
-		headerCustomAttributes: stringValueFrom(ac.CustomAttributes),
+		headerAccessToken:    stringValueFrom(ac.AccessToken),
+		headerAPI:            stringValueFrom(api),
+		headerAPIProducts:    stringValueFrom(strings.Join(ac.APIProducts, ",")),
+		headerApplication:    stringValueFrom(ac.Application),
+		headerClientID:       stringValueFrom(ac.ClientID),
+		headerDeveloperEmail: stringValueFrom(ac.DeveloperEmail),
+		headerEnvironment:    stringValueFrom(ac.Environment()),
+		headerOrganization:   stringValueFrom(ac.Organization()),
+		headerScope:          stringValueFrom(strings.Join(ac.Scopes, " ")),
 	}
+
+	if ac.CustomAttributes != "" {
+		fields[headerCustomAttributes] = stringValueFrom(ac.CustomAttributes)
+	}
+
 	if authorized {
 		fields[headerAuthorized] = stringValueFrom("true")
 	}
