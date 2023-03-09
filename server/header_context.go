@@ -38,9 +38,10 @@ func makeMetadataHeaders(api string, ac *auth.Context, authorized bool) []*core.
 		header(headerEnvironment, ac.Environment()),
 		header(headerOrganization, ac.Organization()),
 		header(headerScope, strings.Join(ac.Scopes, " ")),
-		header(headerCustomAttributes, ac.CustomAttributes),
 	}
-
+	if ac.CustomAttributes != "" {
+		headers = append(headers, header(headerCustomAttributes, ac.CustomAttributes))
+	}
 	if authorized {
 		headers = append(headers, header(headerAuthorized, "true"))
 	}

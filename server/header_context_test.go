@@ -77,6 +77,35 @@ func TestMetadataHeaders(t *testing.T) {
 	}
 }
 
+func TestCustomAttributeMetadata(t *testing.T) {
+	h := &multitenantContext{
+		&Handler{
+			orgName:       "org",
+			envName:       "*",
+			isMultitenant: true,
+		},
+		"env",
+	}
+	ac := &auth.Context{
+		Context:        h,
+		ClientID:       "clientid",
+		AccessToken:    "accesstoken",
+		Application:    "application",
+		APIProducts:    []string{"prod1", "prod2"},
+		DeveloperEmail: "dev@google.com",
+		Scopes:         []string{"scope1", "scope2"},
+	}
+
+	// Call the function with authorized set to true
+	headers := makeMetadataHeaders("api", ac, true)
+
+	// Verify that the CustomAttributes header is not included in the headers
+	for _, h := range headers {
+		if h.Header.Key == headerCustomAttributes {
+			t.Errorf("Expected CustomAttributes header to not be included, but found it with value %s", h.Header.Value)
+		}
+	}
+}
 func TestMetadataHeadersExceptions(t *testing.T) {
 	opts := makeMetadataHeaders("api", nil, true)
 	if opts != nil {
