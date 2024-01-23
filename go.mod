@@ -11,7 +11,7 @@ require (
 	github.com/golang/protobuf v1.5.2
 	github.com/google/go-cmp v0.5.5
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
-	github.com/lestrrat-go/jwx v1.1.6
+	github.com/lestrrat-go/jwx v1.2.27
 	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.12.1
