@@ -22,7 +22,7 @@ require (
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20210315173758-2651cd453018
 	google.golang.org/grpc v1.36.0
-	google.golang.org/protobuf v1.26.0
+	google.golang.org/protobuf v1.33.0
 	gopkg.in/check.v1 v1.0.0-20200902074654-038fdea0a05b // indirect
 	gopkg.in/yaml.v3 v3.0.1
 )
