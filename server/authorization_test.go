@@ -365,12 +365,13 @@ func TestImmediateAnalytics(t *testing.T) {
 		ClientID:         "client id",
 		AccessToken:      "token",
 		Application:      "app",
-		APIProducts:      []string{"product1"},
+		APIProducts:      []string{"not-accepted-product", "accepted-product"},
 		Expires:          time.Now(),
 		DeveloperEmail:   "email",
 		Scopes:           []string{"scope"},
 		APIKey:           "apikey",
 		CustomAttributes: "{\"tier\":\"standard\"}",
+		AnalyticsProduct: "accepted-product",
 	}
 	testAuthMan.sendAuth(ac, auth.ErrBadAuth)
 
@@ -430,7 +431,7 @@ func TestImmediateAnalytics(t *testing.T) {
 		DeveloperApp:                 ac.Application,
 		AccessToken:                  ac.AccessToken,
 		ClientID:                     ac.ClientID,
-		APIProduct:                   ac.APIProducts[0],
+		APIProduct:                   ac.AnalyticsProduct,
 		Organization:                 server.handler.orgName,
 		Environment:                  server.handler.envName,
 		GatewaySource:                gatewaySource,

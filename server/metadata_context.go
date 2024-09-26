@@ -37,6 +37,7 @@ const (
 	headerOrganization     = "x-apigee-organization"
 	headerScope            = "x-apigee-scope"
 	headerCustomAttributes = "x-apigee-customattributes"
+	headerAnalyticsProduct = "x-apigee-analytics-product"
 )
 
 // encodeExtAuthzMetadata encodes given api and auth context into
@@ -47,15 +48,16 @@ func encodeExtAuthzMetadata(api string, ac *auth.Context, authorized bool) *stru
 	}
 
 	fields := map[string]*structpb.Value{
-		headerAccessToken:    stringValueFrom(ac.AccessToken),
-		headerAPI:            stringValueFrom(api),
-		headerAPIProducts:    stringValueFrom(strings.Join(ac.APIProducts, ",")),
-		headerApplication:    stringValueFrom(ac.Application),
-		headerClientID:       stringValueFrom(ac.ClientID),
-		headerDeveloperEmail: stringValueFrom(ac.DeveloperEmail),
-		headerEnvironment:    stringValueFrom(ac.Environment()),
-		headerOrganization:   stringValueFrom(ac.Organization()),
-		headerScope:          stringValueFrom(strings.Join(ac.Scopes, " ")),
+		headerAccessToken:      stringValueFrom(ac.AccessToken),
+		headerAPI:              stringValueFrom(api),
+		headerAPIProducts:      stringValueFrom(strings.Join(ac.APIProducts, ",")),
+		headerApplication:      stringValueFrom(ac.Application),
+		headerClientID:         stringValueFrom(ac.ClientID),
+		headerDeveloperEmail:   stringValueFrom(ac.DeveloperEmail),
+		headerEnvironment:      stringValueFrom(ac.Environment()),
+		headerOrganization:     stringValueFrom(ac.Organization()),
+		headerScope:            stringValueFrom(strings.Join(ac.Scopes, " ")),
+		headerAnalyticsProduct: stringValueFrom(ac.AnalyticsProduct),
 	}
 
 	if ac.CustomAttributes != "" {
@@ -133,5 +135,6 @@ func (h *Handler) decodeExtAuthzMetadata(fields map[string]*structpb.Value) (str
 		DeveloperEmail:   fields[headerDeveloperEmail].GetStringValue(),
 		Scopes:           strings.Split(fields[headerScope].GetStringValue(), " "),
 		CustomAttributes: fields[headerCustomAttributes].GetStringValue(),
+		AnalyticsProduct: fields[headerAnalyticsProduct].GetStringValue(),
 	}
 }

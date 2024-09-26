@@ -41,6 +41,7 @@ func TestEncodeMetadata(t *testing.T) {
 		DeveloperEmail:   "dev@google.com",
 		Scopes:           []string{"scope1", "scope2"},
 		CustomAttributes: "{\"tier\":\"standard\"}",
+		AnalyticsProduct: "prod1",
 	}
 	api := "api"
 	metadata := encodeExtAuthzMetadata(api, authContext, true)
@@ -65,6 +66,7 @@ func TestEncodeMetadata(t *testing.T) {
 	equal(headerOrganization, authContext.Organization())
 	equal(headerScope, strings.Join(authContext.Scopes, " "))
 	equal(headerCustomAttributes, authContext.CustomAttributes)
+	equal(headerAnalyticsProduct, authContext.AnalyticsProduct)
 
 	api2, ac2 := h.decodeExtAuthzMetadata(metadata.GetFields())
 	if api != api2 {
@@ -96,6 +98,7 @@ func TestEncodeMetadataAuthorizedField(t *testing.T) {
 		DeveloperEmail:   "dev@google.com",
 		Scopes:           []string{"scope1", "scope2"},
 		CustomAttributes: "",
+		AnalyticsProduct: "prod1",
 	}
 
 	metadata := encodeExtAuthzMetadata("api", authContext, true)

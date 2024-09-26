@@ -144,6 +144,7 @@ func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.Check
 	if len(authorizedOps) == 0 {
 		return a.denied(req, tracker, authContext, api), nil
 	}
+	authContext.AnalyticsProduct = authorizedOps[0].APIProduct
 
 	// apply quotas to matched operations
 	var quotaArgs = quota.Args{QuotaAmount: 1}

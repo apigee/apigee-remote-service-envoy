@@ -42,6 +42,7 @@ func TestMetadataHeaders(t *testing.T) {
 		DeveloperEmail:   "dev@google.com",
 		Scopes:           []string{"scope1", "scope2"},
 		CustomAttributes: "{\"tier\":\"standard\"}",
+		AnalyticsProduct: "prod1",
 	}
 	api := "api"
 	opts = makeMetadataHeaders(api, authContext, true)
@@ -66,6 +67,7 @@ func TestMetadataHeaders(t *testing.T) {
 	equal(headerEnvironment, authContext.Environment())
 	equal(headerOrganization, authContext.Organization())
 	equal(headerScope, strings.Join(authContext.Scopes, " "))
+	equal(headerAnalyticsProduct, authContext.AnalyticsProduct)
 
 	api2, ac2 := h.decodeMetadataHeaders(headers)
 	if api != api2 {
