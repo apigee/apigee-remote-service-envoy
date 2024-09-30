@@ -38,6 +38,7 @@ func makeMetadataHeaders(api string, ac *auth.Context, authorized bool) []*core.
 		header(headerEnvironment, ac.Environment()),
 		header(headerOrganization, ac.Organization()),
 		header(headerScope, strings.Join(ac.Scopes, " ")),
+		header(headerAnalyticsProduct, ac.AnalyticsProduct),
 	}
 	if ac.CustomAttributes != "" {
 		headers = append(headers, header(headerCustomAttributes, ac.CustomAttributes))
@@ -87,5 +88,6 @@ func (h *Handler) decodeMetadataHeaders(headers map[string]string) (string, *aut
 		DeveloperEmail:   headers[headerDeveloperEmail],
 		Scopes:           strings.Split(headers[headerScope], " "),
 		CustomAttributes: headers[headerCustomAttributes],
+		AnalyticsProduct: headers[headerAnalyticsProduct],
 	}
 }
