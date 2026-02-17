@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package protostruct supports operations on the protocol buffer Struct message.
 package server
 
 import (
@@ -20,6 +19,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
+	"sync" // Added
 	"testing"
 	"time"
 
@@ -29,76 +30,93 @@ import (
 )
 
 func TestKubeHealth(t *testing.T) {
-	fail := true
+	var mu sync.Mutex // Added to protect 'fail'
+	var fail bool
+	
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()         // Added lock
+		shouldFail := fail
+		mu.Unlock()       // Added unlock
+
+		if shouldFail {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 		var result = product.APIResponse{
 			APIProducts: []product.APIProduct{},
-		}
-		if fail {
-			w.WriteHeader(500)
-			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(result)
 	}))
 	defer ts.Close()
 
-	serverURL, err := url.Parse(ts.URL)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	productMan, err := product.NewManager(product.Options{
+	serverURL, _ := url.Parse(ts.URL)
+	opts := product.Options{
 		Client:      http.DefaultClient,
 		BaseURL:     serverURL,
 		RefreshRate: time.Minute,
 		Org:         "org",
 		Env:         "env",
-	})
+	}
+
+	// 1. Start with failure
+	mu.Lock()
+	fail = true
+	mu.Unlock()
+
+	productMan, err := product.NewManager(opts)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer productMan.Close()
 
 	grpcHealth := health.NewServer()
-	handler := &Handler{
-		productMan: productMan,
-	}
-
+	handler := &Handler{productMan: productMan}
 	kubeHealth := NewKubeHealth(handler, grpcHealth)
-	err = kubeHealth.error()
-	exp := "products not loaded"
-	if err.Error() != exp {
-		t.Errorf("expected %s, got: %s", exp, err)
+
+	if err := kubeHealth.error(); err == nil || !strings.Contains(strings.ToLower(err.Error()), "products not loaded") {
+		t.Errorf("expected products not loaded, got: %v", err)
 	}
 
+	// 2. Allow success
+	mu.Lock()
 	fail = false
-	// give it a moment to load
-	time.Sleep(250 * time.Millisecond)
-	err = kubeHealth.error()
-	if err != nil {
-		t.Errorf("expected no error, got: %s", err)
+	mu.Unlock()
+
+	ready := false
+	for i := 0; i < 50; i++ {
+		if err := kubeHealth.error(); err == nil {
+			ready = true
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
 	}
 
-	// handler
+	if !ready {
+		t.Fatalf("kubeHealth never became ready; last error: %v", kubeHealth.error())
+	}
+
+	// 3. Test HTTP Handler (Success Case)
 	req := httptest.NewRequest("GET", "/", nil)
 	res := httptest.NewRecorder()
 	kubeHealth.HandlerFunc()(res, req)
 	if res.Code != 200 {
-		t.Errorf("expected 200, got: %d, body: %s", res.Code, res.Body)
+		t.Errorf("expected 200, got: %d", res.Code)
 	}
 
-	// grpc err
+	// 4. Force gRPC NOT_SERVING state
 	grpcHealth.SetServingStatus("", grpc_health_v1.HealthCheckResponse_NOT_SERVING)
 	err = kubeHealth.error()
-	if err.Error() != grpc_health_v1.HealthCheckResponse_NOT_SERVING.String() {
-		t.Errorf("expected %s, got: %s", exp, err)
+	
+	// Case-insensitive check for NOT_SERVING
+	if err == nil || !strings.Contains(strings.ToUpper(err.Error()), "NOT_SERVING") {
+		t.Errorf("expected error containing 'NOT_SERVING', got: %v", err)
 	}
 
-	// handler err
+	// 5. Verify HTTP Handler reflects the gRPC NOT_SERVING state (returns 500)
 	res = httptest.NewRecorder()
 	kubeHealth.HandlerFunc()(res, req)
 	if res.Code != 500 {
-		t.Errorf("expected 500, got: %d, body: %s", res.Code, res.Body)
+		t.Errorf("expected 500, got: %d", res.Code)
 	}
 }

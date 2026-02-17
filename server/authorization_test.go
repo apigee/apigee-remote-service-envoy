@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/apigee/apigee-remote-service-golib/v2/analytics"
-	"github.com/apigee/apigee-remote-service-golib/v2/auth"
 	libAuth "github.com/apigee/apigee-remote-service-golib/v2/auth"
 	apigeeContext "github.com/apigee/apigee-remote-service-golib/v2/context"
 	"github.com/apigee/apigee-remote-service-golib/v2/product"
@@ -165,7 +164,7 @@ func TestCheck(t *testing.T) {
 	}
 
 	// no matched products
-	testAuthMan.sendAuth(&auth.Context{
+	testAuthMan.sendAuth(&libAuth.Context{
 		APIProducts: []string{"no match"},
 	}, nil)
 	testProductMan.products = products
@@ -179,7 +178,7 @@ func TestCheck(t *testing.T) {
 	testProductMan.resolve = true
 
 	// no products authenticated
-	testAuthMan.sendAuth(&auth.Context{
+	testAuthMan.sendAuth(&libAuth.Context{
 		APIProducts: []string{},
 	}, nil)
 	if resp, err = server.Check(context.Background(), req); err != nil {
@@ -190,7 +189,7 @@ func TestCheck(t *testing.T) {
 	}
 
 	// valid auth
-	testAuthMan.sendAuth(&auth.Context{
+	testAuthMan.sendAuth(&libAuth.Context{
 		APIProducts: []string{"product1"},
 	}, nil)
 
@@ -361,7 +360,7 @@ func TestImmediateAnalytics(t *testing.T) {
 	}
 
 	testAuthMan := &testAuthMan{}
-	ac := &auth.Context{
+	ac := &libAuth.Context{
 		ClientID:         "client id",
 		AccessToken:      "token",
 		Application:      "app",
@@ -373,7 +372,7 @@ func TestImmediateAnalytics(t *testing.T) {
 		CustomAttributes: "{\"tier\":\"standard\"}",
 		AnalyticsProduct: "accepted-product",
 	}
-	testAuthMan.sendAuth(ac, auth.ErrBadAuth)
+	testAuthMan.sendAuth(ac, libAuth.ErrBadAuth)
 
 	testProductMan := &testProductMan{
 		resolve: true,
@@ -461,12 +460,12 @@ type testAuthMan struct {
 	apiKey          string
 	claims          map[string]interface{}
 	apiKeyClaimKey  string
-	makeContextFunc func(ctx apigeeContext.Context) (*auth.Context, error)
+	makeContextFunc func(ctx apigeeContext.Context) (*libAuth.Context, error)
 }
 
 func (a *testAuthMan) Close() {}
 func (a *testAuthMan) Authenticate(ctx apigeeContext.Context, apiKey string, claims map[string]interface{},
-	apiKeyClaimKey string) (*auth.Context, error) {
+	apiKeyClaimKey string) (*libAuth.Context, error) {
 	a.ctx = ctx
 	a.apiKey = apiKey
 	a.claims = claims
@@ -475,11 +474,11 @@ func (a *testAuthMan) Authenticate(ctx apigeeContext.Context, apiKey string, cla
 	return a.makeContextFunc(ctx)
 }
 
-func (a *testAuthMan) sendAuth(ac *auth.Context, err error) {
+func (a *testAuthMan) sendAuth(ac *libAuth.Context, err error) {
 	if ac == nil {
-		ac = &auth.Context{}
+		ac = &libAuth.Context{}
 	}
-	a.makeContextFunc = func(ctx apigeeContext.Context) (*auth.Context, error) {
+	a.makeContextFunc = func(ctx apigeeContext.Context) (*libAuth.Context, error) {
 		ac.Context = ctx
 		return ac, err
 	}
@@ -495,7 +494,7 @@ func (p *testProductMan) Close() {}
 func (p *testProductMan) Products() product.ProductsNameMap {
 	return p.products
 }
-func (p *testProductMan) Authorize(ac *auth.Context, api, path, method string) []product.AuthorizedOperation {
+func (p *testProductMan) Authorize(ac *libAuth.Context, api, path, method string) []product.AuthorizedOperation {
 	if !p.resolve {
 		return nil
 	}
@@ -519,7 +518,7 @@ type testQuotaMan struct {
 
 func (q *testQuotaMan) Start() {}
 func (q *testQuotaMan) Close() {}
-func (q *testQuotaMan) Apply(auth *auth.Context, p product.AuthorizedOperation, args quota.Args) (*quota.Result, error) {
+func (q *testQuotaMan) Apply(auth *libAuth.Context, p product.AuthorizedOperation, args quota.Args) (*quota.Result, error) {
 	if q.sendError != nil {
 		return nil, q.sendError
 	}

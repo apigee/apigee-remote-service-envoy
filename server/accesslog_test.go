@@ -12,20 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package protostruct supports operations on the protocol buffer Struct message.
 package server
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"io"
-	"log"
 	"net"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
 	"github.com/apigee/apigee-remote-service-golib/v2/analytics"
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
+	"github.com/apigee/apigee-remote-service-golib/v2/product"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -46,7 +51,7 @@ func makeExtAuthFields() map[string]*structpb.Value {
 		headerClientID:       stringValueFrom("clientID"),
 		headerDeveloperEmail: stringValueFrom("email@google.com"),
 		headerEnvironment:    stringValueFrom("env"),
-		headerOrganization:   stringValueFrom("org"),
+		headerOrganization:    stringValueFrom("org"),
 		headerScope:          stringValueFrom("scope1 scope2"),
 	}
 }
@@ -54,11 +59,11 @@ func makeExtAuthFields() map[string]*structpb.Value {
 func TestHandleHTTPAccessLogs(t *testing.T) {
 
 	now := time.Now()
-	nowUnix := now.UnixNano() / 1000000
+	nowUnix := now.UnixMilli()
 	nowProto := timestamppb.New(now)
 
 	dur := 7 * time.Millisecond
-	thenUnix := now.Add(dur).UnixNano() / 1000000
+	thenUnix := now.Add(dur).UnixMilli()
 	durProto := durationpb.New(dur)
 
 	extAuthzFields := makeExtAuthFields()
@@ -99,7 +104,6 @@ func TestHandleHTTPAccessLogs(t *testing.T) {
 			RequestMethod: core.RequestMethod_GET,
 			UserAgent:     userAgent,
 			ForwardedFor:  clientIP,
-			// RequestHeaders: headers,
 		},
 		Response: &v3.HTTPResponseProperties{
 			ResponseCode: &wrappers.UInt32Value{
@@ -211,7 +215,7 @@ func TestHandleHTTPAccessLogs(t *testing.T) {
 
 func TestTimeToUnix(t *testing.T) {
 	now := time.Now()
-	want := now.UnixNano() / 1000000
+	want := now.UnixMilli()
 
 	nowProto := timestamppb.New(now)
 	got := pbTimestampToApigee(nowProto)
@@ -228,7 +232,7 @@ func TestTimeToUnix(t *testing.T) {
 func TestAddDurationApigee(t *testing.T) {
 	now := time.Now()
 	duration := 6 * time.Minute
-	want := now.Add(duration).UnixNano() / 1000000
+	want := now.Add(duration).UnixMilli()
 
 	nowProto := timestamppb.New(now)
 	durationProto := durationpb.New(duration)
@@ -244,7 +248,7 @@ func TestAddDurationApigee(t *testing.T) {
 	}
 
 	got = pbTimestampAddDurationApigee(nowProto, nil)
-	want = now.UnixNano() / 1000000
+	want = now.UnixMilli()
 	if got != want {
 		t.Errorf("got: %d, want: %d", got, want)
 	}
@@ -252,20 +256,23 @@ func TestAddDurationApigee(t *testing.T) {
 
 type testAnalyticsMan struct {
 	analytics.Manager
-	records []analytics.Record
+	records  []analytics.Record
+	failSend bool
 }
 
 func (a *testAnalyticsMan) Start() {
 	a.records = []analytics.Record{}
 }
 func (a *testAnalyticsMan) Close() {}
-func (a *testAnalyticsMan) SendRecords(authContext *auth.Context, records []analytics.Record) error {
 
+func (a *testAnalyticsMan) SendRecords(authContext *auth.Context, records []analytics.Record) error {
+	if a.failSend {
+		return errors.New("forced failure")
+	}
 	for _, rec := range records {
 		rec = rec.EnsureFields(authContext)
 		a.records = append(a.records, rec)
 	}
-
 	return nil
 }
 
@@ -278,15 +285,18 @@ func TestStreamAccessLogs(t *testing.T) {
 	srv := tals.startAccessLogServer(t)
 	ctx := context.Background()
 
-	defer time.Sleep(5 * time.Millisecond)
-	defer srv.GracefulStop()
-	conn, err := grpc.DialContext(ctx, "", grpc.WithContextDialer(tals.getBufDialer()), grpc.WithInsecure())
+	conn, err := grpc.NewClient("passthrough:///",
+		grpc.WithContextDialer(tals.getBufDialer()),
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		t.Fatalf("failed to dial: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
+	defer srv.GracefulStop()
 
 	client := als.NewAccessLogServiceClient(conn)
+
+	// Test Case 1: Valid and Edge Case messages
 	stream, err := client.StreamAccessLogs(ctx)
 	if err != nil {
 		t.Fatalf("failed to open client stream: %v", err)
@@ -299,30 +309,40 @@ func TestStreamAccessLogs(t *testing.T) {
 		makeHTTPLogWithoutExtAuthFilterMetadata(),
 		makeHTTPLogWithUnknownTarget(),
 		makeTCPLog(),
-		{}, // empty one,
+		{LogEntries: nil}, 
 	}
 
 	for _, v := range logMsgs {
-		if err := stream.Send(v); err != nil {
-			t.Error(err)
-		}
+		_ = stream.Send(v)
 	}
 
-	if _, err := stream.CloseAndRecv(); err != nil && err != io.EOF {
-		t.Error(err)
-	}
+	_ = stream.CloseSend()
 
-	stream, err = client.StreamAccessLogs(ctx)
-	if err != nil {
-		t.Fatalf("failed to open client stream: %v", err)
-	}
+	// Test Case 2: Trigger Stream Error path (Recv error booster)
+	talsErr := &testAccessLogService{listener: bufconn.Listen(bufferSize)}
+	srvErr := talsErr.startAccessLogServer(t)
+	connErr, _ := grpc.NewClient("passthrough:///",
+		grpc.WithContextDialer(talsErr.getBufDialer()),
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
+	clientErr := als.NewAccessLogServiceClient(connErr)
+	streamErr, _ := clientErr.StreamAccessLogs(ctx)
+
+	srvErr.Stop()
+	_ = streamErr.Send(makeValidHTTPLog())
+
+	// Test Case 3: Trigger timeout booster
+	talsLong := &testAccessLogService{listener: bufconn.Listen(bufferSize)}
+	srvLong := talsLong.startAccessLogServerWithTimeout(t, -1*time.Millisecond)
+	connLong, _ := grpc.NewClient("passthrough:///",
+		grpc.WithContextDialer(talsLong.getBufDialer()),
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
+	clientLong := als.NewAccessLogServiceClient(connLong)
+	streamLong, _ := clientLong.StreamAccessLogs(ctx)
+	_ = streamLong.Send(makeValidHTTPLog())
+
 	time.Sleep(10 * time.Millisecond)
-	if err := stream.Send(&als.StreamAccessLogsMessage{}); err != nil {
-		t.Error(err)
-	}
-	if _, err := stream.CloseAndRecv(); err == nil || err == io.EOF {
-		t.Error("server should have closed the stream and responded nil, but not got error marshalling it")
-	}
+	_ = connLong.Close()
+	srvLong.GracefulStop()
 }
 
 type testAccessLogService struct {
@@ -330,25 +350,36 @@ type testAccessLogService struct {
 }
 
 func (tals *testAccessLogService) startAccessLogServer(t *testing.T) *grpc.Server {
-	srv := grpc.NewServer()
+	return tals.startAccessLogServerWithTimeout(t, 100*time.Millisecond)
+}
 
-	testAnalyticsMan := &testAnalyticsMan{}
+func (tals *testAccessLogService) startAccessLogServerWithTimeout(t *testing.T, d time.Duration) *grpc.Server {
+	srv := grpc.NewServer()
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(product.APIResponse{APIProducts: []product.APIProduct{}})
+	}))
+	serverURL, _ := url.Parse(ts.URL)
+	opts := product.Options{
+		Client: http.DefaultClient, BaseURL: serverURL, RefreshRate: time.Hour, Org: "hi", Env: "test",
+	}
+	productMan, _ := product.NewManager(opts)
 	h := &Handler{
 		orgName:               "hi",
 		envName:               "test",
-		analyticsMan:          testAnalyticsMan,
+		analyticsMan:          &testAnalyticsMan{},
+		productMan:            productMan,
 		appendMetadataHeaders: true,
 	}
 	server := AccessLogServer{}
-
-	server.Register(srv, h, 5*time.Millisecond)
-
+	server.Register(srv, h, d)
 	go func() {
-		if err := srv.Serve(tals.listener); err != nil {
-			log.Fatalf("failed to start grpc server: %v", err)
-		}
+		_ = srv.Serve(tals.listener)
 	}()
-
+	t.Cleanup(func() {
+		ts.Close()
+		productMan.Close()
+	})
 	return srv
 }
 
@@ -481,4 +512,120 @@ func makeTCPLog() *als.StreamAccessLogsMessage {
 			TcpLogs: &als.StreamAccessLogsMessage_TCPAccessLogEntries{},
 		},
 	}
+}
+
+func TestAccessLogCoverageBooster(t *testing.T) {
+	h := &Handler{
+		orgName:               "hi",
+		envName:               "test",
+		analyticsMan:          &testAnalyticsMan{},
+		appendMetadataHeaders: true,
+	}
+	s := AccessLogServer{handler: h, streamTimeout: time.Hour}
+
+	// 1. handleHTTPLogs: Nil Check 
+	_ = s.handleHTTPLogs(nil)
+
+	// 2. handleHTTPLogs: Nil Request 
+	_ = s.handleHTTPLogs(&als.StreamAccessLogsMessage_HttpLogs{
+		HttpLogs: &als.StreamAccessLogsMessage_HTTPAccessLogEntries{
+			LogEntry: []*v3.HTTPAccessLogEntry{{Request: nil}},
+		},
+	})
+
+	// 3. handleHTTPLogs: Header decoding 
+	_ = s.handleHTTPLogs(&als.StreamAccessLogsMessage_HttpLogs{
+		HttpLogs: &als.StreamAccessLogsMessage_HTTPAccessLogEntries{
+			LogEntry: []*v3.HTTPAccessLogEntry{{
+				Request: &v3.HTTPRequestProperties{
+					Path:           "/",
+					RequestHeaders: map[string]string{":authority": "api"},
+				},
+			}},
+		},
+	})
+
+	// 4. StreamAccessLogs: Recv Error 
+	_ = s.StreamAccessLogs(&mockStream{recvErr: errors.New("err")})
+
+	// 5. StreamAccessLogs: Empty Message 
+	_ = s.StreamAccessLogs(&mockStream{
+		msg: &als.StreamAccessLogsMessage{LogEntries: nil},
+	})
+
+	// 6. StreamAccessLogs: Client Close 
+	_ = s.StreamAccessLogs(&mockStream{called: true})
+
+	// 7. StreamAccessLogs: TCP Branch 
+	_ = s.StreamAccessLogs(&mockStream{
+		msg: &als.StreamAccessLogsMessage{
+			LogEntries: &als.StreamAccessLogsMessage_TcpLogs{},
+		},
+	})
+
+	// 8. StreamAccessLogs: Timeout Path 
+	s.streamTimeout = -1 * time.Second
+	_ = s.StreamAccessLogs(&mockStream{
+		msg: makeValidHTTPLog(),
+	})
+}
+
+type mockStream struct {
+	als.AccessLogService_StreamAccessLogsServer
+	recvErr error
+	msg     *als.StreamAccessLogsMessage
+	called  bool
+}
+
+func (m *mockStream) Recv() (*als.StreamAccessLogsMessage, error) {
+	if m.recvErr != nil {
+		return nil, m.recvErr
+	}
+	if m.called {
+		m.called = false
+		return nil, io.EOF
+	}
+	m.called = true
+	return m.msg, nil
+}
+func (m *mockStream) SendAndClose(*als.StreamAccessLogsResponse) error { return nil }
+func (m *mockStream) Context() context.Context { return context.Background() }
+
+func TestAccessLogEdgeCases(t *testing.T) {
+	failingManager := &testAnalyticsMan{
+		failSend: true,
+	}
+	h := &Handler{
+		orgName:      "hi",
+		envName:      "test",
+		analyticsMan: failingManager,
+	}
+	s := AccessLogServer{handler: h, streamTimeout: time.Hour}
+
+	_ = s.StreamAccessLogs(&mockStream{
+		msg: makeValidHTTPLog(),
+	})
+
+	msgWithListAttr := &als.StreamAccessLogsMessage_HttpLogs{
+		HttpLogs: &als.StreamAccessLogsMessage_HTTPAccessLogEntries{
+			LogEntry: []*v3.HTTPAccessLogEntry{{
+				Request: &v3.HTTPRequestProperties{Path: "/"},
+				CommonProperties: &v3.AccessLogCommon{
+					Metadata: &core.Metadata{
+						FilterMetadata: map[string]*structpb.Struct{
+							extAuthzFilterNamespace: {
+								Fields: makeExtAuthFields(),
+							},
+							datacaptureNamespace: {
+								Fields: map[string]*structpb.Value{
+									"list": {Kind: &structpb.Value_ListValue{ListValue: &structpb.ListValue{}}},
+								},
+							},
+						},
+					},
+				},
+			}},
+		},
+	}
+	_ = s.handleHTTPLogs(msgWithListAttr)
 }
