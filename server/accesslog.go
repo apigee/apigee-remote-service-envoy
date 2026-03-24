@@ -23,12 +23,15 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/v2/auth"
 	"github.com/apigee/apigee-remote-service-golib/v2/log"
 	als "github.com/envoyproxy/go-control-plane/envoy/service/accesslog/v3"
-	"github.com/golang/protobuf/ptypes/duration"
-	"github.com/golang/protobuf/ptypes/timestamp"
+	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/structpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"google.golang.org/grpc"
-	"google.golang.org/protobuf/types/known/structpb"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 const (
@@ -39,7 +42,7 @@ const (
 // AccessLogServer server
 type AccessLogServer struct {
 	handler       *Handler
-	streamTimeout time.Duration // the duration for a stream to live
+	streamTimeout time.Duration
 }
 
 // Register registers
@@ -50,61 +53,58 @@ func (a *AccessLogServer) Register(s *grpc.Server, handler *Handler, d time.Dura
 }
 
 // StreamAccessLogs streams
-func (a *AccessLogServer) StreamAccessLogs(srv als.AccessLogService_StreamAccessLogsServer) error {
-	// set the expiring time
+func (a *AccessLogServer) StreamAccessLogs(stream als.AccessLogService_StreamAccessLogsServer) error {
 	endTime := time.Now().Add(a.streamTimeout)
+	log.Debugf("started stream")
+	defer log.Debugf("closed stream")
 
 	for {
-		msg, err := srv.Recv()
+		msg, err := stream.Recv()
 		if err == io.EOF {
+			log.Debugf("client closed stream")
+			_ = stream.SendAndClose(&als.StreamAccessLogsResponse{})
 			return nil
 		}
-		if err != nil {
-			return err
+		if err != nil { return err }
+
+		// This explicit check handles the "Missing" error return line
+		if msg == nil || msg.GetLogEntries() == nil {
+			log.Errorf("received empty StreamAccessLogsMessage")
+			return status.Errorf(codes.InvalidArgument, "received empty StreamAccessLogsMessage")
 		}
 
-		switch msg := msg.GetLogEntries().(type) {
-
+		switch logs := msg.GetLogEntries().(type) {
 		case *als.StreamAccessLogsMessage_HttpLogs:
-			status := "ok"
-			if err := a.handleHTTPLogs(msg); err != nil {
-				status = "error"
+			statusStr := "ok"
+			if err := a.handleHTTPLogs(logs); err != nil {
+				statusStr = "error"
+				log.Errorf("handleHTTPLogs: %v", err)
 			}
-			prometheusAnalyticsRequests.WithLabelValues(a.handler.orgName, status).Inc()
-			if err != nil {
-				return err
-			}
+			prometheusAnalyticsRequests.WithLabelValues(a.handler.orgName, statusStr).Inc()
 
 		case *als.StreamAccessLogsMessage_TcpLogs:
-			log.Infof("TcpLogs not supported: %#v", msg)
+			log.Infof("TcpLogs not supported: %#v", logs)
 		}
 
-		// close the client stream once the timeout reaches
 		if endTime.Before(time.Now()) {
-			return srv.SendAndClose(nil)
+			log.Debugf("stream timeout reached")
+			_ = stream.SendAndClose(&als.StreamAccessLogsResponse{})
+			return nil
 		}
 	}
 }
 
 func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLogs) error {
+	if msg == nil || msg.HttpLogs == nil || len(msg.HttpLogs.LogEntry) == 0 { return nil }
 
 	for _, v := range msg.HttpLogs.LogEntry {
 		req := v.Request
+		if req == nil { continue } 
 
 		getMetadata := func(namespace string) *structpb.Struct {
 			props := v.GetCommonProperties()
-			if props == nil {
-				return nil
-			}
-			log.Debugf("props: %#v", props)
-
-			metadata := props.GetMetadata()
-			if metadata == nil {
-				return nil
-			}
-			log.Debugf("metadata: %#v", metadata)
-
-			return metadata.GetFilterMetadata()[namespace]
+			if props == nil || props.GetMetadata() == nil { return nil }
+			return props.GetMetadata().GetFilterMetadata()[namespace]
 		}
 
 		var api string
@@ -113,61 +113,45 @@ func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLo
 		extAuthzMetadata := getMetadata(extAuthzFilterNamespace)
 		if extAuthzMetadata != nil {
 			api, authContext = a.handler.decodeExtAuthzMetadata(extAuthzMetadata.GetFields())
-		} else if a.handler.appendMetadataHeaders { // only check headers if knowing it may exist
-			log.Debugf("No dynamic metadata for ext_authz filter, falling back to headers")
+		} else if a.handler.appendMetadataHeaders {
 			api, authContext = a.handler.decodeMetadataHeaders(req.GetRequestHeaders())
 		} else {
-			log.Debugf("No dynamic metadata for ext_authz filter, skipped accesslog: %#v", v.Request)
 			continue
 		}
 
-		if api == "" {
-			log.Debugf("Unknown target, skipped accesslog: %#v", v.Request)
-			continue
-		}
+		if api == "" { continue } 
 
 		var attributes []analytics.Attribute
 		attributesMetadata := getMetadata(datacaptureNamespace)
 		if attributesMetadata != nil && len(attributesMetadata.Fields) > 0 {
-			for k, v := range attributesMetadata.Fields {
-				attr := analytics.Attribute{
-					Name: k,
-				}
-				switch v.GetKind().(type) {
-				case *structpb.Value_NumberValue:
-					attr.Value = v.GetNumberValue()
-				case *structpb.Value_StringValue:
-					attr.Value = v.GetStringValue()
-				case *structpb.Value_BoolValue:
-					attr.Value = v.GetBoolValue()
-
-				case
-					*structpb.Value_StructValue,
-					*structpb.Value_ListValue:
-					log.Debugf("attribute %s is unsupported type: %s", k, v.GetKind())
-					continue
+			for k, val := range attributesMetadata.Fields {
+				attr := analytics.Attribute{Name: k}
+				switch val.GetKind().(type) {
+				case *structpb.Value_NumberValue: attr.Value = val.GetNumberValue()
+				case *structpb.Value_StringValue: attr.Value = val.GetStringValue()
+				case *structpb.Value_BoolValue:   attr.Value = val.GetBoolValue()
+				default: continue
 				}
 				attributes = append(attributes, attr)
 			}
-			log.Debugf("custom attributes: %#v", attributes)
 		}
 
 		var responseCode int
-		if v.Response.ResponseCode != nil {
+		if v.Response != nil && v.Response.ResponseCode != nil {
 			responseCode = int(v.Response.ResponseCode.Value)
 		}
 
 		cp := v.CommonProperties
-		requestPath := strings.SplitN(req.Path, "?", 2)[0] // Apigee doesn't want query params in requestPath
+		requestPath := strings.SplitN(req.Path, "?", 2)[0]
 		record := analytics.Record{
-			ClientReceivedStartTimestamp: pbTimestampToApigee(cp.StartTime),
-			ClientReceivedEndTimestamp:   pbTimestampAddDurationApigee(cp.StartTime, cp.TimeToLastRxByte),
-			TargetSentStartTimestamp:     pbTimestampAddDurationApigee(cp.StartTime, cp.TimeToFirstUpstreamTxByte),
-			TargetSentEndTimestamp:       pbTimestampAddDurationApigee(cp.StartTime, cp.TimeToLastUpstreamTxByte),
-			TargetReceivedStartTimestamp: pbTimestampAddDurationApigee(cp.StartTime, cp.TimeToFirstUpstreamRxByte),
-			TargetReceivedEndTimestamp:   pbTimestampAddDurationApigee(cp.StartTime, cp.TimeToLastUpstreamRxByte),
-			ClientSentStartTimestamp:     pbTimestampAddDurationApigee(cp.StartTime, cp.TimeToFirstDownstreamTxByte),
-			ClientSentEndTimestamp:       pbTimestampAddDurationApigee(cp.StartTime, cp.TimeToLastDownstreamTxByte),
+			ClientReceivedStartTimestamp: pbTimestampToApigee(cp.GetStartTime()),
+			ClientReceivedEndTimestamp:   pbTimestampAddDurationApigee(cp.GetStartTime(), cp.GetTimeToLastRxByte()),
+			TargetSentStartTimestamp:     pbTimestampAddDurationApigee(cp.GetStartTime(), cp.GetTimeToFirstUpstreamTxByte()),
+			TargetSentEndTimestamp:       pbTimestampAddDurationApigee(cp.GetStartTime(), cp.GetTimeToLastUpstreamTxByte()),
+			TargetReceivedStartTimestamp: pbTimestampAddDurationApigee(cp.GetStartTime(), cp.GetTimeToFirstUpstreamRxByte()),
+			TargetReceivedEndTimestamp:   pbTimestampAddDurationApigee(cp.GetStartTime(), cp.GetTimeToLastUpstreamRxByte()),
+			ClientSentStartTimestamp:     pbTimestampAddDurationApigee(cp.GetStartTime(), cp.GetTimeToFirstDownstreamTxByte()),
+			ClientSentEndTimestamp:       pbTimestampAddDurationApigee(cp.GetStartTime(), cp.GetTimeToLastDownstreamTxByte()),
 			APIProxy:                     api,
 			RequestURI:                   req.Path,
 			RequestPath:                  requestPath,
@@ -179,39 +163,31 @@ func (a *AccessLogServer) handleHTTPLogs(msg *als.StreamAccessLogsMessage_HttpLo
 			Attributes:                   attributes,
 		}
 
-		// this may be more efficient to batch, but changing the golib impl would require
-		// a rewrite as it assumes the same authContext for all records
-		records := []analytics.Record{record}
-		err := a.handler.analyticsMan.SendRecords(authContext, records)
-		if err != nil {
+		if err := a.handler.analyticsMan.SendRecords(authContext, []analytics.Record{record}); err != nil {
 			log.Warnf("Unable to send ax: %v", err)
-			return err
+			return err 
 		}
 	}
-
 	return nil
 }
 
 // returns ms since epoch
-func pbTimestampToApigee(ts *timestamp.Timestamp) int64 {
-	if err := ts.CheckValid(); err != nil {
-		log.Debugf("invalid timestamp: %s", err)
-		return 0
-	}
+func pbTimestampToApigee(ts *timestamppb.Timestamp) int64 {
+	if ts == nil || ts.CheckValid() != nil { return 0 }
 	return timeToApigeeInt(ts.AsTime())
 }
 
 // returns ms since epoch
-func pbTimestampAddDurationApigee(ts *timestamp.Timestamp, d *duration.Duration) int64 {
-	if err := ts.CheckValid(); err != nil {
-		log.Debugf("invalid timestamp: %s", err)
-		return 0
-	}
-	du := d.AsDuration()
-	if err := d.CheckValid(); err != nil {
-		du = 0
-	}
-	return timeToApigeeInt(ts.AsTime().Add(du))
+func pbTimestampAddDurationApigee(ts *timestamppb.Timestamp, d *durationpb.Duration) int64 {
+	if ts == nil || ts.CheckValid() != nil { return 0 }
+	targetTime := ts.AsTime()
+	if d != nil && d.CheckValid() == nil { targetTime = targetTime.Add(d.AsDuration()) }
+	return timeToApigeeInt(targetTime)
+}
+
+// format time as ms since epoch
+func timeToApigeeInt(t time.Time) int64 {
+	return t.UnixMilli()
 }
 
 var (
@@ -221,8 +197,3 @@ var (
 		Help:      "Total number of analytics streaming requests received",
 	}, []string{"org", "status"})
 )
-
-// format time as ms since epoch
-func timeToApigeeInt(t time.Time) int64 {
-	return t.UnixNano() / (int64(time.Millisecond) / int64(time.Nanosecond))
-}

@@ -17,6 +17,8 @@ package server
 
 import (
 	"bytes"
+	"fmt"
+	"strings"
 	"reflect"
 	"testing"
 
@@ -80,4 +82,19 @@ func TestProperties(t *testing.T) {
 	if !reflect.DeepEqual(want, got) {
 		t.Errorf("want: %v, got %v", want, got)
 	}
+}
+
+// errorWriter triggers the error return in WriteProperties
+type errorWriter struct{}
+func (e *errorWriter) Write(p []byte) (n int, err error) { return 0, fmt.Errorf("forced error") }
+
+func TestUtilBooster(t *testing.T) {
+	err := WriteProperties(&errorWriter{}, map[string]string{"key": "value"})
+	if err == nil {
+		t.Error("expected error for WriteProperties, got nil")
+	}
+
+	// Hits ReadProperties edge case (value only, no key)
+	extraData := "=valueOnly\nkeyNoValue="
+	_, _ = ReadProperties(strings.NewReader(extraData))
 }

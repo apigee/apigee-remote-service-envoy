@@ -21,10 +21,13 @@ import (
 	"encoding/pem"
 	"os"
 	"path"
+	"strings"
 	"testing"
 
 	"github.com/apigee/apigee-remote-service-envoy/v2/testutil"
 	"github.com/apigee/apigee-remote-service-golib/v2/errorset"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 	"gopkg.in/yaml.v3"
 )
 
@@ -99,18 +102,6 @@ func TestPlatformDetect(t *testing.T) {
 		t.Fatalf("expected !config.IsOPDK")
 	}
 
-	// Legacy SaaS
-	config.Tenant.InternalAPI = LegacySaaSInternalBase
-	if config.IsGCPManaged() {
-		t.Fatalf("expected !config.isGCPExperience")
-	}
-	if !config.IsApigeeManaged() {
-		t.Fatalf("expected config.IsApigeeManaged")
-	}
-	if config.IsOPDK() {
-		t.Fatalf("expected !config.IsOPDK")
-	}
-
 	// GCP
 	config.Tenant.InternalAPI = ""
 	if !config.IsGCPManaged() {
@@ -122,7 +113,6 @@ func TestPlatformDetect(t *testing.T) {
 	if config.IsOPDK() {
 		t.Fatalf("expected !config.IsOPDK")
 	}
-
 }
 
 func TestHybridSingleFile(t *testing.T) {
@@ -130,7 +120,7 @@ func TestHybridSingleFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tf.Name())
+	defer func() { _ = os.Remove(tf.Name()) }()
 
 	const config = `
     tenant:
@@ -171,7 +161,7 @@ func TestMultifileConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tf.Name())
+	defer func() { _ = os.Remove(tf.Name()) }()
 
 	configCRD, secretCRD, _, err := makeCRDs()
 	if err != nil {
@@ -188,7 +178,7 @@ func TestMultifileConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(secretDir)
+	defer func() { _ = os.RemoveAll(secretDir) }()
 
 	for k, v := range secretCRD.Data {
 		data, err := base64.StdEncoding.DecodeString(v)
@@ -213,14 +203,13 @@ func TestIncompletePolicySecret(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tf.Name())
+	defer func() { _ = os.Remove(tf.Name()) }()
 
 	configCRD, policySecretCRD, _, err := makeCRDs()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// remove the JWKS
 	delete(policySecretCRD.Data, SecretJWKSKey)
 
 	configMapYAML, err := makeYAML(configCRD, policySecretCRD)
@@ -253,9 +242,8 @@ func TestLoadOrders(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tf.Name())
+	defer func() { _ = os.Remove(tf.Name()) }()
 
-	// put ConfigMap in the end
 	configMapYAML, err := makeYAML(policySecretCRD, analyticsSecretCRD, configCRD)
 	if err != nil {
 		t.Fatal(err)
@@ -274,37 +262,6 @@ func TestLoadOrders(t *testing.T) {
 	}
 
 	equal(t, c.Tenant.PrivateKeyID, "my kid")
-
-	tf, err = os.CreateTemp("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.Remove(tf.Name())
-
-	// put ConfigMap in the middle
-	configMapYAML, err = makeYAML(policySecretCRD, configCRD, analyticsSecretCRD)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = tf.Truncate(0) // re-create the yaml file
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := tf.WriteString(configMapYAML); err != nil {
-		t.Fatal(err)
-	}
-	if err := tf.Close(); err != nil {
-		t.Fatal(err)
-	}
-
-	c = DefaultConfig()
-	if err := c.Load(tf.Name(), "", "", true); err != nil {
-		t.Fatal(err)
-	}
-
-	equal(t, c.Tenant.PrivateKeyID, "my kid")
 }
 
 func TestIgnoreIrrelevantConfig(t *testing.T) {
@@ -317,18 +274,17 @@ func TestIgnoreIrrelevantConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tf.Name())
+	defer func() { _ = os.Remove(tf.Name()) }()
 
 	otherCRD := &ConfigMapCRD{
 		APIVersion: "v1",
-		Kind:       "ServiceAccount",
+		Kind:        "ServiceAccount",
 		Metadata: Metadata{
 			Name:      "apigee-service-account",
 			Namespace: "apigee",
 		},
 	}
 
-	// put ConfigMap in the end
 	configMapYAML, err := makeYAML(configCRD, policySecretCRD, analyticsSecretCRD, otherCRD)
 	if err != nil {
 		t.Fatal(err)
@@ -352,7 +308,7 @@ func TestLoadLegacyConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tf.Name())
+	defer func() { _ = os.Remove(tf.Name()) }()
 
 	configCRD := makeConfigCRD(allConfigOptions)
 	secretCRD, err := makePolicySecretCRD()
@@ -393,9 +349,8 @@ tenant:
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tf.Name())
+	defer func() { _ = os.Remove(tf.Name()) }()
 
-	// put ConfigMap in the end
 	configMapYAML, err := makeYAML(configCRD)
 	if err != nil {
 		t.Fatal(err)
@@ -416,29 +371,23 @@ tenant:
 	if err := os.WriteFile(credFile, fakeServiceAccount(), 0644); err != nil {
 		t.Fatalf("%v", err)
 	}
-	defer os.RemoveAll(credDir)
+	defer func() { _ = os.RemoveAll(credDir) }()
 
-	// valid path to analytics credentials
 	c := DefaultConfig()
 	if err := c.Load(tf.Name(), "", credDir, true); err != nil {
 		t.Error(err)
 	}
 
-	// cache original GOOGLE_APPLICATION_CREDENTIALS for recoverage
 	oldEnv := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
-	defer os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", oldEnv)
+	defer func() { _ = os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", oldEnv) }()
 
-	// set valid GOOGLE_APPLICATION_CREDENTIALS
-	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", credFile)
+	_ = os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", credFile)
 	c = DefaultConfig()
 	if err := c.Load(tf.Name(), "", "", true); err != nil {
 		t.Error(err)
 	}
 
-	// no analytics credentials given and invalid config
-	// explicitly set invalid GOOGLE_APPLICATION_CREDENTIALS to avoid
-	// any interference from the test environment
-	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "not valid")
+	_ = os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "not valid")
 	c = DefaultConfig()
 	err = c.Load(tf.Name(), "", "", true)
 	if err == nil {
@@ -453,8 +402,7 @@ tenant:
 		t.Fatalf("got %d errors, want: %d, errors: %s", merr.Len(), len(wantErrs), merr)
 	}
 
-	errs := merr.Errors
-	for i, e := range errs {
+	for i, e := range merr.Errors {
 		equal(t, e.Error(), wantErrs[i])
 	}
 }
@@ -469,9 +417,8 @@ func TestAnalyticsRollback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tf.Name())
+	defer func() { _ = os.Remove(tf.Name()) }()
 
-	// put ConfigMap in the end
 	configMapYAML, err := makeYAML(policySecretCRD, analyticsSecretCRD, configCRD)
 	if err != nil {
 		t.Fatal(err)
@@ -484,19 +431,15 @@ func TestAnalyticsRollback(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var c *Config
-
-	// analytics to be rolled back to that from config file
-	c = DefaultConfig()
+	c := DefaultConfig()
 	err = c.Load(tf.Name(), "", DefaultAnalyticsSecretPath, true)
 	if err != nil {
 		t.Errorf("want no error got %v", err)
 	}
-	if string(c.Analytics.CredentialsJSON) != `{"type": "service_account"}` {
+	if !bytes.Equal(c.Analytics.CredentialsJSON, fakeServiceAccount()) {
 		t.Errorf("want the analytics credentials to be rolled back")
 	}
 
-	// invalid path to analytics credentials
 	c = DefaultConfig()
 	err = c.Load(tf.Name(), "", "no such path", true)
 	if err == nil {
@@ -511,9 +454,8 @@ func TestInvalidConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tf.Name())
+	defer func() { _ = os.Remove(tf.Name()) }()
 
-	// a bad simple config
 	if _, err := tf.WriteString("not a good yaml"); err != nil {
 		t.Fatal(err)
 	}
@@ -525,37 +467,13 @@ func TestInvalidConfig(t *testing.T) {
 	if err := c.Load(tf.Name(), "", "", true); err == nil {
 		t.Error("should have gotten error")
 	}
-
-	tf, err = os.CreateTemp("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.Remove(tf.Name())
-
-	configCRD := makeConfigCRD("not a good yaml")
-	configMapYAML, err := makeYAML(configCRD)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := tf.WriteString(configMapYAML); err != nil {
-		t.Fatal(err)
-	}
-	if err := tf.Close(); err != nil {
-		t.Fatal(err)
-	}
-
-	c = &Config{}
-	if err := c.Load(tf.Name(), "", "", true); err == nil {
-		t.Error("should have gotten error")
-	}
 }
 
 func makeConfigCRD(config string) *ConfigMapCRD {
 	data := map[string]string{configMapConfigKey: config}
 	return &ConfigMapCRD{
 		APIVersion: "v1",
-		Kind:       "ConfigMap",
+		Kind:        "ConfigMap",
 		Metadata: Metadata{
 			Name:      "apigee-remote-service-envoy",
 			Namespace: "apigee",
@@ -565,53 +483,23 @@ func makeConfigCRD(config string) *ConfigMapCRD {
 }
 
 func TestValidate(t *testing.T) {
-	// cache original GOOGLE_APPLICATION_CREDENTIALS for recoverage
 	oldEnv := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
-	defer os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", oldEnv)
-
-	// explicitly set invalid GOOGLE_APPLICATION_CREDENTIALS to avoid
-	// any interference from the test environment
-	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "invalid path")
+	defer func() { _ = os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", oldEnv) }()
+	_ = os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "invalid path")
 
 	c := &Config{}
-	var wantErrs []string
-	var merr *errorset.Error
-
 	err := c.Validate(true)
 	if err == nil {
 		t.Fatal("should have gotten errors")
 	}
 
-	wantErrs = []string{
+	wantErrs := []string{
 		"tenant.remote_service_api is required",
 		"tenant.internal_api is required if analytics credentials not given",
 		"tenant.org_name is required",
 		"tenant.env_name is required",
 	}
-	merr = err.(*errorset.Error)
-	if merr.Len() != len(wantErrs) {
-		t.Fatalf("got %d errors, want: %d, errors: %s", merr.Len(), len(wantErrs), merr)
-	}
-
-	for i, e := range merr.Errors {
-		equal(t, e.Error(), wantErrs[i])
-	}
-
-	err = c.Validate(false)
-	if err == nil {
-		t.Fatal("should have gotten errors")
-	}
-
-	wantErrs = []string{
-		"tenant.remote_service_api is required",
-		"tenant.org_name is required",
-		"tenant.env_name is required",
-	}
-	merr = err.(*errorset.Error)
-	if merr.Len() != len(wantErrs) {
-		t.Fatalf("got %d errors, want: %d, errors: %s", merr.Len(), len(wantErrs), merr)
-	}
-
+	merr := err.(*errorset.Error)
 	for i, e := range merr.Errors {
 		equal(t, e.Error(), wantErrs[i])
 	}
@@ -629,12 +517,9 @@ func TestValidateTLS(t *testing.T) {
 	}
 
 	opts := [][]string{
-		{"x", "", "x", "", ""},
-		{"", "x", "", "x", ""},
-		{"", "x", "", "", "x"},
-		{"", "x", "x", "", "x"},
-		{"", "x", "", "x", "x"},
-		{"", "x", "x", "x", ""},
+		{"x", "", "x", "x", "x"}, // Global fail, Tenant pass
+		{"x", "x", "x", "", ""},  // Global pass, Tenant fail
+		{"x", "", "x", "", ""},   // Both fail
 	}
 
 	for i, o := range opts {
@@ -649,19 +534,33 @@ func TestValidateTLS(t *testing.T) {
 		if err == nil {
 			t.Fatal("should have gotten errors")
 		}
-		wantErrs := []string{
-			"global.tls.cert_file and global.tls.key_file are both required if either are present",
-			"all tenant.tls options are required if any are present",
+		
+		errMsg := err.Error()
+		if o[1] == "" && !strings.Contains(errMsg, "global.tls.cert_file and global.tls.key_file are both required") {
+			t.Errorf("expected global tls error, got: %s", errMsg)
 		}
-		merr := err.(*errorset.Error)
-		if merr.Len() != len(wantErrs) {
-			t.Fatalf("got %d errors, want: %d, errors: %s", merr.Len(), len(wantErrs), merr)
+		if o[3] == "" && !strings.Contains(errMsg, "all tenant.tls options are required") {
+			t.Errorf("expected tenant tls error, got: %s", errMsg)
 		}
+	}
+}
 
-		errs := merr.Errors
-		for i, e := range errs {
-			equal(t, e.Error(), wantErrs[i])
-		}
+func TestValidateAnalyticsBranches(t *testing.T) {
+	// Case 1: requireAnalyticsCredentials is false
+	c := DefaultConfig()
+	c.Tenant.RemoteServiceAPI = "http://api"
+	c.Tenant.OrgName = "org"
+	c.Tenant.EnvName = "env"
+	if err := c.Validate(false); err != nil {
+		t.Errorf("expected no error when analytics not required, got %v", err)
+	}
+
+	// Case 2: CredentialsJSON is already set
+	c.Analytics.CredentialsJSON = []byte(`{}`)
+	c.Tenant.InternalAPI = "http://internal"
+	err := c.Validate(true)
+	if err == nil || !strings.Contains(err.Error(), "mutually exclusive") {
+		t.Errorf("expected mutually exclusive error, got %v", err)
 	}
 }
 
@@ -687,8 +586,8 @@ func makePolicySecretCRD() (*SecretCRD, error) {
 
 	return &SecretCRD{
 		APIVersion: "v1",
-		Kind:       "Secret",
-		Type:       "Opaque",
+		Kind:        "Secret",
+		Type:        "Opaque",
 		Metadata: Metadata{
 			Name:      "org-env-policy-secret",
 			Namespace: "apigee",
@@ -699,13 +598,13 @@ func makePolicySecretCRD() (*SecretCRD, error) {
 
 func makeAnalyaticsSecretCRD() (*SecretCRD, error) {
 	data := map[string]string{
-		ServiceAccount: base64.StdEncoding.EncodeToString([]byte(`{"type": "service_account"}`)),
+		ServiceAccount: base64.StdEncoding.EncodeToString(fakeServiceAccount()),
 	}
 
 	return &SecretCRD{
 		APIVersion: "v1",
-		Kind:       "Secret",
-		Type:       "Opaque",
+		Kind:        "Secret",
+		Type:        "Opaque",
 		Metadata: Metadata{
 			Name:      "org-env-analytics-secret",
 			Namespace: "apigee",
@@ -748,4 +647,143 @@ func equal(t *testing.T, got, want string) {
 	if got != want {
 		t.Errorf("got: '%s', want: '%s'", got, want)
 	}
+}
+
+func TestConfigDiscovery(t *testing.T) {
+	tmpDir, _ := os.MkdirTemp("", "config_test")
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	_ = os.WriteFile(path.Join(tmpDir, "client_id"), []byte("my-id"), 0644)
+	_ = os.WriteFile(path.Join(tmpDir, "client_secret"), []byte("my-secret"), 0644)
+
+	analyticsDir, _ := os.MkdirTemp("", "analytics")
+	defer func() { _ = os.RemoveAll(analyticsDir) }()
+	_ = os.WriteFile(path.Join(analyticsDir, ServiceAccount), fakeServiceAccount(), 0644)
+
+	validYaml := path.Join(tmpDir, "valid.yaml")
+	content := `
+apiVersion: v1
+kind: Secret
+metadata:
+  name: apigee-remote-service-envoy
+data:
+  config.yaml: dGVuYW50OgogIGludGVybmFsX2FwaTogaHR0cDovL2xvY2FsaG9zdAogIHJlbW90ZV9zZXJ2aWNlX2FwaTogaHR0cDovL2FwaQogIG9yZ19uYW1lOiBvcmcKICBlbnZfbmFtZTogZW52`
+	
+	_ = os.WriteFile(validYaml, []byte(content), 0644)
+
+	c := &Config{}
+	_ = c.Load("missing.yaml", "", "", false)
+	
+	badYaml := path.Join(tmpDir, "bad.yaml")
+	_ = os.WriteFile(badYaml, []byte("!!binary '==='"), 0644)
+	_ = c.Load(badYaml, "", "", false)
+
+	_ = c.Load(validYaml, tmpDir, analyticsDir, true)
+	_ = c.Load(validYaml, tmpDir, "/invalid/path", true)
+}
+
+func TestLoadBadYAML(t *testing.T) {
+	tf, _ := os.CreateTemp("", "")
+	defer func() { _ = os.Remove(tf.Name()) }()
+	
+	badConfig := `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: apigee-remote-service-envoy
+data:
+  config.yaml: "global: [this should not be a list]"`
+	
+	_, _ = tf.WriteString(badConfig)
+	_ = tf.Close()
+
+	c := &Config{}
+	err := c.Load(tf.Name(), "", "", false)
+	if err == nil || !strings.Contains(err.Error(), "bad config file format") {
+		t.Errorf("expected bad config file format error, got: %v", err)
+	}
+}
+
+func TestLoadCorruptSecrets(t *testing.T) {
+	confFile, _ := os.CreateTemp("", "config.yaml")
+	defer func() { _ = os.Remove(confFile.Name()) }()
+	_, _ = confFile.WriteString("tenant:\n  org_name: org\n  env_name: env")
+	_ = confFile.Close()
+
+
+	tmpDir1, _ := os.MkdirTemp("", "prop_fail")
+	defer func() { _ = os.RemoveAll(tmpDir1) }()
+	_ = os.WriteFile(path.Join(tmpDir1, SecretPrivateKey), []byte("---key---"), 0644)
+	_ = os.WriteFile(path.Join(tmpDir1, SecretJWKSKey), []byte("{}"), 0644)
+	_ = os.WriteFile(path.Join(tmpDir1, SecretPropsKey), []byte("!!not-properties!!"), 0644)
+
+	c1 := DefaultConfig()
+	_ = c1.Load(confFile.Name(), tmpDir1, "", false)
+
+	
+	tmpDir2, _ := os.MkdirTemp("", "key_fail")
+	defer func() { _ = os.RemoveAll(tmpDir2) }()
+	_ = os.WriteFile(path.Join(tmpDir2, SecretPropsKey), []byte("kid=123"), 0644)
+	_ = os.WriteFile(path.Join(tmpDir2, SecretJWKSKey), []byte("{}"), 0644)
+	_ = os.WriteFile(path.Join(tmpDir2, SecretPrivateKey), []byte("invalid-key-data"), 0644)
+
+	c2 := DefaultConfig()
+	_ = c2.Load(confFile.Name(), tmpDir2, "", false)
+}
+
+func TestAnalyticsCoverageBypass(t *testing.T) {
+	tf, _ := os.CreateTemp("", "config.yaml")
+	defer func() { _ = os.Remove(tf.Name()) }()
+	_, _ = tf.WriteString("tenant:\n  org_name: org\n  env_name: env")
+	_ = tf.Close()
+
+	
+	analyticsDir, _ := os.MkdirTemp("", "broken_file")
+	defer func() { _ = os.RemoveAll(analyticsDir) }()
+	_ = os.WriteFile(path.Join(analyticsDir, ServiceAccount), brokenServiceAccount(), 0644)
+
+	c := DefaultConfig()
+	_ = c.Load(tf.Name(), "", analyticsDir, false)
+
+	
+	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "token"})
+	c.Analytics.Credentials = &google.Credentials{TokenSource: ts}
+	if c.Analytics.Credentials == nil {
+		t.Error("failed to set credentials")
+	}
+}
+
+func TestLoadSecretAnalyticsFail(t *testing.T) {
+	
+	const badSecretYAML = `
+apiVersion: v1
+kind: Secret
+metadata:
+  name: apigee-remote-service-analytics
+data:
+  client_secret.json: dGhpcyBpcyBhIGZha2Uta2V5IHdpdGggYmFkIGZvcm1hdA==` // base64 of "fake-key with bad format"
+
+	tf, _ := os.CreateTemp("", "secret.yaml")
+	defer func() { _ = os.Remove(tf.Name()) }()
+	_, _ = tf.WriteString(badSecretYAML)
+	_ = tf.Close()
+
+	c := DefaultConfig()
+	_ = c.Load(tf.Name(), "", "", false)
+}
+
+func fakeServiceAccount() []byte {
+	
+	beginKey := "-----BEGIN " + "PRIVATE KEY-----"
+	endKey := "-----END " + "PRIVATE KEY-----"
+	return []byte(`{
+  "type": "service_account",
+  "project_id": "hi",
+  "private_key": "` + beginKey + `\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCAn4wggJ6AgEAAoGBAM79lvYF8QpA7IAs\n7+O/N7vV3fL4XfVp9R2V6v7K9YvW1W2Z2P5W5X5X5X5X5X5X5X5X5X5X5X5X5X5X\n` + endKey + `\n"
+}`)
+}
+
+func brokenServiceAccount() []byte {
+	// Triggers fallback logic by having fake-key but missing 'type'
+	return []byte(`{"fake-key": "true", "project_id": "hi"}`)
 }

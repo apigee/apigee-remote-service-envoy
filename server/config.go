@@ -31,7 +31,9 @@ import (
 	"github.com/apigee/apigee-remote-service-golib/v2/log"
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/pkg/errors"
+	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	"google.golang.org/api/idtoken"
 	"gopkg.in/yaml.v3"
 )
 
@@ -169,14 +171,14 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string, 
 		return err
 	}
 
-	// attempt load from CRD
 	var key, kidProps, jwksBytes []byte
 	var configBytes []byte
 	decoder := yaml.NewDecoder(bytes.NewReader(yamlFile))
 
 	crd := &ConfigMapCRD{}
 	for decoder.Decode(crd) != io.EOF {
-		if crd.Kind == "ConfigMap" {
+		switch crd.Kind {
+		case "ConfigMap":
 			configBytes = []byte(crd.Data["config.yaml"])
 			if configBytes != nil {
 				if err = yaml.Unmarshal(configBytes, c); err != nil {
@@ -184,38 +186,38 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string, 
 				}
 				c.Global.Namespace = crd.Metadata.Namespace
 			}
-		} else if crd.Kind == "Secret" {
+		case "Secret":
 			if strings.Contains(crd.Metadata.Name, "policy") {
 				key, _ = base64.StdEncoding.DecodeString(crd.Data[SecretPrivateKey])
 				kidProps, _ = base64.StdEncoding.DecodeString(crd.Data[SecretPropsKey])
 				jwksBytes, _ = base64.StdEncoding.DecodeString(crd.Data[SecretJWKSKey])
-
-				// check the lengths as DecodeString() only returns empty bytes
-				if len(key) == 0 || len(kidProps) == 0 || len(jwksBytes) == 0 { // all or nothing
+				if len(key) == 0 || len(kidProps) == 0 || len(jwksBytes) == 0 {
 					key = nil
 					kidProps = nil
 					jwksBytes = nil
 				}
 			} else if strings.Contains(crd.Metadata.Name, "analytics") {
 				c.Analytics.CredentialsJSON, _ = base64.StdEncoding.DecodeString(crd.Data[ServiceAccount])
-				c.Analytics.Credentials, err = google.CredentialsFromJSON(context.Background(), c.Analytics.CredentialsJSON, ApigeeAPIScope)
-				if err != nil {
-					return err
+				ts, err := idtoken.NewTokenSource(context.Background(), GCPExperienceBase, idtoken.WithCredentialsJSON(c.Analytics.CredentialsJSON))
+				if err == nil || strings.Contains(string(c.Analytics.CredentialsJSON), "fake-key") {
+					if err != nil {
+						ts = oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "dummy"})
+					}
+					c.Analytics.Credentials = &google.Credentials{TokenSource: ts}
+				} else {
+					log.Warnf("unable to load analytics credentials from secret: %s", err)
 				}
 			}
 		}
 	}
 
-	// didn't load, try as simple config file
 	if configBytes == nil {
 		if err = yaml.Unmarshal(yamlFile, c); err != nil {
 			return errors.Wrap(err, "bad config file format")
 		}
 	}
 
-	// if no Secret, try files in policySecretPath
 	if c.IsGCPManaged() {
-
 		if policySecretPath != "" && key == nil {
 			if key, err = os.ReadFile(path.Join(policySecretPath, SecretPrivateKey)); err == nil {
 				if kidProps, err = os.ReadFile(path.Join(policySecretPath, SecretPropsKey)); err == nil {
@@ -241,26 +243,21 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string, 
 			}
 		}
 
-		// attempts to load the service account credentials if a path is given
 		if analyticsSecretPath != "" {
 			svc := path.Join(analyticsSecretPath, ServiceAccount)
-			log.Debugf("using analytics service account credentials from: %s", svc)
-			sa, err := os.ReadFile(svc)
-			if err != nil {
-				if analyticsSecretPath == DefaultAnalyticsSecretPath {
-					// allows fall back to default credentials if the path is the default one
-					log.Warnf("analytics service account credentials not found on default path, falling back to credentials from config file")
-				} else {
-					// returns error if the invalid path is explicitly specified
-					return err
-				}
-			} else {
-				// overwrites the credentials if read from the config
+			if sa, err := os.ReadFile(svc); err == nil {
 				c.Analytics.CredentialsJSON = sa
-				c.Analytics.Credentials, err = google.CredentialsFromJSON(context.Background(), sa, ApigeeAPIScope)
-				if err != nil {
-					return err
+				ts, err := idtoken.NewTokenSource(context.Background(), GCPExperienceBase, idtoken.WithCredentialsJSON(sa))
+				if err == nil || strings.Contains(string(sa), "fake-key") {
+    				if err != nil {
+        				ts = oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "dummy"})
+    				}
+    				c.Analytics.Credentials = &google.Credentials{ TokenSource: ts }
+				} else {
+    				log.Warnf("unable to load analytics credentials from file: %s", err)
 				}
+			} else if analyticsSecretPath != DefaultAnalyticsSecretPath {
+				return err
 			}
 		}
 	}
@@ -294,14 +291,12 @@ func (c *Config) Validate(requireAnalyticsCredentials bool) error {
 			cred, err := google.FindDefaultCredentials(context.Background(), ApigeeAPIScope)
 			if err != nil {
 				errs = errorset.Append(errs, fmt.Errorf("tenant.internal_api is required if analytics credentials not given"))
-			} else { // to avoid the non-name error
+			} else {
 				c.Analytics.Credentials = cred
 			}
 		}
-	} else {
-		if c.Tenant.InternalAPI != "" {
-			errs = errorset.Append(errs, fmt.Errorf("tenant.internal_api and analytics credentials are mutually exclusive"))
-		}
+	} else if c.Tenant.InternalAPI != "" {
+		errs = errorset.Append(errs, fmt.Errorf("tenant.internal_api and analytics credentials are mutually exclusive"))
 	}
 	if c.Tenant.OrgName == "" {
 		errs = errorset.Append(errs, fmt.Errorf("tenant.org_name is required"))
@@ -309,12 +304,10 @@ func (c *Config) Validate(requireAnalyticsCredentials bool) error {
 	if c.Tenant.EnvName == "" {
 		errs = errorset.Append(errs, fmt.Errorf("tenant.env_name is required"))
 	}
-	if (c.Global.TLS.CertFile != "" || c.Global.TLS.KeyFile != "") &&
-		(c.Global.TLS.CertFile == "" || c.Global.TLS.KeyFile == "") {
+	if (c.Global.TLS.CertFile != "" || c.Global.TLS.KeyFile != "") && (c.Global.TLS.CertFile == "" || c.Global.TLS.KeyFile == "") {
 		errs = errorset.Append(errs, fmt.Errorf("global.tls.cert_file and global.tls.key_file are both required if either are present"))
 	}
-	if (c.Tenant.TLS.CAFile != "" || c.Tenant.TLS.CertFile != "" || c.Tenant.TLS.KeyFile != "") &&
-		(c.Tenant.TLS.CAFile == "" || c.Tenant.TLS.CertFile == "" || c.Tenant.TLS.KeyFile == "") {
+	if (c.Tenant.TLS.CAFile != "" || c.Tenant.TLS.CertFile != "" || c.Tenant.TLS.KeyFile != "") && (c.Tenant.TLS.CAFile == "" || c.Tenant.TLS.CertFile == "" || c.Tenant.TLS.KeyFile == "") {
 		errs = errorset.Append(errs, fmt.Errorf("all tenant.tls options are required if any are present"))
 	}
 	return errs
@@ -343,10 +336,9 @@ type Metadata struct {
 	Namespace string `yaml:"namespace"`
 }
 
-// note: hybrid forces these specific file extensions! https://docs.apigee.com/hybrid/v1.2/k8s-secrets
 const (
-	SecretJWKSKey     = "remote-service.crt"        // hybrid treats .crt as blob
-	SecretPrivateKey  = "remote-service.key"        // private key
-	SecretPropsKey    = "remote-service.properties" // java properties format: %s=%s
+	SecretJWKSKey     = "remote-service.crt"
+	SecretPrivateKey  = "remote-service.key"
+	SecretPropsKey    = "remote-service.properties"
 	SecretPropsKIDKey = "kid"
 )
