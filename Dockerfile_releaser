@@ -18,16 +18,23 @@
 # Runs goreleaser in Boring Crypto Go container in order to allow
 # goreleaser to build a valid Boring Crypto binary
 
-FROM goboring/golang:1.16.7b7
+FROM golang:1.25-bookworm@sha256:7af46e70d2017aef0b4ce2422afbcf39af0511a61993103e948b61011233ec42
 
 ARG GITHUB_TOKEN
 ARG VERSION
 
-RUN go install github.com/goreleaser/goreleaser@v1.6.3
+RUN curl -L https://github.com/goreleaser/goreleaser/releases/download/v2.7.0/goreleaser_Linux_x86_64.tar.gz | tar -xz -C /usr/local/bin/ goreleaser
 
 WORKDIR /app
 ADD . .
 
+# Native FIPS 140-3 environment variables
+ENV CGO_ENABLED=1
+ENV GOFIPS140=latest
+ENV GODEBUG=fips140=on
+
 RUN go mod download
 RUN go mod tidy
-RUN GITHUB_TOKEN=$GITHUB_TOKEN GORELEASER_CURRENT_TAG=$VERSION goreleaser release --rm-dist
+
+RUN GITHUB_TOKEN=$GITHUB_TOKEN 
+GORELEASER_CURRENT_TAG=$VERSION goreleaser release --clean
