@@ -24,7 +24,8 @@ ARG RUN_CONTAINER=gcr.io/distroless/static-debian12@sha256:cd64bec9cec257044ce3a
 FROM ${BUILD_CONTAINER} as builder
 
 ARG CGO_ENABLED=0
-ARG GODEBUG=""  
+ARG GODEBUG="fips140=on" 
+ARG GOFIPS140=latest
 ARG LDFLAGS="-s -w -X main.version=unknown -X main.commit=unknown -X main.date=unknown"
 ARG GO_TAGS="netgo,osusergo" # Tags for static build
 
@@ -39,8 +40,12 @@ ADD . .
 RUN go mod download
 
 # Build the application.
-RUN echo "Building with: CGO_ENABLED=${CGO_ENABLED} GODEBUG=${GODEBUG} GO_TAGS='${GO_TAGS}'"
-RUN GOTOOLCHAIN=local GOOS=linux GOARCH=amd64 CGO_ENABLED=${CGO_ENABLED} GODEBUG=${GODEBUG} go build -a \
+RUN echo "Building with: CGO_ENABLED=${CGO_ENABLED} GODEBUG=${GODEBUG} GOFIPS140=${GOFIPS140} GO_TAGS='${GO_TAGS}'"
+RUN GOTOOLCHAIN=local GOOS=linux GOARCH=amd64 \
+  CGO_ENABLED=${CGO_ENABLED} \
+  GODEBUG=${GODEBUG} \
+  GOFIPS140=${GOFIPS140} \
+  go build -a \
   -tags="${GO_TAGS}" \
   -ldflags "${LDFLAGS}" \
   -o apigee-remote-service-envoy .
@@ -57,7 +62,9 @@ FROM ${RUN_CONTAINER}
 
 # Copy certs, app, and user
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
-COPY --from=builder /app/apigee-remote-service-envoy .
+
+ENV GODEBUG=fips140=on
+COPY --from=builder /app/apigee-remote-service-envoy /apigee-remote-service-envoy
 COPY --from=builder /etc/passwd /etc/group /etc/shadow /etc/
 USER apigee
 
@@ -65,4 +72,3 @@ EXPOSE 5000/tcp 5001/tcp
 
 # Run entrypoint.
 ENTRYPOINT ["/apigee-remote-service-envoy"]
-

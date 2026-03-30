@@ -161,9 +161,9 @@ jobs:
           tags: ${{ steps.prep.outputs.tags }}
           build-args: |
             BUILD_CONTAINER=golang:1.25-bookworm@sha256:7af46e70d2017aef0b4ce2422afbcf39af0511a61993103e948b61011233ec42
-            RUN_CONTAINER=gcr.io/distroless/base-nossl-debian12@sha256:c0d97a3f0d6ad7d75c6494e3d6da54f09a961b80d755f0a09c7328f5a8edee5e
+            RUN_CONTAINER=gcr.io/distroless/base-debian12@sha256:1f144c77a9ecaaa132fc3037b4417d9f9fd0b7a50101c696af5cb186876aa2a3
             CGO_ENABLED=1
+            GOFIPS140=latest
             GODEBUG=fips140=on
             GO_TAGS=""
             LDFLAGS=-s -w -X main.version=${{ steps.prep.outputs.version }} -X main.commit=${{ github.SHA }} -X main.date=${{ steps.prep.outputs.created }}
-

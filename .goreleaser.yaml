@@ -23,6 +23,7 @@ builds:
       - amd64
     env:
       - CGO_ENABLED=0
+
   - id: goboring
     main: main.go
     goos:
@@ -31,22 +32,28 @@ builds:
       - amd64
     env:
       - CGO_ENABLED=1
+      - GOFIPS140=latest
+      - GODEBUG=fips140=on
 
 archives:
   - id: default
     format: tar.gz
-    replacements:
-      darwin: macOS
-      amd64: 64-bit
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- if eq .Os "darwin" }}macOS{{ else }}{{ .Os | title }}{{ end }}_
+      {{- if eq .Arch "amd64" }}64-bit{{ else }}{{ .Arch }}{{ end }}
     files:
       - LICENSE
       - README.md
     builds:
       - default
+
   - id: goboring
     format: tar.gz
-    replacements:
-      amd64: 64-bit_goboring
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Os | title }}_
+      {{- if eq .Arch "amd64" }}64-bit_goboring{{ else }}{{ .Arch }}{{ end }}
     files:
       - LICENSE
       - README.md
