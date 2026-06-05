@@ -170,6 +170,7 @@ func (c *Config) Load(configFile, policySecretPath, analyticsSecretPath string, 
 	if err != nil {
 		return err
 	}
+	yamlFile = []byte(os.ExpandEnv(string(yamlFile)))
 
 	var key, kidProps, jwksBytes []byte
 	var configBytes []byte

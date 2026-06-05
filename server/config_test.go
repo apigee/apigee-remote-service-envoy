@@ -772,6 +772,51 @@ data:
 	_ = c.Load(tf.Name(), "", "", false)
 }
 
+func TestLoadConfigWithEnvVariables(t *testing.T) {
+	os.Setenv("TENANT_KEY", "env-key-value")
+	os.Setenv("TENANT_SECRET", "env-secret-value")
+	defer func() {
+		os.Unsetenv("TENANT_KEY")
+		os.Unsetenv("TENANT_SECRET")
+	}()
+
+	tf, err := os.CreateTemp("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Remove(tf.Name()) }()
+
+	const config = `
+tenant:
+  internal_api: https://istioservices.apigee.net/edgemicro
+  remote_service_api: https://org-test.apigee.net/remote-service
+  org_name: org
+  env_name: env
+  key: ${TENANT_KEY}
+  secret: ${TENANT_SECRET}`
+
+	configCRD := makeConfigCRD(config)
+	configMapYAML, err := makeYAML(configCRD)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := tf.WriteString(configMapYAML); err != nil {
+		t.Fatal(err)
+	}
+	if err := tf.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	c := DefaultConfig()
+	if err := c.Load(tf.Name(), "", "", false); err != nil {
+		t.Fatal(err)
+	}
+
+	equal(t, c.Tenant.Key, "env-key-value")
+	equal(t, c.Tenant.Secret, "env-secret-value")
+}
+
 func fakeServiceAccount() []byte {
 	
 	beginKey := "-----BEGIN " + "PRIVATE KEY-----"
