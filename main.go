@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"syscall"
 	"time"
 
@@ -34,10 +35,12 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/keepalive"
+	"google.golang.org/grpc/status"
 )
 
 const (
@@ -132,8 +135,8 @@ func serve(config *server.Config) {
 		grpc.KeepaliveParams(keepalive.ServerParameters{
 			MaxConnectionAge: config.Global.KeepAliveMaxConnectionAge,
 		}),
-		grpc.StreamInterceptor(grpc_prometheus.StreamServerInterceptor),
-		grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor),
+		grpc.ChainStreamInterceptor(grpc_prometheus.StreamServerInterceptor, recoveryStreamInterceptor),
+		grpc.ChainUnaryInterceptor(grpc_prometheus.UnaryServerInterceptor, recoveryUnaryInterceptor),
 	}
 
 	if config.Global.TLS.CertFile != "" {
@@ -230,4 +233,24 @@ func serve(config *server.Config) {
 		log.Infof("shutdown complete")
 		os.Exit(0)
 	}()
+}
+
+func recoveryUnaryInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("panic recovered in unary gRPC handler %s: %v\n%s", info.FullMethod, r, debug.Stack())
+			err = status.Errorf(codes.Internal, "internal server error")
+		}
+	}()
+	return handler(ctx, req)
+}
+
+func recoveryStreamInterceptor(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("panic recovered in stream gRPC handler %s: %v\n%s", info.FullMethod, r, debug.Stack())
+			err = status.Errorf(codes.Internal, "internal server error")
+		}
+	}()
+	return handler(srv, ss)
 }

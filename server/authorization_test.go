@@ -455,6 +455,55 @@ func TestImmediateAnalytics(t *testing.T) {
 	}
 }
 
+func TestCheck_MalformedRequest(t *testing.T) {
+	server := AuthorizationServer{}
+	testCases := []struct {
+		name string
+		req  *v3.CheckRequest
+	}{
+		{
+			name: "nil request",
+			req:  nil,
+		},
+		{
+			name: "missing attributes",
+			req:  &v3.CheckRequest{},
+		},
+		{
+			name: "missing request context",
+			req: &v3.CheckRequest{
+				Attributes: &v3.AttributeContext{},
+			},
+		},
+		{
+			name: "missing http request",
+			req: &v3.CheckRequest{
+				Attributes: &v3.AttributeContext{
+					Request: &v3.AttributeContext_Request{},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			resp, err := server.Check(context.Background(), tc.req)
+			if err != nil {
+				t.Fatalf("expected nil error, got: %v", err)
+			}
+			if resp == nil || resp.Status == nil {
+				t.Fatalf("expected non-nil response and status, got: %v", resp)
+			}
+			if resp.Status.Code != int32(rpc.INVALID_ARGUMENT) {
+				t.Errorf("got status code %d, want %d", resp.Status.Code, int32(rpc.INVALID_ARGUMENT))
+			}
+			if resp.Status.Message != "CheckRequest missing required attributes" {
+				t.Errorf("got status message %q, want %q", resp.Status.Message, "CheckRequest missing required attributes")
+			}
+		})
+	}
+}
+
 type testAuthMan struct {
 	ctx             apigeeContext.Context
 	apiKey          string
