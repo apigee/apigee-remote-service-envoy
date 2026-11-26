@@ -55,6 +55,16 @@ func (a *AuthorizationServer) Register(s *grpc.Server, handler *Handler) {
 // Check does check
 func (a *AuthorizationServer) Check(ctx gocontext.Context, req *envoy_auth.CheckRequest) (*envoy_auth.CheckResponse, error) {
 
+	if req.GetAttributes().GetRequest().GetHttp() == nil {
+		log.Debugf("rejecting malformed CheckRequest: missing attributes.request.http")
+		return &envoy_auth.CheckResponse{
+			Status: &rpcstatus.Status{
+				Code:    int32(rpc.INVALID_ARGUMENT),
+				Message: "CheckRequest missing required attributes",
+			},
+		}, nil
+	}
+
 	var rootContext context.Context = a.handler
 	var err error
 	envFromEnvoy, envFromEnvoyExists := req.Attributes.ContextExtensions[envContextKey]
